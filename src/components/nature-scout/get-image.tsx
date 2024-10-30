@@ -34,6 +34,7 @@ export function GetImage({ imageTitle, anweisung, onBildUpload }: GetImageProps)
 
       const data = await uploadResponse.json();
       const imageUrl = `/api/images/${data.filename}`;
+      console.log(imageUrl);
       setUploadedImage(imageUrl);
       onBildUpload(imageTitle, data.filename, "");
     } catch (error) {
