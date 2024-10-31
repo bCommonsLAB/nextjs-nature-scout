@@ -1,6 +1,7 @@
 export interface Bild {
   imageKey: string;
   filename: string;
+  url: string;
   analyse: string;
 }
 

@@ -19,7 +19,7 @@ export function UploadedImageList({ bilder }: UploadedImageListProps) {
           {bilder.map((bild) => (
             <div key={bild.imageKey} className="border rounded-lg p-4">
               <Image 
-                src={`/api/images/${bild.filename}`}
+                src={`${bild.url}`}
                 alt={`Bild ${bild.imageKey}`} 
                 className="w-full h-48 object-cover rounded" 
                 width={200} 

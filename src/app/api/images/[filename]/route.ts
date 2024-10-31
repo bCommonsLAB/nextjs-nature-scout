@@ -1,46 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { ImageStorage } from '@/lib/services/image-storage';
-import { config } from '@/lib/config';
+import { NextRequest } from 'next/server';
+import { AzureStorageService } from '@/lib/services/azure-storage-service';
 
-const imageStorage = ImageStorage.getInstance({
-  storageType: config.STORAGE.type,
-  uploadDir: config.STORAGE.uploadDir,
-  azureConfig: config.STORAGE.azure
-});
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ filename: string }> }
+) {
+  try {
+    const { filename } = await context.params;
+    console.log("📸 Bildanfrage für:", filename);
+    
+    const decodedFilename = decodeURIComponent(filename);
+    const azureStorage = new AzureStorageService();
+    const buffer = await azureStorage.getImage(decodedFilename);
 
-export async function GET(request: NextRequest) {
-  const filename = request.nextUrl.pathname.split('/').pop();
-  if (!filename) {
-    return NextResponse.json(
-      { error: 'Kein Dateiname angegeben' },
-      { status: 400 }
-    );
+    if (!buffer) {
+      console.error("❌ Bild nicht gefunden:", decodedFilename);
+      return new Response('Bild nicht gefunden', { status: 404 });
+    }
+
+    return new Response(buffer, {
+      headers: {
+        'Content-Type': 'image/jpeg',
+        'Cache-Control': 'public, max-age=31536000',
+      },
+    });
+  } catch (error) {
+    console.error("❌ Fehler beim Laden des Bildes:", error);
+    return new Response('Fehler beim Laden des Bildes', { status: 500 });
   }
-
-  console.log('Versuche Bild zu laden:', {
-    filename,
-    storageType: config.STORAGE.type,
-    uploadDir: config.STORAGE.uploadDir
-  });
-
-  const decodedFilename = decodeURIComponent(filename);
-  const buffer = await imageStorage.getImage(decodedFilename);
-
-  if (!buffer) {
-    return NextResponse.json(
-      { error: 'Bild nicht gefunden' },
-      { status: 404 }
-    );
-  }
-
-  const contentType = decodedFilename.toLowerCase().endsWith('.png')
-    ? 'image/png'
-    : 'image/jpeg';
-
-  return new Response(buffer, {
-    headers: {
-      'Content-Type': contentType,
-      'Cache-Control': 'public, max-age=31536000',
-    },
-  });
 } 

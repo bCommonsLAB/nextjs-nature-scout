@@ -1,53 +1,38 @@
-import { BlobServiceClient, ContainerClient } from '@azure/storage-blob';
-
-interface AzureStorageConfig {
-  connectionString: string;
-  containerName: string;
-}
+import { BlobServiceClient } from '@azure/storage-blob';
+import { config } from '../config';
 
 export class AzureStorageService {
-  private containerClient: ContainerClient;
+  private blobServiceClient: BlobServiceClient;
+  private containerName: string;
+  private uploadDir: string;
+  private baseUrl: string;
 
-  constructor(config: AzureStorageConfig) {
-    const blobServiceClient = BlobServiceClient.fromConnectionString(config.connectionString);
-    this.containerClient = blobServiceClient.getContainerClient(config.containerName);
+  constructor() {
+    const { connectionString, containerName, uploadDir, baseUrl } = config.STORAGE;
+    
+    if (!connectionString) {
+      throw new Error('AZURE_STORAGE_CONNECTION_STRING ist nicht definiert');
+    }
+
+    this.containerName = containerName;
+    this.uploadDir = uploadDir;
+    this.blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
+    this.baseUrl = baseUrl || '';
   }
 
   async uploadImage(filename: string, buffer: Buffer): Promise<string> {
-    const blockBlobClient = this.containerClient.getBlockBlobClient(filename);
+    const blobPath = `${this.uploadDir}/${filename}`;
+    const containerClient = this.blobServiceClient.getContainerClient(this.containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(blobPath);
     
     await blockBlobClient.upload(buffer, buffer.length, {
-      blobHTTPHeaders: {
-        blobContentType: this.getContentType(filename)
-      }
+      blobHTTPHeaders: { blobContentType: 'image/jpeg' }
     });
-
-    return blockBlobClient.url;
+    
+    return `${this.baseUrl}/${blobPath}`;
   }
 
-  async getImage(filename: string): Promise<Buffer | null> {
-    try {
-      const blockBlobClient = this.containerClient.getBlockBlobClient(filename);
-      const downloadResponse = await blockBlobClient.download(0);
-      
-      if (!downloadResponse.readableStreamBody) {
-        return null;
-      }
-
-      // Stream in Buffer umwandeln
-      const chunks: Buffer[] = [];
-      for await (const chunk of downloadResponse.readableStreamBody) {
-        chunks.push(Buffer.from(chunk));
-      }
-      
-      return Buffer.concat(chunks);
-    } catch (error) {
-      console.error('Fehler beim Abrufen des Bildes:', error);
-      return null;
-    }
+  getImageUrl(filename: string): string {
+    return `${this.baseUrl}/${this.uploadDir}/${filename}`;
   }
-
-  private getContentType(filename: string): string {
-    return filename.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
-  }
-} 
+}

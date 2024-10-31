@@ -8,7 +8,7 @@ const openai = new OpenAI({
     apiKey: config.OPENAI_API_KEY
 });
 
-export async function analyzeImageStructured(imageBase64: string[]): Promise<ImageAnalysisResult> {
+export async function analyzeImageStructured(imageUrls: string[]): Promise<ImageAnalysisResult> {
     const zSchema = z.object({
         "analyses": z.array(z.object({
             "Pflanzen-Arten": z.array(z.string()),
@@ -22,9 +22,18 @@ export async function analyzeImageStructured(imageBase64: string[]): Promise<Ima
             "Wahrscheinlichkeit": z.number()
         }))
     });
+    console.log("analyzeImageStructured");
+    console.log(imageUrls);
 
     try {
-        const imageContents = imageBase64.map(base64 => ({
+        
+        const imageBase64Contents = await Promise.all(
+            imageUrls.map(async (url) => {
+                return url;
+            })
+        );
+
+        const imageContents = imageBase64Contents.map(base64 => ({
             type: "image_url" as const,
             image_url: {
                 url: `data:image/jpeg;base64,${base64}`,
@@ -33,7 +42,7 @@ export async function analyzeImageStructured(imageBase64: string[]): Promise<Ima
         }));
 
         const completion = await openai.chat.completions.create({
-            model: "gpt-4-vision-preview",
+            model: config.OPENAI_VISION_MODEL,
             messages: [
                 { 
                     role: "system", 

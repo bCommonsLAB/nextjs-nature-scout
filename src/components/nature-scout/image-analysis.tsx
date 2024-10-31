@@ -23,7 +23,7 @@ export function ImageAnalysis({ bilder, onAnalysisComplete }: ImageAnalysisProps
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          images: bilder.map(bild => bild.filename)
+          images: bilder.map(bild => bild.url)
         }),
       });
       

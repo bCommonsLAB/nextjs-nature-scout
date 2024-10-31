@@ -1,52 +1,30 @@
-import { type NextRequest } from 'next/server';
-import { ImageStorage } from '@/lib/services/image-storage';
-import { config } from '@/lib/config';
-
-function sanitizeFilename(filename: string): string {
-  return filename
-    .replace(/[^a-zA-Z0-9.-]/g, '-')
-    .replace(/--+/g, '-');
-}
-
-const imageStorage = ImageStorage.getInstance({
-  storageType: config.STORAGE.type,
-  uploadDir: config.STORAGE.uploadDir,
-  azureConfig: config.STORAGE.azure
-});
+import { NextRequest } from 'next/server';
+import { AzureStorageService } from '@/lib/services/azure-storage-service';
 
 export async function POST(request: NextRequest) {
-    try {
-        console.log('Upload-Konfiguration:', {
-            storageType: config.STORAGE.type,
-            uploadDir: config.STORAGE.uploadDir
-        });
-
-        const formData = await request.formData();
-        const file = formData.get('image') as File;
-        
-        if (!file) {
-            return Response.json(
-                { error: 'Kein Bild hochgeladen.' },
-                { status: 400 }
-            );
-        }
-
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-        const sanitizedFilename = sanitizeFilename(`${Date.now()}-${file.name}`);
-
-        await imageStorage.saveImage(sanitizedFilename, buffer);
-
-        return Response.json({ 
-            success: true, 
-            filename: sanitizedFilename 
-        });
-
-    } catch (error) {
-        console.error('Fehler beim Upload:', error);
-        return Response.json(
-            { error: 'Fehler beim Bildupload' },
-            { status: 500 }
-        );
+  try {
+    const formData = await request.formData();
+    const file = formData.get('image') as File;
+    
+    if (!file) {
+      return new Response('Keine Datei gefunden', { status: 400 });
     }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const timestamp = Date.now();
+    const filename = `${timestamp}-${file.name}`;
+
+    const azureStorage = new AzureStorageService();
+    const url = await azureStorage.uploadImage(filename, buffer);
+
+    return Response.json({ 
+      filename,
+      url,
+      success: true 
+    });
+
+  } catch (error) {
+    console.error('Fehler beim Upload:', error);
+    return new Response('Upload fehlgeschlagen', { status: 500 });
+  }
 } 

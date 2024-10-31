@@ -24,10 +24,11 @@ export function NatureScout() {
   const [bilder, setBilder] = useState<Bild[]>([]);
   const [bewertung] = useState(0);
 
-  const handleBildUpload = (imageKey: string, filename: string, analysis: string) => {
+  const handleBildUpload = (imageKey: string, filename: string, url: string, analysis: string) => {
     const neuesBild: Bild = {
       imageKey,
       filename,
+      url,
       analyse: analysis 
     };
     setBilder(prev => [...prev, neuesBild]);
