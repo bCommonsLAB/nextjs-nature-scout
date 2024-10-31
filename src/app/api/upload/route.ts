@@ -10,12 +10,17 @@ function sanitizeFilename(filename: string): string {
 
 const imageStorage = ImageStorage.getInstance({
   storageType: config.STORAGE.type,
-  azureConfig: config.STORAGE.azure,
-  uploadDir: config.STORAGE.filesystem?.uploadDir
+  uploadDir: config.STORAGE.uploadDir,
+  azureConfig: config.STORAGE.azure
 });
 
 export async function POST(request: NextRequest) {
     try {
+        console.log('Upload-Konfiguration:', {
+            storageType: config.STORAGE.type,
+            uploadDir: config.STORAGE.uploadDir
+        });
+
         const formData = await request.formData();
         const file = formData.get('image') as File;
         

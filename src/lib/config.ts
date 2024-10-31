@@ -4,12 +4,10 @@ interface Config {
     OPENAI_API_KEY: string;
     STORAGE: {
         type: 'filesystem' | 'azure';
+        uploadDir: string;
         azure?: {
             connectionString: string;
             containerName: string;
-        };
-        filesystem?: {
-            uploadDir: string;
         };
     };
 }
@@ -20,12 +18,10 @@ export const config: Config = {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
     STORAGE: {
         type: (process.env.STORAGE_TYPE as 'filesystem' | 'azure') || 'filesystem',
+        uploadDir: process.env.UPLOAD_DIR || 'uploads',
         azure: process.env.STORAGE_TYPE === 'azure' ? {
             connectionString: process.env.AZURE_STORAGE_CONNECTION_STRING || '',
             containerName: process.env.AZURE_STORAGE_CONTAINER_NAME || 'images',
-        } : undefined,
-        filesystem: process.env.STORAGE_TYPE === 'filesystem' ? {
-            uploadDir: process.env.UPLOAD_DIR || join(process.cwd(), 'uploads'),
         } : undefined,
     }
 };
