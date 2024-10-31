@@ -1,6 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
+import { type NextRequest } from 'next/server';
+import { ImageStorage } from '@/lib/services/image-storage';
+import { config } from '@/lib/config';
+
+function sanitizeFilename(filename: string): string {
+  return filename
+    .replace(/[^a-zA-Z0-9.-]/g, '-')
+    .replace(/--+/g, '-');
+}
+
+const imageStorage = ImageStorage.getInstance({
+  storageType: config.STORAGE.type,
+  azureConfig: config.STORAGE.azure,
+  uploadDir: config.STORAGE.filesystem?.uploadDir
+});
 
 export async function POST(request: NextRequest) {
     try {
@@ -8,7 +20,7 @@ export async function POST(request: NextRequest) {
         const file = formData.get('image') as File;
         
         if (!file) {
-            return NextResponse.json(
+            return Response.json(
                 { error: 'Kein Bild hochgeladen.' },
                 { status: 400 }
             );
@@ -16,22 +28,18 @@ export async function POST(request: NextRequest) {
 
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
+        const sanitizedFilename = sanitizeFilename(`${Date.now()}-${file.name}`);
 
-        // Stellen Sie sicher, dass das Verzeichnis existiert
-        const uploadDir = join(process.cwd(), 'uploads');
-        const filename = `${Date.now()}-${file.name}`;
-        const filepath = join(uploadDir, filename);
+        await imageStorage.saveImage(sanitizedFilename, buffer);
 
-        await writeFile(filepath, buffer);
-
-        return NextResponse.json({ 
+        return Response.json({ 
             success: true, 
-            filename 
+            filename: sanitizedFilename 
         });
 
     } catch (error) {
         console.error('Fehler beim Upload:', error);
-        return NextResponse.json(
+        return Response.json(
             { error: 'Fehler beim Bildupload' },
             { status: 500 }
         );
