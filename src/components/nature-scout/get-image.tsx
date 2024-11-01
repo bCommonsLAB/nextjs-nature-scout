@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import { Upload } from "lucide-react";
 import { Progress } from "../ui/progress";
-//import { AzureStorageService } from "@/lib/services/azure-storage-service";
+import { publicConfig } from '@/lib/config';
+
+const { maxWidth: MAX_WIDTH, maxHeight: MAX_HEIGHT, quality: IMAGE_QUALITY } = publicConfig.imageSettings;
 
 interface GetImageProps {
   imageTitle: string;
@@ -15,6 +17,7 @@ export function GetImage({ imageTitle, anweisung, onBildUpload }: GetImageProps)
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [backgroundImageStyle, setBackgroundImageStyle] = useState<React.CSSProperties>({});
 
   const compressImage = async (file: File): Promise<Blob> => {
     console.log("compressImage");
@@ -28,11 +31,14 @@ export function GetImage({ imageTitle, anweisung, onBildUpload }: GetImageProps)
         
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 2000;
-          const MAX_HEIGHT = 2000;
           
           let width = img.width;
           let height = img.height;
+          console.log("width", width);
+          console.log("height", height);
+
+          console.log("MAX_WIDTH", MAX_WIDTH);
+          console.log("MAX_HEIGHT", MAX_HEIGHT);
           
           // Berechne neue Dimensionen
           if (width > height) {
@@ -63,7 +69,7 @@ export function GetImage({ imageTitle, anweisung, onBildUpload }: GetImageProps)
               }
             },
             'image/jpeg',
-            0.8  // Qualität (0.7 = 70%)
+            IMAGE_QUALITY  // Qualität (0.7 = 70%)
           );
         };
       };
@@ -83,7 +89,8 @@ export function GetImage({ imageTitle, anweisung, onBildUpload }: GetImageProps)
       const compressedBlob = await compressImage(file);
       console.log("✅ Bild komprimiert");
 
-      const compressedFile = new File([compressedBlob], file.name, {
+      const newFileName = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+      const compressedFile = new File([compressedBlob], newFileName, {
         type: 'image/jpeg',
       });
 
@@ -117,10 +124,14 @@ export function GetImage({ imageTitle, anweisung, onBildUpload }: GetImageProps)
   // Nach dem Upload können wir testen, ob das Bild ladbar ist
   useEffect(() => {
     if (uploadedImage) {
-      const img = new Image();
-      img.onload = () => console.log("✅ Bild erfolgreich geladen");
-      img.onerror = (e) => console.error("❌ Fehler beim Laden des Bildes:", e);
-      img.src = uploadedImage;
+      setBackgroundImageStyle({
+        backgroundImage: `url("${uploadedImage}")`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        opacity: 1
+      });
+    } else {
+      setBackgroundImageStyle({});
     }
   }, [uploadedImage]);
 
@@ -131,11 +142,7 @@ export function GetImage({ imageTitle, anweisung, onBildUpload }: GetImageProps)
       
       <div 
         className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-100 hover:bg-gray-200" 
-        style={{ 
-          backgroundImage: uploadedImage ? `url(${uploadedImage})` : "none", 
-          backgroundSize: "cover", 
-          backgroundPosition: "center" 
-        }}
+        style={backgroundImageStyle}
         onLoad={() => console.log("🎨 Hintergrundbild geladen:", uploadedImage)}
       >
         <label htmlFor={`dropzone-file-${imageTitle}`} className="flex flex-col items-center justify-center w-full h-full">

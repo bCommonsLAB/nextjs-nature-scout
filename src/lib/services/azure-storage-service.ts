@@ -1,29 +1,32 @@
 import { BlobServiceClient } from '@azure/storage-blob';
-import { config } from '../config';
+import { serverConfig } from '../config';
 
 export class AzureStorageService {
   private blobServiceClient: BlobServiceClient;
-  private containerName: string;
+  private containerClient;
   private uploadDir: string;
   private baseUrl: string;
 
   constructor() {
-    const { connectionString, containerName, uploadDir, baseUrl } = config.STORAGE;
-    
-    if (!connectionString) {
-      throw new Error('AZURE_STORAGE_CONNECTION_STRING ist nicht definiert');
+    if (!serverConfig.STORAGE.connectionString) {
+      throw new Error('Azure Storage connection string ist nicht konfiguriert');
     }
 
-    this.containerName = containerName;
-    this.uploadDir = uploadDir;
-    this.blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
-    this.baseUrl = baseUrl || '';
+    this.blobServiceClient = BlobServiceClient.fromConnectionString(
+      serverConfig.STORAGE.connectionString
+    );
+    
+    this.containerClient = this.blobServiceClient.getContainerClient(
+      serverConfig.STORAGE.containerName
+    );
+    
+    this.uploadDir = serverConfig.STORAGE.uploadDir;
+    this.baseUrl = serverConfig.STORAGE.baseUrl || '';
   }
 
   async uploadImage(filename: string, buffer: Buffer): Promise<string> {
     const blobPath = `${this.uploadDir}/${filename}`;
-    const containerClient = this.blobServiceClient.getContainerClient(this.containerName);
-    const blockBlobClient = containerClient.getBlockBlobClient(blobPath);
+    const blockBlobClient = this.containerClient.getBlockBlobClient(blobPath);
     
     await blockBlobClient.upload(buffer, buffer.length, {
       blobHTTPHeaders: { blobContentType: 'image/jpeg' }
