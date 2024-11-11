@@ -1,16 +1,7 @@
 import { analyzeImageStructured } from '@/lib/services/openai-service';
 import { NextRequest, NextResponse } from 'next/server';
 
-interface RouteContext {
-    params: {
-      jobId: string;
-    };
-  }
-
-  export async function GET(
-    request: NextRequest,
-    context: RouteContext
-  ) {
+  export async function GET(request: NextRequest,context: any) {
   try {
     const { jobId } = context.params;
     console.log('jobId', jobId);
