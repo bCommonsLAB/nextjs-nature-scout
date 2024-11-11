@@ -18,6 +18,9 @@ export function ImageAnalysis({ bilder, analyseErgebnis, onAnalysisComplete }: I
 
   const handleAnalyzeClick = async () => {
     setIsAnalyzing(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 Sekunden
+
     try {
       const response = await fetch('/api/analyze', {
         method: "POST",
@@ -28,8 +31,7 @@ export function ImageAnalysis({ bilder, analyseErgebnis, onAnalysisComplete }: I
           images: bilder.map(bild => bild.url),
           kommentar
         }),
-        // Erhöhen Sie auch das Client-Timeout
-        signal: AbortSignal.timeout(60000) // 60 Sekunden
+        signal: controller.signal
       });
       
       if (!response.ok) {
@@ -49,6 +51,7 @@ export function ImageAnalysis({ bilder, analyseErgebnis, onAnalysisComplete }: I
     } catch (error) {
       console.error("Fehler bei der Analyse:", error);
     } finally {
+      clearTimeout(timeoutId);
       setIsAnalyzing(false);
     }
   };
