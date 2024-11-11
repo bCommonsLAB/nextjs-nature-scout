@@ -28,6 +28,8 @@ export function ImageAnalysis({ bilder, analyseErgebnis, onAnalysisComplete }: I
           images: bilder.map(bild => bild.url),
           kommentar
         }),
+        // Erhöhen Sie auch das Client-Timeout
+        signal: AbortSignal.timeout(60000) // 60 Sekunden
       });
       
       if (!response.ok) {

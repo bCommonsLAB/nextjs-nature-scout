@@ -1,7 +1,0 @@
-{
-    "functions": {
-      "api/analyze": {
-        "maxDuration": 60
-      }
-    }
-  }
