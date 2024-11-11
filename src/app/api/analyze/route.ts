@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { images } = await request.json();
+    const { images, kommentar } = await request.json();
 
     if (!images || !Array.isArray(images)) {
       return NextResponse.json(
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const analysisResult = await analyzeImageStructured(images);
+    const analysisResult = await analyzeImageStructured(images, kommentar);
     return NextResponse.json(analysisResult);
   } catch (error) {
     console.error('Fehler bei der Bildanalyse:', error);

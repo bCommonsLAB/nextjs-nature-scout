@@ -4,20 +4,37 @@ import { useState, useEffect } from "react";
 import { Upload } from "lucide-react";
 import { Progress } from "../ui/progress";
 import { publicConfig } from '@/lib/config';
+import { GetImageProps } from "@/types/types";
 
 const { maxWidth: MAX_WIDTH, maxHeight: MAX_HEIGHT, quality: IMAGE_QUALITY } = publicConfig.imageSettings;
 
-interface GetImageProps {
-  imageTitle: string;
-  anweisung: string;
-  onBildUpload: (imageTitle: string, filename: string, url: string, analysis: string) => void;
-}
 
-export function GetImage({ imageTitle, anweisung, onBildUpload }: GetImageProps) {
+export function GetImage({ imageTitle, anweisung, onBildUpload, existingImage }: GetImageProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [backgroundImageStyle, setBackgroundImageStyle] = useState<React.CSSProperties>({});
+  const [uploadedImage, setUploadedImage] = useState<string | null>(existingImage?.url || null);
+  const [backgroundImageStyle, setBackgroundImageStyle] = useState<React.CSSProperties>(
+    existingImage?.url ? {
+      backgroundImage: `url("${existingImage.url}")`,
+      backgroundSize: 'contain',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      opacity: 1
+    } : {}
+  );
+
+  useEffect(() => {
+    if (existingImage?.url) {
+      setUploadedImage(existingImage.url);
+      setBackgroundImageStyle({
+        backgroundImage: `url("${existingImage.url}")`,
+        backgroundSize: 'contain',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        opacity: 1
+      });
+    }
+  }, [existingImage]);
 
   const compressImage = async (file: File): Promise<Blob> => {
     console.log("compressImage");
@@ -110,6 +127,12 @@ export function GetImage({ imageTitle, anweisung, onBildUpload }: GetImageProps)
       console.log("📸 Bild hochgeladen, URL:", data.url);
       
       setUploadedImage(data.url);
+      setBackgroundImageStyle({
+        backgroundImage: `url("${data.url}?${Date.now()}")`,
+        backgroundSize: 'contain',
+        backgroundPosition: 'center',
+        opacity: 1
+      });
       onBildUpload(imageTitle, data.filename, data.url, "");
       setUploadProgress(100);
       
@@ -120,20 +143,6 @@ export function GetImage({ imageTitle, anweisung, onBildUpload }: GetImageProps)
       console.log("🏁 Upload-Prozess abgeschlossen");
     }
   };
-
-  // Nach dem Upload können wir testen, ob das Bild ladbar ist
-  useEffect(() => {
-    if (uploadedImage) {
-      setBackgroundImageStyle({
-        backgroundImage: `url("${uploadedImage}")`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        opacity: 1
-      });
-    } else {
-      setBackgroundImageStyle({});
-    }
-  }, [uploadedImage]);
 
   return (
     <div className="flex flex-col items-center justify-start w-64 min-h-64 border-2 border-gray-300 rounded-lg bg-gray-50 p-4 space-y-2">

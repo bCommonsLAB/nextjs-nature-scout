@@ -21,11 +21,11 @@ export function UploadedImageList({ bilder }: UploadedImageListProps) {
               <Image 
                 src={`${bild.url}`}
                 alt={`Bild ${bild.imageKey}`} 
-                className="w-full h-48 object-cover rounded" 
+                className="w-full h-48 object-contain rounded bg-gray-50" 
                 width={200} 
                 height={200} 
               />
-              <p className="mt-2 text-sm text-gray-600">{bild.filename}</p>
+              <p className="mt-2 text-sm text-gray-600">{bild.imageKey.replace("_", " ")}</p>
             </div>
           ))}
         </div>

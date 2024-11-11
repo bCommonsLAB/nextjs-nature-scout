@@ -30,7 +30,10 @@ async function urlToBase64(url: string): Promise<string> {
   }
 }
 
-export async function analyzeImageStructured(imageUrls: string[]): Promise<ImageAnalysisResult> {
+export async function analyzeImageStructured(
+  imageUrls: string[], 
+  kommentar?: string
+): Promise<ImageAnalysisResult> {
     /*
     const zSchema = z.object({
         "analyses": z.array(z.object({
@@ -123,7 +126,10 @@ export async function analyzeImageStructured(imageUrls: string[]): Promise<Image
             "dagegenSpricht": z.array(z.string())
               .describe("Merkmale, die gegen die Klassifizierung sprechen")
           }),
-        }))
+          "zusammenfassung": z.string()
+              .describe("Wie könnte man das Habitat und die Einschätzung des Schutzstatus zusammenfassen?")
+        })
+        )
     });
 
     try {
@@ -176,7 +182,7 @@ export async function analyzeImageStructured(imageUrls: string[]): Promise<Image
                     content: [
                         { 
                             type: "text", 
-                            text: Question
+                            text: kommentar ? `${Question}\n\nZusätzliche Hinweis: ${kommentar}` : Question
                         },
                         ...imageContents
                     ],

@@ -4,15 +4,17 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bild, AnalyseErgebnis } from "@/types/nature-scout";
+import { Textarea } from "@/components/ui/textarea";
 
 interface ImageAnalysisProps {
   bilder: Bild[];
-  onAnalysisComplete: (analysedBilder: Bild[]) => void;
+  analyseErgebnis: AnalyseErgebnis | null;
+  onAnalysisComplete: (analysedBilder: Bild[], ergebnis: AnalyseErgebnis) => void;
 }
 
-export function ImageAnalysis({ bilder, onAnalysisComplete }: ImageAnalysisProps) {
+export function ImageAnalysis({ bilder, analyseErgebnis, onAnalysisComplete }: ImageAnalysisProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analyseErgebnis, setAnalyseErgebnis] = useState<AnalyseErgebnis | null>(null);
+  const [kommentar, setKommentar] = useState("");
 
   const handleAnalyzeClick = async () => {
     setIsAnalyzing(true);
@@ -23,7 +25,8 @@ export function ImageAnalysis({ bilder, onAnalysisComplete }: ImageAnalysisProps
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          images: bilder.map(bild => bild.url)
+          images: bilder.map(bild => bild.url),
+          kommentar
         }),
       });
       
@@ -33,13 +36,13 @@ export function ImageAnalysis({ bilder, onAnalysisComplete }: ImageAnalysisProps
       
       const data = await response.json();
       const parsedAnalysis = JSON.parse(data.analysis);
-      setAnalyseErgebnis(parsedAnalysis);
       
       const updatedBilder = bilder.map(bild => ({
         ...bild,
-        analyse: JSON.stringify(parsedAnalysis)
+        analyse: null
       }));
-      onAnalysisComplete(updatedBilder);
+      
+      onAnalysisComplete(updatedBilder, parsedAnalysis.analyses[0]);
       
     } catch (error) {
       console.error("Fehler bei der Analyse:", error);
@@ -50,19 +53,13 @@ export function ImageAnalysis({ bilder, onAnalysisComplete }: ImageAnalysisProps
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <Button 
-          onClick={handleAnalyzeClick}
-          disabled={isAnalyzing || bilder.length === 0}
-        >
-          {isAnalyzing ? "Analysiere..." : "Habitate analysieren"}
-        </Button>
-      </div>
-
-      {isAnalyzing ? (
+      
+      {!analyseErgebnis && (
         <Card>
           <CardHeader>
-            <CardTitle>Habitat-Analyse läuft...</CardTitle>
+            <CardTitle>
+              {isAnalyzing ? "Habitat-Analyse läuft..." : "Habitate analysieren"}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-gray-600">Um die Schutzwürdigkeit des Habitats zu bestimmen, werden die Bilder nun nach folgenden Kriterien systematisch analysiert:</p>
@@ -77,36 +74,36 @@ export function ImageAnalysis({ bilder, onAnalysisComplete }: ImageAnalysisProps
               <li>Einschätzung der Konfidenz dieser Einordnung</li>
             </ol>
           </CardContent>
+          
         </Card>
-      ) : (
-        analyseErgebnis?.analyses && (
+      )}
+      {analyseErgebnis && (
           <Card>
             <CardHeader>
               <CardTitle>Habitat-Analyse</CardTitle>
             </CardHeader>
             <CardContent>
-              {analyseErgebnis.analyses.map((analyse, index) => (
-                <div key={index} className="space-y-4">
-                  <div className="grid grid-cols-[200px_1fr] gap-4">
-                    <div className="font-bold">Habitat:</div>
-                    <div className="text-lg font-semibold text-green-700">{analyse.habitatTyp}</div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-[200px_1fr] gap-4">
+                  <div className="font-bold">Habitat:</div>
+                  <div className="text-lg font-semibold text-green-700">{analyseErgebnis.habitatTyp}</div>
 
                     <div className="font-bold">Standort:</div>
                     <div className="flex gap-4">
                       <span className="px-2 py-1 bg-gray-100 rounded">
-                        Hangneigung: {analyse.standort.hangneigung}
+                        Hangneigung: {analyseErgebnis.standort.hangneigung}
                       </span>
                       <span className="px-2 py-1 bg-gray-100 rounded">
-                        Exposition: {analyse.standort.exposition}
+                        Exposition: {analyseErgebnis.standort.exposition}
                       </span>
                       <span className="px-2 py-1 bg-gray-100 rounded">
-                        Bodenfeuchtigkeit: {analyse.standort.bodenfeuchtigkeit}
+                        Bodenfeuchtigkeit: {analyseErgebnis.standort.bodenfeuchtigkeit}
                       </span>
                     </div>
 
                     <div className="font-bold">Pflanzenarten:</div>
                     <div className="flex flex-wrap gap-2">
-                      {analyse.pflanzenArten.map((art, i) => (
+                      {analyseErgebnis.pflanzenArten.map((art, i) => (
                         <span 
                           key={i} 
                           className={`px-2 py-1 rounded ${
@@ -124,29 +121,29 @@ export function ImageAnalysis({ bilder, onAnalysisComplete }: ImageAnalysisProps
                     <div className="font-bold">Vegetationsstruktur:</div>
                     <div className="flex gap-4">
                       <span className="px-2 py-1 bg-gray-100 rounded">
-                        Höhe: {analyse.Vegetationsstruktur.höhe}
+                        Höhe: {analyseErgebnis.Vegetationsstruktur.höhe}
                       </span>
                       <span className="px-2 py-1 bg-gray-100 rounded">
-                        Dichte: {analyse.Vegetationsstruktur.dichte}
+                        Dichte: {analyseErgebnis.Vegetationsstruktur.dichte}
                       </span>
                       <span className="px-2 py-1 bg-gray-100 rounded">
-                        Deckung: {analyse.Vegetationsstruktur.deckung}
+                        Deckung: {analyseErgebnis.Vegetationsstruktur.deckung}
                       </span>
                     </div>
 
                     <div className="font-bold">Blühaspekte:</div>
                     <div className="flex items-center gap-4">
                       <span className="px-2 py-1 bg-gray-100 rounded">
-                        Intensität: {analyse.blühaspekte.intensität}
+                        Intensität: {analyseErgebnis.blühaspekte.intensität}
                       </span>
                       <span className="px-2 py-1 bg-gray-100 rounded">
-                        {analyse.blühaspekte.anzahlFarben} Farben
+                        {analyseErgebnis.blühaspekte.anzahlFarben} Farben
                       </span>
                     </div>
 
                     <div className="font-bold">Nutzung:</div>
                     <div className="flex gap-2">
-                      {Object.entries(analyse.nutzung).map(([key, value]) => (
+                      {Object.entries(analyseErgebnis.nutzung).map(([key, value]) => (
                         <span 
                           key={key}
                           className={`px-2 py-1 rounded ${
@@ -160,7 +157,7 @@ export function ImageAnalysis({ bilder, onAnalysisComplete }: ImageAnalysisProps
 
                     <div className="font-bold">Schutzstatus:</div>
                     <div className="flex gap-4">
-                      {Object.entries(analyse.schutzstatus).map(([key, value]) => (
+                      {Object.entries(analyseErgebnis.schutzstatus).map(([key, value]) => (
                         <div key={key} className="flex flex-col items-center">
                           <div className="text-sm text-gray-600">
                             {key.charAt(0).toUpperCase() + key.slice(1)}
@@ -187,20 +184,20 @@ export function ImageAnalysis({ bilder, onAnalysisComplete }: ImageAnalysisProps
                         <div className="w-24 bg-gray-200 rounded-full h-2">
                           <div 
                             className="bg-green-600 h-2 rounded-full" 
-                            style={{ width: `${analyse.bewertung.artenreichtum}%` }}
+                            style={{ width: `${analyseErgebnis.bewertung.artenreichtum}%` }}
                           />
                         </div>
-                        <span className="text-sm">{analyse.bewertung.artenreichtum}</span>
+                        <span className="text-sm">{analyseErgebnis.bewertung.artenreichtum}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span>Konfidenz:</span>
                         <div className="w-24 bg-gray-200 rounded-full h-2">
                           <div 
                             className="bg-blue-600 h-2 rounded-full" 
-                            style={{ width: `${analyse.bewertung.konfidenz}%` }}
+                            style={{ width: `${analyseErgebnis.bewertung.konfidenz}%` }}
                           />
                         </div>
-                        <span className="text-sm">{analyse.bewertung.konfidenz}%</span>
+                        <span className="text-sm">{analyseErgebnis.bewertung.konfidenz}%</span>
                       </div>
                     </div>
 
@@ -209,7 +206,7 @@ export function ImageAnalysis({ bilder, onAnalysisComplete }: ImageAnalysisProps
                       <div>
                         <div className="text-sm text-gray-600 mb-1">Dafür spricht:</div>
                         <ul className="list-disc list-inside space-y-1">
-                          {analyse.evidenz.dafürSpricht.map((punkt, i) => (
+                          {analyseErgebnis.evidenz.dafürSpricht.map((punkt, i) => (
                             <li key={i} className="text-green-700">{punkt}</li>
                           ))}
                         </ul>
@@ -217,23 +214,40 @@ export function ImageAnalysis({ bilder, onAnalysisComplete }: ImageAnalysisProps
                       <div>
                         <div className="text-sm text-gray-600 mb-1">Dagegen spricht:</div>
                         <ul className="list-disc list-inside space-y-1">
-                          {analyse.evidenz.dagegenSpricht.map((punkt, i) => (
+                          {analyseErgebnis.evidenz.dagegenSpricht.map((punkt, i) => (
                             <li key={i} className="text-red-700">{punkt}</li>
                           ))}
                         </ul>
                       </div>
                     </div>
                   </div>
-                  
-                  {index < analyseErgebnis.analyses.length - 1 && (
-                    <div className="border-t my-4" />
-                  )}
                 </div>
-              ))}
+              
             </CardContent>
           </Card>
         )
-      )}
+      }
+      <Card>
+        <CardHeader>
+          <CardTitle>Kommentar & Hinweis</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-4 items-start">
+            <Textarea
+              placeholder={analyseErgebnis ? "Optionaler Korrekturhinweis zur Analyse... (nur zu Standort, Pflanzenarten, Vegetationsstruktur, Blühaspekte und Nutzung)" : "Optionaler Kommentar zur Analyse... (nur zu Standort, Pflanzenarten, Vegetationsstruktur, Blühaspekte und Nutzung)"} 
+              className="flex-1 h-24 resize-none"
+              value={kommentar}
+              onChange={(e) => setKommentar(e.target.value)}
+            />
+            <Button 
+              onClick={handleAnalyzeClick}
+              disabled={isAnalyzing || bilder.length === 0}
+            >
+              {isAnalyzing ? "Analysiere..." : "Analyse jetzt starten"}
+            </Button>
+        </div>
+        </CardContent>
+      </Card>
     </div>
   );
 } 

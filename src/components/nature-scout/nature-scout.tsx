@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -9,7 +9,7 @@ import { GetImage } from "./get-image";
 import { Summary } from "./summary";
 import { UploadedImageList } from "./uploaded-image-list";
 import { ImageAnalysis } from "./image-analysis";
-import { Bild } from "@/types/nature-scout";
+import { Bild, AnalyseErgebnis } from "@/types/nature-scout";
 
 const schritte = [
   "Einführung",
@@ -21,7 +21,7 @@ const schritte = [
 export function NatureScout() {
   const [aktiverSchritt, setAktiverSchritt] = useState(0);
   const [bilder, setBilder] = useState<Bild[]>([]);
-  const [bewertung] = useState(0);
+  const [analyseErgebnis, setAnalyseErgebnis] = useState<AnalyseErgebnis | null>(null);
 
   const handleBildUpload = (imageKey: string, filename: string, url: string, analysis: string) => {
     const neuesBild: Bild = {
@@ -30,13 +30,19 @@ export function NatureScout() {
       url,
       analyse: analysis 
     };
-    setBilder(prev => [...prev, neuesBild]);
+    
+    setBilder(prev => {
+      // Entferne zuerst alle Bilder mit demselben imageKey
+      const gefilterteBilder = prev.filter(bild => bild.imageKey !== imageKey);
+      // Füge das neue Bild hinzu
+      return [...gefilterteBilder, neuesBild];
+    });
   };
 
-  const handleAnalysisComplete = (analysedBilder: Bild[]) => {
+  const handleAnalysisComplete = (analysedBilder: Bild[], ergebnis: AnalyseErgebnis) => {
     setBilder(analysedBilder);
-    // Optional: Automatisch zum nächsten Schritt
-    // setAktiverSchritt(prev => prev + 1);
+    setAnalyseErgebnis(ergebnis);
+    //setAktiverSchritt(prev => prev + 1);
   };
 
   const handlePDFDownload = () => {
@@ -54,38 +60,45 @@ export function NatureScout() {
             <p>Habitat bestimmen</p>
             <div className="flex flex-wrap justify-center gap-4">
               <GetImage 
-                imageTitle="Panorama" 
+                imageTitle="Panoramabild" 
                 anweisung="Laden Sie ein Panoramabild des gesamten Habitats hoch." 
                 onBildUpload={handleBildUpload}
+                existingImage={bilder.find(b => b.imageKey === "Panoramabild")}
               />
               <GetImage 
-                imageTitle="Detail1" 
+                imageTitle="Detailbild_1" 
                 anweisung="Laden Sie ein Detailbild des Habitats hoch." 
                 onBildUpload={handleBildUpload}
+                existingImage={bilder.find(b => b.imageKey === "Detailbild_1")}
               />
               <GetImage 
-                imageTitle="Detail2" 
+                imageTitle="Detailbild_2" 
                 anweisung="Laden Sie ein weiteres Detailbild des Habitats hoch." 
                 onBildUpload={handleBildUpload}
+                existingImage={bilder.find(b => b.imageKey === "Detailbild_2")}
               />
             </div>
           </div>
         );
       case 2:
         return (
-          <div>
-            <p>Habitat bestimmen</p>
-            <UploadedImageList bilder={bilder} />
-            <ImageAnalysis 
-              bilder={bilder} 
-              onAnalysisComplete={handleAnalysisComplete} 
-            />
+          <div className="space-y-4">
+            <div>
+              <UploadedImageList bilder={bilder} />
+            </div>
+            <div>
+              <ImageAnalysis 
+                bilder={bilder} 
+                analyseErgebnis={analyseErgebnis}
+                onAnalysisComplete={handleAnalysisComplete} 
+              />
+            </div>
           </div>
         );
-      case 4:
+      case 3:
         return (
           <Summary 
-            bewertung={bewertung.toString()}
+            analyseErgebnis={analyseErgebnis}
             handlePDFDownload={handlePDFDownload}
           />
         );
@@ -93,6 +106,10 @@ export function NatureScout() {
         return "Unbekannter Schritt";
     }
   };
+
+  useEffect(() => {
+    console.log("Aktuelle Bilder:", bilder);
+  }, [bilder]);
 
   return (
     <div className="container mx-auto p-4">
