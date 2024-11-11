@@ -3,10 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
-  context: { params: { jobId: string } }
+  { params }: { params: { jobId: string } }
 ) {
   try {
-    const { jobId } = context.params;
+    const { jobId } = params;
     console.log('jobId', jobId);
     // Hier würde normalerweise der Status aus einer Queue abgefragt
     const images = JSON.parse(request.nextUrl.searchParams.get('images') || '[]');
