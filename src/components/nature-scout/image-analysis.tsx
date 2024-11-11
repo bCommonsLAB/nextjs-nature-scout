@@ -14,15 +14,14 @@ interface ImageAnalysisProps {
 
 export function ImageAnalysis({ bilder, analyseErgebnis, onAnalysisComplete }: ImageAnalysisProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  //const [analyseStatus, setAnalyseStatus] = useState<string>("");
   const [kommentar, setKommentar] = useState("");
 
   const handleAnalyzeClick = async () => {
     setIsAnalyzing(true);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 Sekunden
-
     try {
-      const response = await fetch('/api/analyze', {
+      // Initiale Analyse-Anfrage
+      const startResponse = await fetch('/api/analyze/start', {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -30,28 +29,41 @@ export function ImageAnalysis({ bilder, analyseErgebnis, onAnalysisComplete }: I
         body: JSON.stringify({
           images: bilder.map(bild => bild.url),
           kommentar
-        }),
-        signal: controller.signal
+        })
       });
-      
-      if (!response.ok) {
+
+      if (!startResponse.ok) {
         throw new Error('Netzwerk-Antwort war nicht ok');
       }
-      
-      const data = await response.json();
-      const parsedAnalysis = JSON.parse(data.analysis);
-      
-      const updatedBilder = bilder.map(bild => ({
-        ...bild,
-        analyse: null
-      }));
-      
-      onAnalysisComplete(updatedBilder, parsedAnalysis.analyses[0]);
-      
+
+      const { jobId } = await startResponse.json();
+
+      // Status-Polling
+      const checkStatus = async () => {
+        const statusResponse = await fetch(`/api/analyze/status/${jobId}`);
+        const { status, result } = await statusResponse.json();
+
+        if (status === 'completed') {
+          const parsedAnalysis = JSON.parse(result.analysis);
+          const updatedBilder = bilder.map(bild => ({
+            ...bild,
+            analyse: null
+          }));
+          onAnalysisComplete(updatedBilder, parsedAnalysis.analyses[0]);
+          setIsAnalyzing(false);
+        } else if (status === 'failed') {
+          throw new Error('Analyse fehlgeschlagen');
+        } else {
+          // Weiter pollen nach 2 Sekunden
+          setTimeout(checkStatus, 2000);
+        }
+      };
+
+      // Starte Polling
+      await checkStatus();
+
     } catch (error) {
       console.error("Fehler bei der Analyse:", error);
-    } finally {
-      clearTimeout(timeoutId);
       setIsAnalyzing(false);
     }
   };
