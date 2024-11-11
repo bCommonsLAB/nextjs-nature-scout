@@ -1,12 +1,18 @@
 import { analyzeImageStructured } from '@/lib/services/openai-service';
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { jobId: string } }
-) {
+interface RouteContext {
+    params: {
+      jobId: string;
+    };
+  }
+
+  export async function GET(
+    request: NextRequest,
+    context: RouteContext
+  ) {
   try {
-    const { jobId } = params;
+    const { jobId } = context.params;
     console.log('jobId', jobId);
     // Hier würde normalerweise der Status aus einer Queue abgefragt
     const images = JSON.parse(request.nextUrl.searchParams.get('images') || '[]');
