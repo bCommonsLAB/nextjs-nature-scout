@@ -14,8 +14,7 @@ import { Bild } from "@/types/nature-scout";
 const schritte = [
   "Einführung",
   "Bilder hochladen",
-  "Habitat bestimmen",
-  "Pflanzenarten bestimmen",
+  "Habitat analysieren",
   "Abschlussbewertung"
 ];
 
@@ -81,12 +80,6 @@ export function NatureScout() {
               bilder={bilder} 
               onAnalysisComplete={handleAnalysisComplete} 
             />
-          </div>
-        );
-      case 3:
-        return (
-          <div>
-            <p>Arten bestimmen</p>
           </div>
         );
       case 4:

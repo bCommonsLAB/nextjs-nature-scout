@@ -31,6 +31,7 @@ async function urlToBase64(url: string): Promise<string> {
 }
 
 export async function analyzeImageStructured(imageUrls: string[]): Promise<ImageAnalysisResult> {
+    /*
     const zSchema = z.object({
         "analyses": z.array(z.object({
             "Pflanzen-Arten": z.array(z.string()).describe("Liste der erkannten Pflanzenarten"),
@@ -44,7 +45,87 @@ export async function analyzeImageStructured(imageUrls: string[]): Promise<Image
             "Wahrscheinlichkeit": z.number().describe("Die Wahrscheinlichkeit, dass das Habitat richtig erkannt wurde")
           }))
     });
-    
+    */
+    const zSchema = z.object({
+        "analyses": z.array(z.object({
+          "standort": z.object({
+            "hangneigung": z.enum(["eben", "leicht_geneigt", "steil", "weis nicht"])
+              .describe("Hangneigung des Geländes"),
+            "exposition": z.enum(["N", "NO", "O", "SO", "S", "SW", "W", "NW", "weis nicht"])
+              .describe("Ausrichtung des Hanges"),
+            "bodenfeuchtigkeit": z.enum(["trocken", "frisch", "feucht", "nass", "wasserzügig", "weis nicht"])
+              .describe("Feuchtigkeit des Bodens")
+          }),
+          "pflanzenArten": z.array(
+            z.object({
+              "name": z.string().describe("Name der Pflanzenart in deutscher Sprache"),
+              "häufigkeit": z.enum(["einzeln", "zerstreut", "häufig", "dominant"])
+                .describe("Häufigkeit der Art im Bestand"),
+              "istZeiger": z.boolean().optional()
+                .describe("Ist die Art ein wichtiger Indikator?")
+            })
+          ).describe("Liste der erkannten Pflanzenarten mit Details"),
+          "Vegetationsstruktur": z.object({
+            "höhe": z.enum(["kurz", "mittel", "hoch"])
+              .describe("Höhe des Hauptbestandes"),
+            "dichte": z.enum(["dünn", "mittel", "dicht"])
+              .describe("Dichte der Vegetation"),
+            "deckung": z.enum(["offen", "mittel", "geschlossen"])
+              .describe("Bodendeckung der Vegetation")
+          }),
+          "blühaspekte": z.object({
+            "intensität": z.enum(["keine", "vereinzelt", "reich"])
+              .describe("Intensität der Blüte"),
+            "anzahlFarben": z.number()
+              .int()
+              .describe("Anzahl verschiedener Blütenfarben")
+          }),
+          "nutzung": z.object({
+            "beweidung": z.boolean()
+              .describe("Beweidungsspuren vorhanden"),
+            "mahd": z.boolean()
+              .describe("Mahdspuren vorhanden"),
+            "düngung": z.boolean()
+              .describe("Düngungsspuren vorhanden")
+          }),
+          "habitatTyp": z.enum([
+            "Magerwiese",
+            "Trockenrasen",
+            "Fettwiese",
+            "Magerweide",
+            "Fettweide",
+            "Niedermoor",
+            "Hochmoor",
+            "sonstiges"
+          ]).describe("Klassifizierung des Habitattyps"),
+          "schutzstatus": z.object({
+            "gesetzlich": z.number()
+              .int()
+              .describe("Mit welcher Wahrscheinlichkeit in Prozent ist es ein Habitat, der im Naturschutzgesetz angeführt ist - Nass- und Feuchtflächen:Verlandungsbereiche von stehenden oder langsam fließenden Gewässern, Schilf-, Röhricht- und Großseggenbestände, Feucht- und Nasswiesen mit Seggen und Binsen, Moore, Auwälder, Sumpf- und Bruchwälder, Quellbereiche, Naturnahe und unverbaute Bach- und Flussabschnitte sowie Wassergräben inklusive der Ufervegetation. Bei Trockenstandorte: Trockenrasen, Felsensteppen, Lehmbrüche?"),
+            "hochwertig": z.number()
+              .int()
+              .describe("Mit welcher Wahrscheinlichkeit in Prozent ist es ein ökologisch hochwertige Lebensraum, der nicht vom Gesetz erfasst ist: Magerwiese, Magerweide, Trockenrasen, Felsensteppen, Lehmbrüche?"),
+            "standard": z.number()
+              .int()
+              .describe("Mit Welcher Wahrscheinlichkeit in Prozent ist es ein ökologisch nicht hochwertige Lebensraum, wie Fettwiese, Fettweide, Kunstrasen aller Art, Parkanlagen, Ruderalflächen, u. a. Standardlebensraum?")
+          }),
+          "bewertung": z.object({
+            "artenreichtum": z.number()
+              .int()
+              .describe("Geschätzte Anzahl Arten pro 25m²"),
+            "konfidenz": z.number()
+              .int()
+              .describe("Konfidenz der Habitatbestimmung in Prozent")
+          }),
+          "evidenz": z.object({
+            "dafürSpricht": z.array(z.string())
+              .describe("Merkmale, die für die Klassifizierung sprechen"),
+            "dagegenSpricht": z.array(z.string())
+              .describe("Merkmale, die gegen die Klassifizierung sprechen")
+          }),
+        }))
+    });
+
     try {
         
         console.log('🔄 Starte Bildanalyse für URLs:', imageUrls);
@@ -66,19 +147,21 @@ export async function analyzeImageStructured(imageUrls: string[]): Promise<Image
         });
 
         const systemInstruction = `
-            Du bist ein Biologe und solltest mir helfen Habitate anhand von Bildern zu erkennen. 
-            Du solltest sehr wissenschaftlich argumentieren.
+            Du bist ein erfahrener Vegetationsökologe und sollst bei der Habitatanalyse unterstützen. 
+            Argumentiere wissenschaftlich fundiert und berücksichtige alle verfügbaren Indizien 
+            für eine möglichst präzise Einschätzung.
         `.trim();
   
         const Question = `
-            Um eine Aussage zu treffen:
-            - Erkenne Indizien wie typische Pflanzenarten, Vegetationshöhe , Vegetationsdichte, Vegetationsstruktur,
-            Blühintensität
-            - Versuche aus diesen Indizien einen Habitattyp abzuleiten und verständlich zu erklären
-            - Erkenne den Hapitatstyp: Entweder Magerwiese, Trockenrasen, Fettwiese, Magerweide, Niedermoor, Hochmoor, anderes Habitate.
-            - Wenn du eine Aussage machst, erkläre bitte was dafür spricht
-            - Aber auch was dagegen spricht
-            Am Ende muss sich ein Mensch ein Bild machen, wie wahrscheinlich die Aussage ist.
+            Bitte analysiere das Habitat systematisch nach folgenden Kriterien:
+            1. Erfasse die Standortbedingungen und deren Einfluss auf die Vegetation
+            2. Identifiziere charakteristische Pflanzenarten und deren Häufigkeit
+            3. Beschreibe die Vegetationsstruktur und -dynamik
+            4. Dokumentiere Nutzungsspuren und deren Auswirkungen
+            5. Leite daraus den wahrscheinlichen Habitattyp ab
+            6. Bewerte die ökologische Qualität und Schutzwürdigkeit
+            7. Führe unterstützende und widersprechende Merkmale auf
+            8. Schätze die Konfidenz deiner Einordnung
         `.trim();
 
         const completion = await openai.chat.completions.create({
@@ -102,10 +185,13 @@ export async function analyzeImageStructured(imageUrls: string[]): Promise<Image
             response_format: zodResponseFormat(zSchema, "structured_analysis"),
             max_tokens: 2000,
         });
-
-        return { 
-            analysis: completion.choices[0]?.message?.content || "Keine Analyse verfügbar.",
-            error: undefined
+        const analysisResult = completion.choices[0]?.message.content ?? null;
+        if (analysisResult) {
+            console.log("analysisResult", analysisResult);
+            //const parsedResult = JSON.parse(analysisResult); // Falls die Antwort ein JSON-String ist
+            return { analysis: analysisResult, error: undefined};
+        } else {
+            return { analysis: "Keine Analyse verfügbar.", error: undefined};
         };
     } catch (error: Error | unknown) {
         console.error('Fehler bei der Bildanalyse:', error);
