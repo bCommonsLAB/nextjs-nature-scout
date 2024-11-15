@@ -1,9 +1,13 @@
 import { analyzeImageStructured } from '@/lib/services/openai-service';
 import { NextRequest, NextResponse } from 'next/server';
 
-  export async function GET(request: NextRequest,context: any) {
+// Korrekte Typisierung für Next.js 15 Route Handler
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { jobId: string } }
+) {
   try {
-    const { jobId } = context.params;
+    const { jobId } = params;
     console.log('jobId', jobId);
     // Hier würde normalerweise der Status aus einer Queue abgefragt
     const images = JSON.parse(request.nextUrl.searchParams.get('images') || '[]');
