@@ -67,7 +67,7 @@ export async function analyzeImageStructured(
               "istZeiger": z.boolean().optional()
                 .describe("Ist die Art ein wichtiger Indikator?")
             })
-          ).describe("Liste der erkannten Pflanzenarten mit Details"),
+          ).describe("Liste der erkannten Pflanzenarten mit Details, bitte nur die Arten auflisten, die eindeutig in den Bildern erkannt werden."),
           "Vegetationsstruktur": z.object({
             "höhe": z.enum(["kurz", "mittel", "hoch"])
               .describe("Höhe des Hauptbestandes"),

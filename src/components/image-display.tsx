@@ -11,7 +11,8 @@ interface ImageDisplayProps {
 
 export function ImageDisplay({ filename, alt, width, height }: ImageDisplayProps) {
   const imageUrl = `/api/images/${filename}`;
-
+  console.log(imageUrl);
+  
   return (
     <Image
       src={imageUrl}

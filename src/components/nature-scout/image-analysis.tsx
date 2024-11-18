@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bild, AnalyseErgebnis } from "@/types/nature-scout";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface ImageAnalysisProps {
   bilder: Bild[];
@@ -16,6 +23,7 @@ export function ImageAnalysis({ bilder, analyseErgebnis, onAnalysisComplete }: I
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   //const [analyseStatus, setAnalyseStatus] = useState<string>("");
   const [kommentar, setKommentar] = useState("");
+  const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
 
   const handleAnalyzeClick = async () => {
     setIsAnalyzing(true);
@@ -251,18 +259,38 @@ export function ImageAnalysis({ bilder, analyseErgebnis, onAnalysisComplete }: I
         <CardContent>
           <div className="flex gap-4 items-start">
             <Textarea
-              placeholder={analyseErgebnis ? "Optionaler Korrekturhinweis zur Analyse... (nur zu Standort, Pflanzenarten, Vegetationsstruktur, Blühaspekte und Nutzung)" : "Optionaler Kommentar zur Analyse... (nur zu Standort, Pflanzenarten, Vegetationsstruktur, Blühaspekte und Nutzung)"} 
+              placeholder={analyseErgebnis ? "Optionaler Korrekturhinweis zur Analyse..." : "Optionaler Kommentar zur Analyse..."}
               className="flex-1 h-24 resize-none"
               value={kommentar}
               onChange={(e) => setKommentar(e.target.value)}
             />
-            <Button 
-              onClick={handleAnalyzeClick}
-              disabled={isAnalyzing || bilder.length === 0}
-            >
-              {isAnalyzing ? "Analysiere..." : "Analyse jetzt starten"}
-            </Button>
-        </div>
+            <div className="flex flex-col gap-2">
+              <Button 
+                onClick={handleAnalyzeClick}
+                disabled={isAnalyzing || bilder.length === 0}
+              >
+                {isAnalyzing ? "Analysiere..." : "Analyse jetzt starten"}
+              </Button>
+              
+              {analyseErgebnis && (
+                <Dialog open={isJsonDialogOpen} onOpenChange={setIsJsonDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      JSON anzeigen
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
+                    <DialogHeader>
+                      <DialogTitle>Analyse-Ergebnis als JSON</DialogTitle>
+                    </DialogHeader>
+                    <pre className="bg-gray-100 p-4 rounded-md overflow-x-auto">
+                      {JSON.stringify(analyseErgebnis, null, 2)}
+                    </pre>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
