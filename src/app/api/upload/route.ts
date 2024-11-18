@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const timestamp = Date.now();
-    const filename = `${timestamp}-${file.name}`;
+    const filename = `${timestamp}`;  //-${file.name}
 
     const azureStorage = new AzureStorageService();
     const url = await azureStorage.uploadImage(filename, buffer);

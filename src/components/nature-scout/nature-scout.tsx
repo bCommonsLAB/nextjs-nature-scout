@@ -9,11 +9,13 @@ import { GetImage } from "./get-image";
 import { Summary } from "./summary";
 import { UploadedImageList } from "./uploaded-image-list";
 import { ImageAnalysis } from "./image-analysis";
+import { PlantIdentification } from "./plant-identification"
 import { Bild, AnalyseErgebnis } from "@/types/nature-scout";
 
 const schritte = [
   "Einführung",
   "Bilder hochladen",
+  "Pflanzen bestimmen",
   "Habitat analysieren",
   "Abschlussbewertung"
 ];
@@ -48,6 +50,14 @@ export function NatureScout() {
   const handlePDFDownload = () => {
     console.log("PDF-Download wurde angefordert");
     // Hier würde die tatsächliche PDF-Generierung und der Download implementiert werden
+  };
+
+  const handlePlantIdentification = (updatedBilder: Bild[]) => {
+    setBilder(prev => 
+      prev.map(bild => 
+        updatedBilder.find(updated => updated.imageKey === bild.imageKey) || bild
+      )
+    );
   };
 
   const renderSchrittInhalt = (schritt: number) => {
@@ -87,6 +97,20 @@ export function NatureScout() {
               <UploadedImageList bilder={bilder} />
             </div>
             <div>
+              <PlantIdentification 
+                bilder={bilder.filter(b => b.imageKey.startsWith("Detailbild"))}
+                onIdentificationComplete={handlePlantIdentification}
+              />
+            </div>
+          </div>
+        );
+      case 3:
+        return (
+          <div className="space-y-4">
+            <div>
+              <UploadedImageList bilder={bilder} />
+            </div>
+            <div>
               <ImageAnalysis 
                 bilder={bilder} 
                 analyseErgebnis={analyseErgebnis}
@@ -95,7 +119,7 @@ export function NatureScout() {
             </div>
           </div>
         );
-      case 3:
+      case 4:
         return (
           <Summary 
             analyseErgebnis={analyseErgebnis}

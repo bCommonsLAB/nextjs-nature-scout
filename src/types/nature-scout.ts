@@ -1,8 +1,49 @@
+export interface LocationMetadata {
+  gemeinde: string;
+  flurname: string;
+  erfassungsperson: string;
+  latitude: number;
+  longitude: number;
+  standort: string;
+}
+
+
 export interface Bild {
   imageKey: string;
   filename: string;
   url: string;
   analyse: string | null;
+  plantnetResult?: PlantNetResult;
+}
+
+export interface PlantNetResponse {
+  query: {
+    project: string;
+    images: string[];
+    organs: string[];
+    includeRelatedImages: boolean;
+  };
+  language: string;
+  preferedReferential: string;
+  bestMatch: string;
+  results: PlantNetResult[];
+  remainingIdentificationRequests: number;
+}
+
+export interface PlantNetResult {
+  score: number;
+  species: {
+    scientificNameWithoutAuthor: string;
+    scientificNameAuthorship: string;
+    genus: {
+      scientificNameWithoutAuthor: string;
+    };
+    family: {
+      scientificNameWithoutAuthor: string;
+    };
+    commonNames: string[];
+    scientificName: string;
+  };
 }
 
 export interface AnalyseErgebnis {
@@ -45,4 +86,11 @@ export interface AnalyseErgebnis {
     dagegenSpricht: string[];
   };
   zusammenfassung: string;
+}
+
+export interface GetImageProps {
+  imageTitle: string;
+  anweisung: string;
+  onBildUpload: (imageTitle: string, filename: string, url: string, analysis: string) => void;
+  existingImage?: Bild;
 }

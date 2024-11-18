@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Upload } from "lucide-react";
 import { Progress } from "../ui/progress";
 import { publicConfig } from '@/lib/config';
-import { GetImageProps } from "@/types/types";
+import { GetImageProps } from "@/types/nature-scout";
 
 const { maxWidth: MAX_WIDTH, maxHeight: MAX_HEIGHT, quality: IMAGE_QUALITY } = publicConfig.imageSettings;
 
