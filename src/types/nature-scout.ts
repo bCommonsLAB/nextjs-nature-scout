@@ -1,12 +1,20 @@
-export interface LocationMetadata {
+
+
+export interface GeocodingResult {
+  standort: string;
   gemeinde: string;
   flurname: string;
+}
+
+export interface LocationMetadata {
   erfassungsperson: string;
+  email: string;
   latitude: number;
   longitude: number;
   standort: string;
+  gemeinde: string;
+  flurname: string;
 }
-
 
 export interface Bild {
   imageKey: string;

@@ -8,11 +8,19 @@ interface MapNoSSRProps {
   onCenterChange: (newCenter: [number, number]) => void;
 }
 
-const MapNoSSR: React.FC<MapNoSSRProps> = ({ position , zoom, onCenterChange }) => {
+// Komponente als benannte Funktion deklarieren
+function MapNoSSR({ position, zoom, onCenterChange }: MapNoSSRProps) {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
 
+  // Debug-Logging für Prop-Changes
   useEffect(() => {
+    console.log('MapNoSSR: Props geändert:', { position, zoom });
+  }, [position, zoom]);
+
+  // Debug-Logging für Map-Initialisierung
+  useEffect(() => {
+    console.log('MapNoSSR: Map wird initialisiert');
     if (mapRef.current === null && mapContainerRef.current !== null) {
       mapRef.current = L.map(mapContainerRef.current).setView(position, zoom);
 
@@ -41,6 +49,7 @@ const MapNoSSR: React.FC<MapNoSSRProps> = ({ position , zoom, onCenterChange }) 
 
     return () => {
       if (mapRef.current !== null) {
+        console.log('MapNoSSR: Map wird zerstört');
         mapRef.current.remove();
         mapRef.current = null;
       }
@@ -54,6 +63,6 @@ const MapNoSSR: React.FC<MapNoSSRProps> = ({ position , zoom, onCenterChange }) 
   }, [position, zoom]);
 
   return <div ref={mapContainerRef} style={{ width: '100%', height: '500px' }} />;
-};
+}
 
-export default MapNoSSR;
+export default React.memo(MapNoSSR);

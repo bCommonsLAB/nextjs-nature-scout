@@ -10,10 +10,12 @@ import { Summary } from "./summary";
 import { UploadedImageList } from "./uploaded-image-list";
 import { ImageAnalysis } from "./image-analysis";
 import { PlantIdentification } from "./plant-identification"
-import { Bild, AnalyseErgebnis } from "@/types/nature-scout";
+import { Bild, AnalyseErgebnis, LocationMetadata } from "@/types/nature-scout";
+import { LocationDetermination } from './locationDetermination';
 
 const schritte = [
-  "Einführung",
+  "Willkommen",
+  "Standort bestimmen",
   "Bilder hochladen",
   "Pflanzen bestimmen",
   "Habitat analysieren",
@@ -24,6 +26,16 @@ export function NatureScout() {
   const [aktiverSchritt, setAktiverSchritt] = useState(0);
   const [bilder, setBilder] = useState<Bild[]>([]);
   const [analyseErgebnis, setAnalyseErgebnis] = useState<AnalyseErgebnis | null>(null);
+  const [metadata, setMetadata] = useState<LocationMetadata>({
+    erfassungsperson: "",
+    email: "",
+    gemeinde: "",
+    flurname: "",
+    latitude: 0,
+    longitude: 0,
+    standort: "",
+    // ... weitere Felder, falls benötigt ...
+  });
 
   const handleBildUpload = (imageKey: string, filename: string, url: string, analysis: string) => {
     const neuesBild: Bild = {
@@ -63,8 +75,10 @@ export function NatureScout() {
   const renderSchrittInhalt = (schritt: number) => {
     switch (schritt) {
       case 0:
-        return <Welcome />;
+        return <Welcome metadata={metadata} setMetadata={setMetadata} />;
       case 1:
+        return <LocationDetermination metadata={metadata} setMetadata={setMetadata} />;
+      case 2:
         return (
           <div>
             <p>Habitat bestimmen</p>
@@ -90,7 +104,7 @@ export function NatureScout() {
             </div>
           </div>
         );
-      case 2:
+      case 3:
         return (
           <div className="space-y-4">
             <div>
@@ -104,7 +118,7 @@ export function NatureScout() {
             </div>
           </div>
         );
-      case 3:
+      case 4:
         return (
           <div className="space-y-4">
             <div>
@@ -119,11 +133,12 @@ export function NatureScout() {
             </div>
           </div>
         );
-      case 4:
+      case 5:
         return (
           <Summary 
             analyseErgebnis={analyseErgebnis}
             handlePDFDownload={handlePDFDownload}
+            metadata={metadata}
           />
         );
       default:
@@ -131,9 +146,16 @@ export function NatureScout() {
     }
   };
 
+  // Debug-Komponente, um die aktuellen metadata als JSON anzuzeigen
   useEffect(() => {
     console.log("Aktuelle Bilder:", bilder);
   }, [bilder]);
+
+  const DebugMetadata = ({ metadata }: { metadata: LocationMetadata }) => (
+    <pre className="bg-gray-200 p-2 rounded text-xs">
+      {JSON.stringify(metadata, null, 2)}
+    </pre>
+  );
 
   return (
     <div className="container mx-auto p-4">
@@ -173,6 +195,7 @@ export function NatureScout() {
           Weiter
         </Button>
       </div>
+      <DebugMetadata metadata={metadata} />
     </div>
   );
 } 
