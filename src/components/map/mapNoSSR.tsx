@@ -13,14 +13,8 @@ function MapNoSSR({ position, zoom, onCenterChange }: MapNoSSRProps) {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Debug-Logging für Prop-Changes
-  useEffect(() => {
-    console.log('MapNoSSR: Props geändert:', { position, zoom });
-  }, [position, zoom]);
-
   // Debug-Logging für Map-Initialisierung
   useEffect(() => {
-    console.log('MapNoSSR: Map wird initialisiert');
     if (mapRef.current === null && mapContainerRef.current !== null) {
       mapRef.current = L.map(mapContainerRef.current).setView(position, zoom);
 
@@ -49,7 +43,6 @@ function MapNoSSR({ position, zoom, onCenterChange }: MapNoSSRProps) {
 
     return () => {
       if (mapRef.current !== null) {
-        console.log('MapNoSSR: Map wird zerstört');
         mapRef.current.remove();
         mapRef.current = null;
       }

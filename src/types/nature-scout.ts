@@ -1,4 +1,14 @@
-
+export interface NatureScoutData {
+  erfassungsperson: string;
+  email: string;
+  gemeinde: string;
+  flurname: string;
+  latitude: number;
+  longitude: number;
+  standort: string;
+  bilder: Bild[];
+  analyseErgebnis?: AnalyseErgebnis;
+}
 
 export interface GeocodingResult {
   standort: string;
@@ -6,15 +16,6 @@ export interface GeocodingResult {
   flurname: string;
 }
 
-export interface LocationMetadata {
-  erfassungsperson: string;
-  email: string;
-  latitude: number;
-  longitude: number;
-  standort: string;
-  gemeinde: string;
-  flurname: string;
-}
 
 export interface Bild {
   imageKey: string;

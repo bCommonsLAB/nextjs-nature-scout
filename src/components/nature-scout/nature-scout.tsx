@@ -8,9 +8,9 @@ import { Welcome } from "./welcome";
 import { GetImage } from "./get-image";
 import { Summary } from "./summary";
 import { UploadedImageList } from "./uploaded-image-list";
-import { ImageAnalysis } from "./image-analysis";
+import { HabitatAnalysis } from "./habitat-analysis";
 import { PlantIdentification } from "./plant-identification"
-import { Bild, AnalyseErgebnis, LocationMetadata } from "@/types/nature-scout";
+import { Bild, NatureScoutData, AnalyseErgebnis } from "@/types/nature-scout";
 import { LocationDetermination } from './locationDetermination';
 
 const schritte = [
@@ -24,9 +24,7 @@ const schritte = [
 
 export function NatureScout() {
   const [aktiverSchritt, setAktiverSchritt] = useState(0);
-  const [bilder, setBilder] = useState<Bild[]>([]);
-  const [analyseErgebnis, setAnalyseErgebnis] = useState<AnalyseErgebnis | null>(null);
-  const [metadata, setMetadata] = useState<LocationMetadata>({
+  const [metadata, setMetadata] = useState<NatureScoutData>({
     erfassungsperson: "",
     email: "",
     gemeinde: "",
@@ -34,7 +32,8 @@ export function NatureScout() {
     latitude: 0,
     longitude: 0,
     standort: "",
-    // ... weitere Felder, falls benötigt ...
+    bilder: [],
+    analyseErgebnis: undefined
   });
 
   const handleBildUpload = (imageKey: string, filename: string, url: string, analysis: string) => {
@@ -44,18 +43,22 @@ export function NatureScout() {
       url,
       analyse: analysis 
     };
-    
-    setBilder(prev => {
-      // Entferne zuerst alle Bilder mit demselben imageKey
-      const gefilterteBilder = prev.filter(bild => bild.imageKey !== imageKey);
-      // Füge das neue Bild hinzu
-      return [...gefilterteBilder, neuesBild];
-    });
+      
+    setMetadata(prev => ({
+      ...prev,
+      bilder: [
+        ...prev.bilder.filter(bild => bild.imageKey !== imageKey),
+        neuesBild
+      ]
+    }));
   };
 
   const handleAnalysisComplete = (analysedBilder: Bild[], ergebnis: AnalyseErgebnis) => {
-    setBilder(analysedBilder);
-    setAnalyseErgebnis(ergebnis);
+    setMetadata(prev => ({
+      ...prev,
+      bilder: analysedBilder,
+      analyseErgebnis: ergebnis
+    }));
     //setAktiverSchritt(prev => prev + 1);
   };
 
@@ -65,11 +68,12 @@ export function NatureScout() {
   };
 
   const handlePlantIdentification = (updatedBilder: Bild[]) => {
-    setBilder(prev => 
-      prev.map(bild => 
+    setMetadata(prev => ({
+      ...prev,
+      bilder: prev.bilder.map(bild => 
         updatedBilder.find(updated => updated.imageKey === bild.imageKey) || bild
       )
-    );
+    }));
   };
 
   const renderSchrittInhalt = (schritt: number) => {
@@ -87,19 +91,19 @@ export function NatureScout() {
                 imageTitle="Panoramabild" 
                 anweisung="Laden Sie ein Panoramabild des gesamten Habitats hoch." 
                 onBildUpload={handleBildUpload}
-                existingImage={bilder.find(b => b.imageKey === "Panoramabild")}
+                existingImage={metadata.bilder.find(b => b.imageKey === "Panoramabild")}
               />
               <GetImage 
                 imageTitle="Detailbild_1" 
                 anweisung="Laden Sie ein Detailbild des Habitats hoch." 
                 onBildUpload={handleBildUpload}
-                existingImage={bilder.find(b => b.imageKey === "Detailbild_1")}
+                existingImage={metadata.bilder.find(b => b.imageKey === "Detailbild_1")}
               />
               <GetImage 
                 imageTitle="Detailbild_2" 
                 anweisung="Laden Sie ein weiteres Detailbild des Habitats hoch." 
                 onBildUpload={handleBildUpload}
-                existingImage={bilder.find(b => b.imageKey === "Detailbild_2")}
+                existingImage={metadata.bilder.find(b => b.imageKey === "Detailbild_2")}
               />
             </div>
           </div>
@@ -108,11 +112,11 @@ export function NatureScout() {
         return (
           <div className="space-y-4">
             <div>
-              <UploadedImageList bilder={bilder} />
+              <UploadedImageList bilder={metadata.bilder.filter(b => b.imageKey.startsWith("Detailbild"))} />
             </div>
             <div>
               <PlantIdentification 
-                bilder={bilder.filter(b => b.imageKey.startsWith("Detailbild"))}
+                bilder={metadata.bilder.filter(b => b.imageKey.startsWith("Detailbild"))}
                 onIdentificationComplete={handlePlantIdentification}
               />
             </div>
@@ -122,12 +126,11 @@ export function NatureScout() {
         return (
           <div className="space-y-4">
             <div>
-              <UploadedImageList bilder={bilder} />
+              <UploadedImageList bilder={metadata.bilder} />
             </div>
             <div>
-              <ImageAnalysis 
-                bilder={bilder} 
-                analyseErgebnis={analyseErgebnis}
+              <HabitatAnalysis 
+                metadata={metadata} 
                 onAnalysisComplete={handleAnalysisComplete} 
               />
             </div>
@@ -136,9 +139,8 @@ export function NatureScout() {
       case 5:
         return (
           <Summary 
-            analyseErgebnis={analyseErgebnis}
-            handlePDFDownload={handlePDFDownload}
             metadata={metadata}
+            handlePDFDownload={handlePDFDownload}
           />
         );
       default:
@@ -148,10 +150,10 @@ export function NatureScout() {
 
   // Debug-Komponente, um die aktuellen metadata als JSON anzuzeigen
   useEffect(() => {
-    console.log("Aktuelle Bilder:", bilder);
-  }, [bilder]);
+    console.log("Aktuelle Bilder:", metadata.bilder);
+  }, [metadata.bilder]);
 
-  const DebugMetadata = ({ metadata }: { metadata: LocationMetadata }) => (
+  const DebugMetadata = ({ metadata }: { metadata: NatureScoutData }) => (
     <pre className="bg-gray-200 p-2 rounded text-xs">
       {JSON.stringify(metadata, null, 2)}
     </pre>

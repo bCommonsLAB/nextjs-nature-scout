@@ -24,7 +24,6 @@ export async function POST(request: Request) {
     
     // Füge die Bilder hinzu (max. 5)
     imageUrls.slice(0, 5).forEach((url) => {
-      console.log("url", url);
       urlParams.append("images", url);
       urlParams.append("organs", "auto");
     });
@@ -35,7 +34,6 @@ export async function POST(request: Request) {
     urlParams.append("type", "kt");
 
     const apiUrl = `${baseUrl}?${urlParams.toString()}`;
-    console.log("apiUrl", apiUrl);
 
     const response = await fetch(apiUrl, {
       method: "GET",

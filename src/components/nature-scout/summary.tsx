@@ -3,15 +3,14 @@
 import { FileDown } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { AnalyseErgebnis, LocationMetadata } from "@/types/nature-scout";
+import { NatureScoutData } from "@/types/nature-scout";
 
 interface SummaryProps {
-  analyseErgebnis: AnalyseErgebnis | null;
-  metadata: LocationMetadata;
+  metadata: NatureScoutData;
   handlePDFDownload: () => void;
 }
 
-const saveMetadata = async (metadata: LocationMetadata) => {
+const saveMetadata = async (metadata: NatureScoutData) => {
   try {
     const response = await fetch('/api/save-metadata', {
       method: 'POST',
@@ -33,19 +32,22 @@ const saveMetadata = async (metadata: LocationMetadata) => {
 };
 
 
-export function Summary({ analyseErgebnis, metadata, handlePDFDownload }: SummaryProps) {
-  if (!analyseErgebnis) return null;
+export function Summary({ metadata, handlePDFDownload }: SummaryProps) {
+  if (!metadata.analyseErgebnis) return null;
 
   return (
     <div className="space-y-4">
       <Alert>
         <AlertTitle>Zusammenfassung der Analyse</AlertTitle>
         <AlertDescription className="whitespace-pre-line">
-          {analyseErgebnis.zusammenfassung}
+          {metadata.analyseErgebnis.zusammenfassung}
         </AlertDescription>
       </Alert>
       <Button onClick={handlePDFDownload}>
         <FileDown className="mr-2 h-4 w-4" /> Bericht herunterladen (PDF)
+      </Button>
+      <Button onClick={() => saveMetadata(metadata)}>
+        <FileDown className="mr-2 h-4 w-4" /> speichern
       </Button>
       <div className="p-4">
         <h2 className="text-lg font-semibold">Zusammenfassung der Erkenntnisse</h2>

@@ -62,8 +62,8 @@ export async function GET(request: Request) {
     }
 
     const data: GoogleGeocodingResponse = await response.json()
-    console.log('Google Maps API response:', data);
 
+    console.log(data)
     const street_number: string | null = extractValue("street_number", data)
     const route: string | null  = extractValue("route", data)
     const locality: string | null  = extractValue("locality", data)

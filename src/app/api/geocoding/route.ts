@@ -16,7 +16,6 @@ export async function GET(request: Request) {
   try {
     const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`
     
-    console.log('Nominatim URL:', nominatimUrl);
     const response = await fetch(nominatimUrl, {
       headers: {
         'User-Agent': 'NatureScout App',

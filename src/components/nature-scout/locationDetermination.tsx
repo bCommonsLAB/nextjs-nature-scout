@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Map from '../map/maps';
-import { GeocodingResult, LocationMetadata } from "@/types/nature-scout";
+import { GeocodingResult, NatureScoutData } from "@/types/nature-scout";
 
-
-
-export function LocationDetermination({ metadata, setMetadata }: { metadata: LocationMetadata; setMetadata: React.Dispatch<React.SetStateAction<LocationMetadata>> }) {
+export function LocationDetermination({ metadata, setMetadata }: { metadata: NatureScoutData; setMetadata: React.Dispatch<React.SetStateAction<NatureScoutData>> }) {
   // Lokaler Zustand für die initiale Position der Karte
   const [initialPosition, setInitialPosition] = useState<[number, number]>([metadata.latitude, metadata.longitude]);
   // Lokaler Zustand für die aktuelle Position der Karte
@@ -29,35 +27,25 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Loc
             latitude,
             longitude
           }));
+          getAddressFromCoordinates(latitude, longitude);
         },
         (error) => {
           console.error("Fehler beim Abrufen der Geolocation", error);
           // Setzen der Fallback-Position mit den definierten Standardwerten
           setCurrentPosition([defaultLatitude, defaultLongitude]);
+          getAddressFromCoordinates(defaultLatitude, defaultLongitude);
         }
       );
     } else {
       // Setzen Sie initialPosition nur, wenn sie noch nicht gesetzt wurde
       if (initialPosition[0] === 0 && initialPosition[1] === 0) {
         setInitialPosition([metadata.latitude, metadata.longitude]);
+        getAddressFromCoordinates(metadata.latitude, metadata.longitude);
       }
     }
   }, [metadata, setMetadata]);
 
-  // Debug-Logging für State-Changes
-  useEffect(() => {
-    console.log('LocationDetermination: initialPosition geändert:', initialPosition);
-  }, [initialPosition]);
-
-  useEffect(() => {
-    console.log('LocationDetermination: currentPosition geändert:', currentPosition);
-  }, [currentPosition]);
-
-  useEffect(() => {
-    console.log('LocationDetermination: metadata geändert:', metadata);
-  }, [metadata]);
-
-  
+ 
   async function getAddressFromCoordinates(lat: number, lon: number) {
     try {
 
@@ -72,7 +60,6 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Loc
       }
       
       const data: GeocodingResult = await response.json();
-      console.log('Geocoding erfolgreich:', data);
 
       if (!data.standort) {
         throw new Error('Keine Adressdaten gefunden');
@@ -106,7 +93,7 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Loc
     // Set new timer
     debounceTimer.current = setTimeout(() => {
       getAddressFromCoordinates(lat, lon);
-    }, 2000); // 2 Sekunden Verzögerung
+    }, 1000); // 1 Sekunden Verzögerung
   }, []);
 
   // Handler für die Zentrumsänderung der Karte
@@ -138,8 +125,8 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Loc
       </div>
       <div className="bg-gray-50 p-4 rounded-lg space-y-2">
         <p className="text-sm font-medium">Aktuelle Position:</p>
-        <p className="text-sm">Lat: {metadata.latitude?.toFixed(6)}</p>
-        <p className="text-sm">Lng: {metadata.longitude?.toFixed(6)}</p>
+        <p className="text-sm">Lat: {currentPosition[0]?.toFixed(6)}</p>
+        <p className="text-sm">Lng: {currentPosition[1]?.toFixed(6)}</p>
         <p className="text-sm">Gemeinde: {metadata.gemeinde}</p>
         <p className="text-sm">Standort: {metadata.standort}</p>
       </div>
