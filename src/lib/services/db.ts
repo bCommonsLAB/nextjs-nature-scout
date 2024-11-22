@@ -10,17 +10,19 @@ const options = {
 let client: MongoClient | null = null;
 
 export async function connectToDatabase() {
+  let step=0;
   try {
     if (!client) {
       client = new MongoClient(uri, options);
+      step+=1;
       await client.connect();
+      step+=1;
     }
-    
-    return client.db('divarag');
+    return client.db(process.env.MONGODB_DATABASE_NAME || 'naturescout');
   } catch (error) {
     console.error('MongoDB Verbindungsfehler:', error);
     throw new Error(
-      `Datenbankverbindung fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`
+      `Datenbankverbindung fehlgeschlagen: step ${step} ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`
     );
   }
 }

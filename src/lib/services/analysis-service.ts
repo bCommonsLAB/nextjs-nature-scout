@@ -27,7 +27,9 @@ export async function updateAnalysisJob(
   jobId: string, 
   update: Partial<AnalysisJob>
 ): Promise<AnalysisJob | null> {
-    try {
+    
+  try {
+
       const db = await connectToDatabase();
       const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
 
