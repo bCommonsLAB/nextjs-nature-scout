@@ -4,25 +4,25 @@ let client: MongoClient | null = null;
 
 export async function connectToDatabase() {
   try {
+    console.log("MONGODB_DATABASE_NAME: ", process.env.MONGODB_DATABASE_NAME);
     // Check if client exists and is connected
     if (client?.connect && client.db(process.env.MONGODB_DATABASE_NAME)) {
       return client.db(process.env.MONGODB_DATABASE_NAME);
     }
 
+    console.log("MONGODB_URI: ", process.env.MONGODB_URI);
     // Wenn keine Verbindung besteht, neue aufbauen
     client = new MongoClient(process.env.MONGODB_URI as string, {
       maxPoolSize: 10,
       minPoolSize: 5,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
-      connectTimeoutMS: 10000
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 75000,
+      connectTimeoutMS: 30000,
+      retryWrites: true,
+      retryReads: true
     });
 
     await client.connect();
-    
-    // Ping zur Überprüfung der Verbindung
-    await client.db("admin").command({ ping: 1 });
-    console.log("MongoDB Verbindung erfolgreich hergestellt");
     
     return client.db(process.env.MONGODB_DATABASE_NAME);
   } catch (error) {
