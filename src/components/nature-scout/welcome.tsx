@@ -3,15 +3,14 @@
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LocationMetadata } from "@/types/nature-scout";
+import { NatureScoutData } from "@/types/nature-scout";
 
-
-export function Welcome({ metadata, setMetadata }: { metadata: LocationMetadata; setMetadata: React.Dispatch<React.SetStateAction<LocationMetadata>> }) {
+export function Welcome({ metadata, setMetadata }: { metadata: NatureScoutData; setMetadata: React.Dispatch<React.SetStateAction<NatureScoutData>> }) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setMetadata(prev => {
       const newMetadata = { ...prev, [name]: value };
-      localStorage.setItem("habitatMetadata", JSON.stringify(newMetadata));
+      localStorage.setItem("NatureScoutData", JSON.stringify(newMetadata));
       return newMetadata;
     });
   };

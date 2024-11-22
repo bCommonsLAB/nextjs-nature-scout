@@ -20,12 +20,11 @@ interface ImageAnalysisProps {
 
 export function HabitatAnalysis({ metadata, onAnalysisComplete }: ImageAnalysisProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  //const [analyseStatus, setAnalyseStatus] = useState<string>("");
-  const [kommentar, setKommentar] = useState("");
   const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
 
   const handleAnalyzeClick = async () => {
     setIsAnalyzing(true);
+
     try {
       // Initiale Analyse-Anfrage
       const startResponse = await fetch('/api/analyze/start', {
@@ -33,10 +32,7 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete }: ImageAnalysisP
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          images: metadata.bilder.map(bild => bild.url),
-          kommentar
-        })
+        body: JSON.stringify({ metadata })
       });
 
       if (!startResponse.ok) {
@@ -47,16 +43,20 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete }: ImageAnalysisP
 
       // Status-Polling
       const checkStatus = async () => {
-        const statusResponse = await fetch(`/api/analyze/status/${jobId}`);
+        const statusResponse = await fetch(`/api/analyze/status?jobId=${jobId}`, {
+          method: "GET"
+        });
+
         const { status, result } = await statusResponse.json();
 
-        if (status === 'completed') {
-          const parsedAnalysis = JSON.parse(result.analysis);
+        console.log('[HabitatAnalysis] Status-Antwort:', { status, result });
+
+        if (status === 'completed' && result) {
           const updatedBilder = metadata.bilder.map(bild => ({
             ...bild,
             analyse: null
           }));
-          onAnalysisComplete(updatedBilder, parsedAnalysis.analyses[0]);
+          onAnalysisComplete(updatedBilder, result);
           setIsAnalyzing(false);
         } else if (status === 'failed') {
           throw new Error('Analyse fehlgeschlagen');
@@ -260,8 +260,11 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete }: ImageAnalysisP
             <Textarea
               placeholder={metadata.analyseErgebnis ? "Optionaler Korrekturhinweis zur Analyse..." : "Optionaler Kommentar zur Analyse..."}
               className="flex-1 h-24 resize-none"
-              value={kommentar}
-              onChange={(e) => setKommentar(e.target.value)}
+              value={metadata.kommentar ?? ""}
+              onChange={() => onAnalysisComplete(
+                metadata.bilder,
+                metadata.analyseErgebnis!
+              )}
             />
             <div className="flex flex-col gap-2">
               <Button 

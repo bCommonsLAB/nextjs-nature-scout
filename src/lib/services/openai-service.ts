@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
-import { ImageAnalysisResult } from '@/types/types';
+import { openAiResult, AnalyseErgebnis, NatureScoutData } from '@/types/nature-scout';
 import { serverConfig } from '../config';
 
 const openai = new OpenAI({
@@ -30,10 +30,7 @@ async function urlToBase64(url: string): Promise<string> {
   }
 }
 
-export async function analyzeImageStructured(
-  imageUrls: string[], 
-  kommentar?: string
-): Promise<ImageAnalysisResult> {
+export async function analyzeImageStructured(metadata: NatureScoutData): Promise<openAiResult> {
     /*
     const zSchema = z.object({
         "analyses": z.array(z.object({
@@ -134,10 +131,10 @@ export async function analyzeImageStructured(
 
     try {
         
-        console.log('🔄 Starte Bildanalyse für URLs:', imageUrls);
+        console.log('🔄 Starte Bildanalyse für URLs:', metadata.bilder);
         
         const imageBase64Contents = await Promise.all(
-            imageUrls.map(url => urlToBase64(url))
+          metadata.bilder.map(bild => urlToBase64(bild.url))
         );
 
         const imageContents = imageBase64Contents.map(base64 => ({
@@ -154,12 +151,17 @@ export async function analyzeImageStructured(
 
         const systemInstruction = `
             Du bist ein erfahrener Vegetationsökologe und sollst bei der Habitatanalyse unterstützen. 
+            Berücksichtige die bereits bekannten Standortdaten und Pflanzenarten in deiner Analyse.
             Argumentiere wissenschaftlich fundiert und berücksichtige alle verfügbaren Indizien 
             für eine möglichst präzise Einschätzung.
         `.trim();
   
         const Question = `
-            Bitte analysiere das Habitat systematisch nach folgenden Kriterien:
+            Analysiere die hochgeladenen Bilder unter Berücksichtigung der bekannten Geokoordinaten (${metadata.latitude}, ${metadata.longitude}), 
+            Standort: ${metadata.standort} und der bereits identifizierten Pflanzenarten:
+            ${metadata.bilder.map(bild => `${bild.analyse} `).join(', ')} 
+
+            Bitte analysiere folgende Parameter:
             1. Erfasse die Standortbedingungen und deren Einfluss auf die Vegetation
             2. Identifiziere charakteristische Pflanzenarten und deren Häufigkeit
             3. Beschreibe die Vegetationsstruktur und -dynamik
@@ -169,6 +171,7 @@ export async function analyzeImageStructured(
             7. Führe unterstützende und widersprechende Merkmale auf
             8. Schätze die Konfidenz deiner Einordnung
         `.trim();
+        console.log("Question", Question);
 
         const completion = await openai.chat.completions.create({
             model: serverConfig.OPENAI_VISION_MODEL,
@@ -182,7 +185,7 @@ export async function analyzeImageStructured(
                     content: [
                         { 
                             type: "text", 
-                            text: kommentar ? `${Question}\n\nZusätzliche Hinweis: ${kommentar}` : Question
+                            text: metadata.kommentar ? `${Question}\n\nZusätzliche Hinweis: ${metadata.kommentar}` : Question
                         },
                         ...imageContents
                     ],
@@ -191,19 +194,19 @@ export async function analyzeImageStructured(
             response_format: zodResponseFormat(zSchema, "structured_analysis"),
             max_tokens: 2000,
         });
-        const analysisResult = completion.choices[0]?.message.content ?? null;
+        const analysisResult =  completion.choices[0]?.message.content;
         if (analysisResult) {
             console.log("analysisResult", analysisResult);
-            //const parsedResult = JSON.parse(analysisResult); // Falls die Antwort ein JSON-String ist
-            return { analysis: analysisResult, error: undefined};
+            const parsedResult: AnalyseErgebnis = JSON.parse(analysisResult).analyses[0]; // Falls die Antwort ein JSON-String ist
+            return { result: parsedResult, error: undefined};
         } else {
-            return { analysis: "Keine Analyse verfügbar.", error: undefined};
+            return { result: null, error: "Keine Analyse verfügbar."};
         };
     } catch (error: Error | unknown) {
         console.error('Fehler bei der Bildanalyse:', error);
         const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
         return {
-            analysis: "Analysefehler",
+            result: null,
             error: `Die Analyse ist fehlgeschlagen: ${errorMessage}`
         };
     }

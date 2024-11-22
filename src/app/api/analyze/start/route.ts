@@ -1,22 +1,74 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
+import { createAnalysisJob, updateAnalysisJob, getAnalysisJob } from '@/lib/services/analysis-service';
+import { analyzeImageStructured } from '@/lib/services/openai-service';
+import { openAiResult } from '@/types/nature-scout';
 
 export async function POST(request: NextRequest) {
-  try {
-    const { images, kommentar } = await request.json();
+  const startTime = performance.now();
+  console.log('[Start-Route] Neue Analyse-Anfrage empfangen');
 
-    if (!images || !Array.isArray(images)) {
+  try {
+    const { metadata } = await request.json();
+    
+    if (!metadata) {
+      console.warn('[Start-Route] Keine Metadaten in der Anfrage');
       return NextResponse.json(
-        { error: 'Keine Bilder übergeben.' },
+        { error: 'Keine Metadaten übergeben.' },
         { status: 400 }
       );
     }
-    console.log('kommentar', kommentar);
-    // Hier würde normalerweise die Analyse in einer Queue gestartet
-    const jobId = Date.now().toString(); // Dummy jobId
+
+    const jobId = Date.now().toString();
+    console.log(`[Start-Route] Erstelle neuen Job mit ID: ${jobId}`);
+    
+    await createAnalysisJob(jobId, metadata, 'pending');
+    const job = await getAnalysisJob(jobId);
+    
+    if (!job) {
+      console.error(`[Start-Route] Job ${jobId} wurde nicht erfolgreich erstellt`);
+      return NextResponse.json(
+        { error: 'Fehler beim Erstellen des Analyse-Jobs' },
+        { status: 500 }
+      );
+    }
+
+    // Starte die Analyse asynchron
+    (async () => {
+      try {
+        const analysisResult: openAiResult = await analyzeImageStructured(metadata);
+        
+        if (analysisResult.error) {
+          await updateAnalysisJob(jobId, {
+            status: 'failed',
+            error: analysisResult.error
+          });
+          return;
+        }
+
+        await updateAnalysisJob(jobId, {
+          status: 'completed',
+          result: analysisResult.result
+        });
+      } catch (error) {
+        console.error(`[Start-Route] Fehler bei der Analyse für Job ${jobId}:`, error);
+        await updateAnalysisJob(jobId, {
+          status: 'failed',
+          error: 'Fehler bei der Bildanalyse'
+        });
+      }
+    })();
+
+    const endTime = performance.now();
+    console.log(`[Start-Route] Job-Erstellung abgeschlossen in ${(endTime - startTime).toFixed(2)}ms`);
 
     return NextResponse.json({ jobId });
   } catch (error) {
-    console.error('Fehler beim Starten der Analyse:', error);
+    const endTime = performance.now();
+    console.error('[Start-Route] Fehler beim Starten der Analyse:', {
+      error,
+      verarbeitungszeit: `${(endTime - startTime).toFixed(2)}ms`
+    });
+
     return NextResponse.json(
       { error: 'Fehler beim Starten der Analyse' },
       { status: 500 }

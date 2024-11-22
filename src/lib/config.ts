@@ -13,6 +13,7 @@ export const serverConfig = {
     OPENAI_VISION_MODEL: process.env.OPENAI_VISION_MODEL || '',
     OPENAI_TRANSCRIPTION_MODEL: process.env.OPENAI_TRANSCRIPTION_MODEL || '',
     OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+    MONGODB_URI: process.env.MONGODB_URI || '',
     STORAGE: {
         containerName: process.env.AZURE_STORAGE_CONTAINER_NAME || '',
         connectionString: process.env.AZURE_STORAGE_CONNECTION_STRING || '',

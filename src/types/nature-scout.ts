@@ -1,3 +1,5 @@
+import { ObjectId } from 'mongodb';
+
 export interface NatureScoutData {
   erfassungsperson: string;
   email: string;
@@ -8,6 +10,7 @@ export interface NatureScoutData {
   standort: string;
   bilder: Bild[];
   analyseErgebnis?: AnalyseErgebnis;
+  kommentar?: string;
 }
 
 export interface GeocodingResult {
@@ -54,6 +57,24 @@ export interface PlantNetResult {
     scientificName: string;
   };
 }
+
+
+export interface AnalysisJob {
+  _id: ObjectId;
+  status: 'pending' | 'completed' | 'failed';
+  metadata: NatureScoutData;
+  result?: AnalyseErgebnis | null;
+  error?: string | null;
+  startTime: Date;
+  updatedAt: Date;
+}
+
+
+export interface openAiResult {
+  result?: AnalyseErgebnis | null;
+  error?: string;
+}
+
 
 export interface AnalyseErgebnis {
   standort: {
@@ -102,4 +123,13 @@ export interface GetImageProps {
   anweisung: string;
   onBildUpload: (imageTitle: string, filename: string, url: string, analysis: string) => void;
   existingImage?: Bild;
+}
+
+export interface LocationMetadata {
+  address?: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+  // Weitere Metadaten falls benötigt
 }

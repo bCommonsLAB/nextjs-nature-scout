@@ -30,12 +30,16 @@ function MapNoSSR({ position, zoom, onCenterChange }: MapNoSSRProps) {
       });
 
       // Fadenkreuz in der Mitte der Karte platzieren
-      const crosshair = L.marker(mapRef.current.getCenter(), { icon: crosshairIcon, clickable: false });
+      const crosshair = L.marker(mapRef.current.getCenter(), { 
+        icon: crosshairIcon, 
+        interactive: false 
+      });
       crosshair.addTo(mapRef.current);
 
       // Event-Listener hinzufügen, um die Position zu aktualisieren
-      mapRef.current.on('move', () => {
-        const newCenter = mapRef.current.getCenter();
+      const map = mapRef.current;
+      map.on('move', () => {
+        const newCenter = map.getCenter();
         onCenterChange([newCenter.lat, newCenter.lng]);
         crosshair.setLatLng(newCenter);
       });
