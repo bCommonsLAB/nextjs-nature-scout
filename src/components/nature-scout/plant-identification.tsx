@@ -23,27 +23,15 @@ export function PlantIdentification({ bilder, onIdentificationComplete }: PlantI
       
       // Sequentiell jeden API-Call durchführen
       for (const bild of bilder) {
-        const response = await fetch('/api/analyze/plants', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ imageUrls: [bild.url] }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Fehler bei der API-Anfrage für Bild ${bild.imageKey}`);
-        }
-
-        const data: PlantNetResponse = await response.json();
+        const response = await analyzePlants([bild.url]);
         
         // Aktualisiere das einzelne Bild mit dem Analyseergebnis
         const bildIndex = updatedBilder.findIndex(b => b.imageKey === bild.imageKey);
         if (bildIndex !== -1) {
           updatedBilder[bildIndex] = {
             ...bild,
-            analyse: data.bestMatch || '',
-            plantnetResult: data.results[0]
+            analyse: response.bestMatch || '',
+            plantnetResult: response.results[0]
           };
         }
       }
@@ -72,4 +60,33 @@ export function PlantIdentification({ bilder, onIdentificationComplete }: PlantI
       </Button>
     </Card>
   );
+}
+
+async function analyzePlants(imageUrls: string[]) {
+  try {
+    const response = await fetch('/api/analyze/plants', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ imageUrls }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('PlantNet API Fehler:', {
+        status: response.status,
+        statusText: response.statusText,
+        details: errorData.details,
+        error: errorData.error
+      });
+      throw new Error(errorData.error);
+    }
+
+    const data: PlantNetResponse = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Fehler bei der Pflanzenanalyse:', error);
+    throw error;
+  }
 } 

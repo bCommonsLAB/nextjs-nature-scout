@@ -5,7 +5,7 @@ import { ObjectId } from 'mongodb';
 export async function createAnalysisJob(jobId: string, metadata: NatureScoutData, status: 'pending' | 'completed' | 'failed'): Promise<AnalysisJob> {
   try {
     const db = await connectToDatabase();
-    const collection = db.collection('naturescoutJobs');
+    const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
 
     const jobData: AnalysisJob = {
       _id: new ObjectId(jobId),
@@ -29,7 +29,7 @@ export async function updateAnalysisJob(
 ): Promise<AnalysisJob | null> {
     try {
       const db = await connectToDatabase();
-      const collection = db.collection('naturescoutJobs');
+      const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
 
       const job = await collection.findOne({ _id: new ObjectId(jobId) });
       if (!job) return null;
@@ -51,7 +51,7 @@ export async function updateAnalysisJob(
 export async function getAnalysisJob(jobId: string): Promise<AnalysisJob | null> {
   try {
     const db = await connectToDatabase();
-    const collection = db.collection('naturescoutJobs');
+    const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
 
     const result = await collection.findOne({ _id: new ObjectId(jobId) });
     return result as AnalysisJob | null;

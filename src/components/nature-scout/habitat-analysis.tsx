@@ -21,9 +21,11 @@ interface ImageAnalysisProps {
 export function HabitatAnalysis({ metadata, onAnalysisComplete }: ImageAnalysisProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const handleAnalyzeClick = async () => {
     setIsAnalyzing(true);
+    setAnalysisError(null);
 
     try {
       // Initiale Analyse-Anfrage
@@ -36,7 +38,9 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete }: ImageAnalysisP
       });
 
       if (!startResponse.ok) {
-        throw new Error('Netzwerk-Antwort war nicht ok');
+        const errorData = await startResponse.json();
+        console.error("Analyse-Fehler:", errorData);
+        throw new Error(errorData.details || 'Ein Fehler ist bei der Analyse aufgetreten');
       }
 
       const { jobId } = await startResponse.json();
@@ -61,22 +65,32 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete }: ImageAnalysisP
         } else if (status === 'failed') {
           throw new Error('Analyse fehlgeschlagen');
         } else {
-          // Weiter pollen nach 2 Sekunden
           setTimeout(checkStatus, 2000);
         }
       };
 
-      // Starte Polling
       await checkStatus();
 
     } catch (error) {
       console.error("Fehler bei der Analyse:", error);
+      setAnalysisError(error instanceof Error ? error.message : 'Ein unerwarteter Fehler ist aufgetreten');
       setIsAnalyzing(false);
     }
   };
 
   return (
     <div className="space-y-4">
+      {/* Fehleranzeige */}
+      {analysisError && (
+        <Card className="border-red-200 bg-red-50">
+          <CardHeader>
+            <CardTitle className="text-red-700">Fehler bei der Analyse</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-red-600">{analysisError}</p>
+          </CardContent>
+        </Card>
+      )}
       
       {!metadata.analyseErgebnis && (
         <Card>
