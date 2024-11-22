@@ -19,7 +19,9 @@ export async function connectToDatabase() {
     return client.db('divarag');
   } catch (error) {
     console.error('MongoDB Verbindungsfehler:', error);
-    throw new Error('Datenbankverbindung konnte nicht hergestellt werden');
+    throw new Error(
+      `Datenbankverbindung fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`
+    );
   }
 }
 
