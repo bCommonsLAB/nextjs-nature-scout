@@ -1,36 +1,58 @@
 import { MongoClient } from 'mongodb';
-//test
-const uri = process.env.MONGODB_URI || '';
-const options = {
-  maxPoolSize: 10,
-  serverSelectionTimeoutMS: 5000,
-  socketTimeoutMS: 45000,
-};
 
 let client: MongoClient | null = null;
 
 export async function connectToDatabase() {
-  let step=0;
   try {
-    if (!client) {
-      client = new MongoClient(uri, options);
-      step+=1;
-      await client.connect();
-      step+=1;
+    // Check if client exists and is connected
+    if (client?.connect && client.db(process.env.MONGODB_DATABASE_NAME)) {
+      return client.db(process.env.MONGODB_DATABASE_NAME);
     }
-    return client.db(process.env.MONGODB_DATABASE_NAME || 'naturescout');
+
+    // Wenn keine Verbindung besteht, neue aufbauen
+    client = new MongoClient(process.env.MONGODB_URI as string, {
+      maxPoolSize: 10,
+      minPoolSize: 5,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 10000
+    });
+
+    await client.connect();
+    
+    // Ping zur Überprüfung der Verbindung
+    await client.db("admin").command({ ping: 1 });
+    console.log("MongoDB Verbindung erfolgreich hergestellt");
+    
+    return client.db(process.env.MONGODB_DATABASE_NAME);
   } catch (error) {
     console.error('MongoDB Verbindungsfehler:', error);
+    
+    // Verbindung bei Fehler zurücksetzen
+    if (client) {
+      await client.close();
+      client = null;
+    }
+    
     throw new Error(
-      `Datenbankverbindung fehlgeschlagen: step ${step} ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`
+      `Datenbankverbindung fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`
     );
   }
 }
 
-// Optional: Cleanup-Funktion für Tests oder Server-Shutdown
-export async function closeDatabase() {
+// Optional: Cleanup-Funktion für die Verbindung
+export async function closeDatabaseConnection() {
   if (client) {
     await client.close();
     client = null;
+    console.log('MongoDB Verbindung geschlossen');
   }
+}
+
+// Prozess-Beendigung behandeln
+if (typeof process !== 'undefined') {
+  process.on('SIGINT', async () => {
+    await closeDatabaseConnection();
+    process.exit(0);
+  });
 }

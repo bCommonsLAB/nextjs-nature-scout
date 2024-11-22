@@ -171,7 +171,8 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
             7. Führe unterstützende und widersprechende Merkmale auf
             8. Schätze die Konfidenz deiner Einordnung
         `.trim();
-        console.log("Question", Question);
+        console.log("Question: ", Question);
+        console.log("OPENAI_VISION_MODEL: ", serverConfig.OPENAI_VISION_MODEL);
 
         const completion = await openai.chat.completions.create({
             model: serverConfig.OPENAI_VISION_MODEL,

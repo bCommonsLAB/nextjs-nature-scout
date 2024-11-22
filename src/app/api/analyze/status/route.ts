@@ -19,7 +19,6 @@ export async function GET(request: NextRequest) {
     console.log(`[Status-Route] Rufe getAnalysisJob Service auf für ID: ${jobId}`);
     
     const job = await getAnalysisJob(jobId);
-    console.log(`[Status-Route] Service-Antwort für Job ${jobId}:`, job);
 
     if (!job) {
       console.warn(`[Status-Route] Job ${jobId} nicht gefunden`);
