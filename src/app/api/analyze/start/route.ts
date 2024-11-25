@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { createAnalysisJob, updateAnalysisJob, getAnalysisJob } from '@/lib/services/analysis-service';
 import { analyzeImageStructured } from '@/lib/services/openai-service';
 import { openAiResult } from '@/types/nature-scout';
+import { ObjectId } from 'mongodb';
 
 export async function POST(request: NextRequest) {
   const startTime = performance.now();
@@ -18,10 +19,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const jobId = Date.now().toString();
+    const jobId = new ObjectId().toString();
     console.log(`[Start-Route] Erstelle neuen Job mit ID: ${jobId}`);
     
-    await createAnalysisJob(jobId, metadata, 'pending');
+    try {
+      await createAnalysisJob(jobId, metadata, 'pending');
+    } catch (dbError) {
+      console.error('[Start-Route] Datenbankfehler:', dbError);
+      return NextResponse.json(
+        { 
+          error: 'Datenbankfehler',
+          details: 'Die Verbindung zur Datenbank konnte nicht hergestellt werden',
+          technicalDetails: dbError instanceof Error ? dbError.message : 'Unbekannter Fehler'
+        },
+        { status: 503 }
+      );
+    }
     const job = await getAnalysisJob(jobId);
     
     if (!job) {

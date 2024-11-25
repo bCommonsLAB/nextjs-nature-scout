@@ -45,7 +45,14 @@ export async function POST(request: Request) {
     if (!response.ok) {
       const errorData = await response.json();
       console.error("PlantNet API Error:", errorData);
-      throw new Error(`PlantNet API Fehler: ${response.statusText}`);
+      return NextResponse.json(
+        { 
+          error: "Fehler bei der Pflanzenidentifikation",
+          details: errorData.message,
+          statusText: response.statusText 
+        },
+        { status: response.status }
+      );
     }
 
     const data = await response.json();
