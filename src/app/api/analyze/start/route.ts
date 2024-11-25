@@ -47,7 +47,8 @@ export async function POST(request: NextRequest) {
 
         await updateAnalysisJob(jobId, {
           status: 'completed',
-          result: analysisResult.result
+          result: analysisResult.result,
+          llmInfo: analysisResult.llmInfo
         });
       } catch (error) {
         console.error(`[Start-Route] Fehler bei der Analyse für Job ${jobId}:`, error);
@@ -57,9 +58,6 @@ export async function POST(request: NextRequest) {
         });
       }
     })();
-
-    const endTime = performance.now();
-    console.log(`[Start-Route] Job-Erstellung abgeschlossen in ${(endTime - startTime).toFixed(2)}ms`);
 
     return NextResponse.json({ jobId });
   } catch (error) {

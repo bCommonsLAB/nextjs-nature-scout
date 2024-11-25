@@ -16,7 +16,7 @@ export async function connectToDatabase() {
       await client.connect();
     }
     
-    return client.db('divarag');
+    return client.db('naturescout');
   } catch (error) {
     console.error('MongoDB Verbindungsfehler:', error);
     throw new Error('Datenbankverbindung konnte nicht hergestellt werden');

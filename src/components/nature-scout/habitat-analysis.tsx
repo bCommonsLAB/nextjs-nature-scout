@@ -3,25 +3,18 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { NatureScoutData, Bild, AnalyseErgebnis } from "@/types/nature-scout";
+import { NatureScoutData, Bild, AnalyseErgebnis, llmInfo } from "@/types/nature-scout";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 
 interface ImageAnalysisProps {
   metadata: NatureScoutData;
-  onAnalysisComplete: (analysedBilder: Bild[], ergebnis: AnalyseErgebnis) => void;
+  onAnalysisComplete: (analysedBilder: Bild[], ergebnis: AnalyseErgebnis, llmInfo: llmInfo) => void;
+  onKommentarChange: (kommentar: string) => void;
 }
 
-export function HabitatAnalysis({ metadata, onAnalysisComplete }: ImageAnalysisProps) {
+export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChange }: ImageAnalysisProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
-
+  
   const handleAnalyzeClick = async () => {
     setIsAnalyzing(true);
 
@@ -47,16 +40,16 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete }: ImageAnalysisP
           method: "GET"
         });
 
-        const { status, result } = await statusResponse.json();
+        const { status, result, llmInfo } = await statusResponse.json();
 
-        console.log('[HabitatAnalysis] Status-Antwort:', { status, result });
+        //console.log('[HabitatAnalysis] Status-Antwort:', { status, result });
 
         if (status === 'completed' && result) {
           const updatedBilder = metadata.bilder.map(bild => ({
             ...bild,
             analyse: null
           }));
-          onAnalysisComplete(updatedBilder, result);
+          onAnalysisComplete(updatedBilder, result, llmInfo);
           setIsAnalyzing(false);
         } else if (status === 'failed') {
           throw new Error('Analyse fehlgeschlagen');
@@ -73,6 +66,11 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete }: ImageAnalysisP
       console.error("Fehler bei der Analyse:", error);
       setIsAnalyzing(false);
     }
+  };
+
+  // Funktion zum Aktualisieren des Kommentars
+  const handleKommentarChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    onKommentarChange(event.target.value);
   };
 
   return (
@@ -258,13 +256,10 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete }: ImageAnalysisP
         <CardContent>
           <div className="flex gap-4 items-start">
             <Textarea
-              placeholder={metadata.analyseErgebnis ? "Optionaler Korrekturhinweis zur Analyse..." : "Optionaler Kommentar zur Analyse..."}
-              className="flex-1 h-24 resize-none"
+              placeholder="Kommentar zur Analyse..."
+              className="flex-1 h-24 resize-none mt-4"
               value={metadata.kommentar ?? ""}
-              onChange={() => onAnalysisComplete(
-                metadata.bilder,
-                metadata.analyseErgebnis!
-              )}
+              onChange={handleKommentarChange}
             />
             <div className="flex flex-col gap-2">
               <Button 
@@ -274,23 +269,6 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete }: ImageAnalysisP
                 {isAnalyzing ? "Analysiere..." : "Analyse jetzt starten"}
               </Button>
               
-              {metadata.analyseErgebnis && (
-                <Dialog open={isJsonDialogOpen} onOpenChange={setIsJsonDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline">
-                      JSON anzeigen
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
-                    <DialogHeader>
-                      <DialogTitle>Analyse-Ergebnis als JSON</DialogTitle>
-                    </DialogHeader>
-                    <pre className="bg-gray-100 p-4 rounded-md overflow-x-auto">
-                      {JSON.stringify(metadata.analyseErgebnis, null, 2)}
-                    </pre>
-                  </DialogContent>
-                </Dialog>
-              )}
             </div>
           </div>
         </CardContent>

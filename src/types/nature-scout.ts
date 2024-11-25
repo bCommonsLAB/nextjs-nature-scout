@@ -10,6 +10,7 @@ export interface NatureScoutData {
   standort: string;
   bilder: Bild[];
   analyseErgebnis?: AnalyseErgebnis;
+  llmInfo?: llmInfo;
   kommentar?: string;
 }
 
@@ -61,9 +62,11 @@ export interface PlantNetResult {
 
 export interface AnalysisJob {
   _id: ObjectId;
+  jobId: string; // Neue Zeile für die ursprüngliche ID
   status: 'pending' | 'completed' | 'failed';
   metadata: NatureScoutData;
   result?: AnalyseErgebnis | null;
+  llmInfo?: llmInfo
   error?: string | null;
   startTime: Date;
   updatedAt: Date;
@@ -72,9 +75,15 @@ export interface AnalysisJob {
 
 export interface openAiResult {
   result?: AnalyseErgebnis | null;
+  llmInfo?: llmInfo;
   error?: string;
 }
 
+export interface llmInfo {
+  llmSystemInstruction?: string;
+  llmQuestion?: string;
+  jsonSchema?: string;
+}
 
 export interface AnalyseErgebnis {
   standort: {
@@ -116,6 +125,7 @@ export interface AnalyseErgebnis {
     dagegenSpricht: string[];
   };
   zusammenfassung: string;
+  kommentar?: string;
 }
 
 export interface GetImageProps {

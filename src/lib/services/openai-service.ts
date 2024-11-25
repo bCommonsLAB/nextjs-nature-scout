@@ -3,6 +3,7 @@ import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { openAiResult, AnalyseErgebnis, NatureScoutData } from '@/types/nature-scout';
 import { serverConfig } from '../config';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 const openai = new OpenAI({
     apiKey: serverConfig.OPENAI_API_KEY
@@ -50,11 +51,11 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
         "analyses": z.array(z.object({
           "standort": z.object({
             "hangneigung": z.enum(["eben", "leicht_geneigt", "steil", "weis nicht"])
-              .describe("Hangneigung des Geländes"),
+              .describe("Hangneigung des Geländes evtl. unter Berücksichtigung von Hinweisen aus der Fragestellung"),
             "exposition": z.enum(["N", "NO", "O", "SO", "S", "SW", "W", "NW", "weis nicht"])
-              .describe("Ausrichtung des Hanges"),
+              .describe("Ausrichtung des Habitats evtl. unter Berücksichtigung von Hinweisen aus der Fragestellung"),
             "bodenfeuchtigkeit": z.enum(["trocken", "frisch", "feucht", "nass", "wasserzügig", "weis nicht"])
-              .describe("Feuchtigkeit des Bodens")
+              .describe("Feuchtigkeit des Bodens evtl. unter Berücksichtigung von Hinweisen aus der Fragestellung"),
           }),
           "pflanzenArten": z.array(
             z.object({
@@ -64,7 +65,7 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
               "istZeiger": z.boolean().optional()
                 .describe("Ist die Art ein wichtiger Indikator?")
             })
-          ).describe("Liste der erkannten Pflanzenarten mit Details, bitte nur die Arten auflisten, die eindeutig in den Bildern erkannt werden."),
+          ).describe("Liste der erkannten Pflanzenarten mit Details, bitte nur die Arten auflisten, die in der Fragestellung genannt wurden."),
           "Vegetationsstruktur": z.object({
             "höhe": z.enum(["kurz", "mittel", "hoch"])
               .describe("Höhe des Hauptbestandes"),
@@ -72,14 +73,14 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
               .describe("Dichte der Vegetation"),
             "deckung": z.enum(["offen", "mittel", "geschlossen"])
               .describe("Bodendeckung der Vegetation")
-          }),
+          }).describe("Bitte die vegetationsstruktur beschreiben. Wenn nicht genau erkennbar, bitte 'weis nicht' angeben."),
           "blühaspekte": z.object({
             "intensität": z.enum(["keine", "vereinzelt", "reich"])
               .describe("Intensität der Blüte"),
             "anzahlFarben": z.number()
               .int()
               .describe("Anzahl verschiedener Blütenfarben")
-          }),
+          }).describe("Bitte die Blühaspekte beschreiben. Wenn nicht genau erkennbar, bitte 'weis nicht' angeben."),
           "nutzung": z.object({
             "beweidung": z.boolean()
               .describe("Beweidungsspuren vorhanden"),
@@ -87,7 +88,7 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
               .describe("Mahdspuren vorhanden"),
             "düngung": z.boolean()
               .describe("Düngungsspuren vorhanden")
-          }),
+          }).describe("Bitte die Nutzungsspuren beschreiben. Wenn nicht genau erkennbar, bitte 'weis nicht' angeben."),
           "habitatTyp": z.enum([
             "Magerwiese",
             "Trockenrasen",
@@ -116,7 +117,7 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
             "konfidenz": z.number()
               .int()
               .describe("Konfidenz der Habitatbestimmung in Prozent")
-          }),
+          }).describe("Bitte die Bewertung der ökologischen Qualität und Schutzwürdigkeit des Habitats beschreiben. Wenn nicht genau erkennbar, bitte 'weis nicht' angeben."),
           "evidenz": z.object({
             "dafürSpricht": z.array(z.string())
               .describe("Merkmale, die für die Klassifizierung sprechen"),
@@ -128,6 +129,9 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
         })
         )
     });
+
+    const jsonSchema = zodToJsonSchema(zSchema, 'analyseSchema');
+    console.log(JSON.stringify(jsonSchema, null, 2));
 
     try {
         
@@ -149,43 +153,45 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
             numberOfImages: imageContents.length
         });
 
-        const systemInstruction = `
-            Du bist ein erfahrener Vegetationsökologe und sollst bei der Habitatanalyse unterstützen. 
-            Berücksichtige die bereits bekannten Standortdaten und Pflanzenarten in deiner Analyse.
-            Argumentiere wissenschaftlich fundiert und berücksichtige alle verfügbaren Indizien 
-            für eine möglichst präzise Einschätzung.
+        const llmSystemInstruction = `
+Du bist ein erfahrener Vegetationsökologe und sollst bei der Habitatanalyse unterstützen. 
+Berücksichtige die bereits bekannten Standortdaten und Pflanzenarten in deiner Analyse.
+Argumentiere wissenschaftlich fundiert und berücksichtige alle verfügbaren Indizien 
+für eine möglichst präzise Einschätzung.
         `.trim();
   
-        const Question = `
-            Analysiere die hochgeladenen Bilder unter Berücksichtigung der bekannten Geokoordinaten (${metadata.latitude}, ${metadata.longitude}), 
-            Standort: ${metadata.standort} und der bereits identifizierten Pflanzenarten:
-            ${metadata.bilder.map(bild => `${bild.analyse} `).join(', ')} 
+        const llmQuestion = `
+Analysiere das hochgeladenen Geasamtbild und einige Detailbilder unter Berücksichtigung der bekannten Geokoordinaten (${metadata.latitude}, ${metadata.longitude}), 
+Standort: ${metadata.standort} und der bereits identifizierten Pflanzenarten:
+${metadata.bilder.map(bild => `${bild.analyse} `).join(', ')} 
+Bitte analysiere folgende Parameter:
+1. Erfasse die Standortbedingungen und deren Einfluss auf die Vegetation
+2. Wie häufig sind die erkannten Pflanzenarten im Bestand
+3. Beschreibe die Vegetationsstruktur und -dynamik
+4. Dokumentiere Nutzungsspuren und deren Auswirkungen
+5. Leite daraus den wahrscheinlichen Habitattyp ab
+6. Bewerte die ökologische Qualität und Schutzwürdigkeit
+7. Führe unterstützende und widersprechende Merkmale auf
+8. Schätze die Konfidenz deiner Einordnung
+Beachte bitte folgende zusätzliche Hinweise: ${metadata.kommentar}
+`.trim();
 
-            Bitte analysiere folgende Parameter:
-            1. Erfasse die Standortbedingungen und deren Einfluss auf die Vegetation
-            2. Identifiziere charakteristische Pflanzenarten und deren Häufigkeit
-            3. Beschreibe die Vegetationsstruktur und -dynamik
-            4. Dokumentiere Nutzungsspuren und deren Auswirkungen
-            5. Leite daraus den wahrscheinlichen Habitattyp ab
-            6. Bewerte die ökologische Qualität und Schutzwürdigkeit
-            7. Führe unterstützende und widersprechende Merkmale auf
-            8. Schätze die Konfidenz deiner Einordnung
-        `.trim();
-        console.log("Question", Question);
+
+        console.log("Question", llmQuestion);
 
         const completion = await openai.chat.completions.create({
             model: serverConfig.OPENAI_VISION_MODEL,
             messages: [
                 { 
                     role: "system", 
-                    content: systemInstruction 
+                    content: llmSystemInstruction 
                 },
                 {
                     role: "user",
                     content: [
                         { 
                             type: "text", 
-                            text: metadata.kommentar ? `${Question}\n\nZusätzliche Hinweis: ${metadata.kommentar}` : Question
+                            text: llmQuestion
                         },
                         ...imageContents
                     ],
@@ -196,9 +202,15 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
         });
         const analysisResult =  completion.choices[0]?.message.content;
         if (analysisResult) {
-            console.log("analysisResult", analysisResult);
+            //console.log("analysisResult", analysisResult);
             const parsedResult: AnalyseErgebnis = JSON.parse(analysisResult).analyses[0]; // Falls die Antwort ein JSON-String ist
-            return { result: parsedResult, error: undefined};
+            return { result: parsedResult,
+              llmInfo: {
+                llmSystemInstruction: llmSystemInstruction,
+                llmQuestion: llmQuestion,
+                jsonSchema: JSON.stringify(jsonSchema, null, 2)
+              }
+            };
         } else {
             return { result: null, error: "Keine Analyse verfügbar."};
         };

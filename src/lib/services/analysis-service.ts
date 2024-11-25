@@ -8,7 +8,8 @@ export async function createAnalysisJob(jobId: string, metadata: NatureScoutData
     const collection = db.collection('naturescoutJobs');
 
     const jobData: AnalysisJob = {
-      _id: new ObjectId(jobId),
+      _id: new ObjectId(),
+      jobId: jobId,
       status: status,
       metadata,
       startTime: new Date(),
@@ -31,7 +32,7 @@ export async function updateAnalysisJob(
       const db = await connectToDatabase();
       const collection = db.collection('naturescoutJobs');
 
-      const job = await collection.findOne({ _id: new ObjectId(jobId) });
+      const job = await collection.findOne({ jobId: jobId });
       if (!job) return null;
 
       const updatedJob = {
@@ -40,7 +41,7 @@ export async function updateAnalysisJob(
           updatedAt: new Date()
       };
       
-      await collection.updateOne({ _id: new ObjectId(jobId) }, { $set: updatedJob });
+      await collection.updateOne({ jobId: jobId }, { $set: updatedJob });
       return updatedJob;
     } catch (error) {
       console.error('Fehler bei der Verbindung zur Datenbank:', error);
@@ -53,7 +54,7 @@ export async function getAnalysisJob(jobId: string): Promise<AnalysisJob | null>
     const db = await connectToDatabase();
     const collection = db.collection('naturescoutJobs');
 
-    const result = await collection.findOne({ _id: new ObjectId(jobId) });
+    const result = await collection.findOne({ jobId: jobId });
     return result as AnalysisJob | null;
   } catch (error) {
     console.error('Fehler bei der Verbindung zur Datenbank:', error);

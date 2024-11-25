@@ -10,8 +10,10 @@ import { Summary } from "./summary";
 import { UploadedImageList } from "./uploaded-image-list";
 import { HabitatAnalysis } from "./habitat-analysis";
 import { PlantIdentification } from "./plant-identification"
-import { Bild, NatureScoutData, AnalyseErgebnis } from "@/types/nature-scout";
+import { Bild, NatureScoutData, AnalyseErgebnis, llmInfo } from "@/types/nature-scout";
 import { LocationDetermination } from './locationDetermination';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Code, ChevronLeft, ChevronRight } from "lucide-react";
 
 const schritte = [
   "Willkommen",
@@ -35,6 +37,7 @@ export function NatureScout() {
     bilder: [],
     analyseErgebnis: undefined
   });
+  const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
 
   const handleBildUpload = (imageKey: string, filename: string, url: string, analysis: string) => {
     const neuesBild: Bild = {
@@ -53,13 +56,19 @@ export function NatureScout() {
     }));
   };
 
-  const handleAnalysisComplete = (analysedBilder: Bild[], ergebnis: AnalyseErgebnis) => {
+  const handleAnalysisComplete = (
+    analysedBilder: Bild[], 
+    ergebnis: AnalyseErgebnis, 
+    llmInfo: llmInfo,
+    kommentar?: string
+  ) => {
     setMetadata(prev => ({
       ...prev,
       bilder: analysedBilder,
-      analyseErgebnis: ergebnis
+      analyseErgebnis: ergebnis,
+      llmInfo: llmInfo,
+      kommentar: kommentar
     }));
-    //setAktiverSchritt(prev => prev + 1);
   };
 
   const handlePDFDownload = () => {
@@ -73,6 +82,13 @@ export function NatureScout() {
       bilder: prev.bilder.map(bild => 
         updatedBilder.find(updated => updated.imageKey === bild.imageKey) || bild
       )
+    }));
+  };
+
+  const handleKommentarChange = (kommentar: string) => {
+    setMetadata(prev => ({
+      ...prev,
+      kommentar
     }));
   };
 
@@ -131,7 +147,8 @@ export function NatureScout() {
             <div>
               <HabitatAnalysis 
                 metadata={metadata} 
-                onAnalysisComplete={handleAnalysisComplete} 
+                onAnalysisComplete={handleAnalysisComplete}
+                onKommentarChange={handleKommentarChange}
               />
             </div>
           </div>
@@ -153,11 +170,6 @@ export function NatureScout() {
     console.log("Aktuelle Bilder:", metadata.bilder);
   }, [metadata.bilder]);
 
-  const DebugMetadata = ({ metadata }: { metadata: NatureScoutData }) => (
-    <pre className="bg-gray-200 p-2 rounded text-xs">
-      {JSON.stringify(metadata, null, 2)}
-    </pre>
-  );
 
   return (
     <div className="container mx-auto p-4">
@@ -183,21 +195,48 @@ export function NatureScout() {
           </Card>
         </div>
       </div>
-      <div className="flex justify-between mt-4">
-        <Button 
-          onClick={() => setAktiverSchritt(prev => prev - 1)} 
-          disabled={aktiverSchritt === 0}
-        >
-          Zurück
-        </Button>
+      <div className="flex justify-between items-center mt-4 gap-4">
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => setAktiverSchritt(prev => prev - 1)} 
+            disabled={aktiverSchritt === 0}
+            variant="outline"
+            className="gap-2"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Zurück
+          </Button>
+          
+          {metadata && (
+            <Dialog open={isJsonDialogOpen} onOpenChange={setIsJsonDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Code className="h-4 w-4" />
+                  Analysierte Daten anzeigen
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
+                <DialogHeader>
+                  <DialogTitle>Analysierte Daten</DialogTitle>
+                </DialogHeader>
+                <pre className="bg-gray-100 p-4 rounded-md overflow-x-auto">
+                  {JSON.stringify(metadata, null, 2)}
+                </pre>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
+
         <Button 
           onClick={() => setAktiverSchritt(prev => prev + 1)} 
           disabled={aktiverSchritt === schritte.length - 1}
+          className="gap-2"
         >
           Weiter
+          <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
-      <DebugMetadata metadata={metadata} />
+      
     </div>
   );
 } 
