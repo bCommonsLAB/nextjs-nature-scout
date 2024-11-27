@@ -1,0 +1,236 @@
+"use client";
+
+import * as React from "react";
+import { useState } from "react";
+import { HabitatCard } from "./Landing/HabitatCard";
+import { FeatureCard } from "./Landing/FeatureCard";
+import { ProcessStep } from "./Landing/ProcessStep";
+import { Button } from "@/components/ui/button";
+import { ArrowDown, ArrowRight   } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Info, Sparkles } from "lucide-react";
+import Link from 'next/link';
+import { WelcomePopup } from "./welcome-popup";
+console.log('LandingPage wird gerendert');
+
+const colors = {
+  lightest: "#FAFFF3",
+  light: "#E9F5DB",
+  medium: "#90A955",
+  mediumDark: "#31572C",
+  dark: "#132A13"
+};
+
+const features = [
+  {
+    iconSrc: "camera",
+    title: "Lebensräume fotografieren",
+    description: "Teilen Sie Ihre Beobachtungen und helfen Sie mit, besonders wertvolle Lebensräume zu identifizieren und zu dokumentieren."
+  },
+  {
+    iconSrc: "map",
+    title: "Wissenschaftlich verifizieren",
+    description: "Die wissenschaftlich verifizierten Daten werden in den Geobrowser integriert und dienen als wertvolle Informationsgrundlage."
+  },
+  {
+    iconSrc: "building",
+    title: "Gemeinden informieren",
+    description: "Gemeinden und relevante Behörden erhalten Zugang zu den Daten für fundierte Entscheidungen im Naturschutz."
+  }
+];
+
+const habitats = [
+  { 
+    imageSrc: "/placeholder.svg?height=300&width=400", 
+    title: "Artenreiche Bergwiese", 
+    location: "Meran", 
+    recorder: "Anna Mayer",
+    status: "protected",
+    org: "Naturschutzgruppe"
+  },
+  { 
+    imageSrc: "/placeholder.svg?height=300&width=400", 
+    title: "Alter Obstgarten", 
+    location: "Brixen", 
+    recorder: "Thomas Hofer",
+    status: "endangered",
+    org: "Umweltinitiative"
+  },
+  { 
+    imageSrc: "/placeholder.svg?height=300&width=400", 
+    title: "Feuchtbiotop", 
+    location: "Bozen", 
+    recorder: "Lisa Pichler",
+    status: "stable",
+    org: "Biotopschutz"
+  },
+  { 
+    imageSrc: "/placeholder.svg?height=300&width=400", 
+    title: "Trockenmauer", 
+    location: "Meran", 
+    recorder: "Michael Gruber",
+    status: "endangered",
+    org: "Naturscouts"
+  }
+];
+
+const processSteps = [
+  {
+    iconSrc: "user",
+    title: "Erfassung durch NatureScouts"
+  },
+  {
+    iconSrc: "sparkles",
+    title: "Automatische Voranalyse"
+  },
+  {
+    iconSrc: "check",
+    title: "Wissenschaftliche Bewertung"
+  },
+  {
+    iconSrc: "database",
+    title: "Integration Geobrowser"
+  }
+];
+
+export function NatureScoutPage() {
+  console.log('NatureScoutPage Component wird gerendert');
+
+  const [showAIInfo, setShowAIInfo] = useState(false);
+
+  return (
+    <div className="flex overflow-hidden flex-col bg-black bg-opacity-20">
+      <WelcomePopup />
+      <div className="flex flex-col w-full max-md:max-w-full">
+        <main>
+          <section 
+            className="relative flex overflow-hidden items-end px-16 pt-80 pb-24 min-h-[749px] max-md:px-5 max-md:pt-24"
+            style={{
+              backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6)), url('/images/Bergwiese.jpg')`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
+          >
+            <div className="relative z-10 flex flex-col min-w-[240px] w-[560px]">
+              <div className="flex flex-col w-full text-white max-md:max-w-full">
+                <h1 className="text-6xl font-bold leading-[67px] max-md:max-w-full max-md:text-4xl max-md:leading-[54px]">
+                  Schützen Sie die Biodiversität in Südtirol
+                </h1>
+                <p className="mt-6 text-lg leading-7 max-md:max-w-full">
+                  Ein Citizen-Science Projekt des Dachverbands für Natur und
+                  Umweltschutz in Südtirol. Helfen Sie mit, die biologische
+                  Vielfalt Südtirols zu dokumentieren und zu schützen.
+                </p>
+              </div>
+              <div className="flex gap-4 items-start self-start mt-8 text-base max-md:max-w-full">
+                <Button 
+                  size="lg" 
+                  variant="default"
+                  className="min-w-[240px] bg-stone-400 hover:bg-stone-500"
+                >
+                  Jetzt als NatureScout anmelden
+                </Button>
+                
+                <Link href="/naturescout">
+                  <Button 
+                    size="lg" 
+                    variant="outline"
+                    className="bg-white text-stone-600 hover:bg-stone-50"
+                  >
+                    Jetzt ausprobieren
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </section>
+
+          <section className="flex overflow-hidden flex-col px-16 py-24 w-full bg-[#D3E0BD] max-md:px-5 max-md:max-w-full">
+            <h2 className="text-center text-4xl font-bold leading-tight text-stone-900 mb-16 max-md:max-w-full">
+              Ihre Rolle im Naturschutz
+            </h2>
+            <div className="container mx-auto">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 justify-items-center">
+                {features.map((feature, index) => (
+                  <FeatureCard key={index} {...feature} />
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="flex overflow-hidden flex-col px-16 py-16 w-full bg-[#FAFFF3] max-md:px-5 max-md:max-w-full">
+            <h2 className="self-center max-w-full text-3xl font-bold leading-tight text-center text-black w-[768px] max-md:max-w-full">
+              Bisher verifizierte Habitate
+            </h2>
+            <div className="flex flex-col mt-10 w-full max-md:max-w-full">
+              <div className="flex gap-8 items-start w-full max-md:max-w-full">
+                <div className="flex flex-wrap flex-1 shrink gap-8 items-center w-full basis-0 min-w-[240px] max-md:max-w-full">
+                  {habitats.map((habitat, index) => (
+                    <React.Fragment key={index}>
+                      <HabitatCard {...habitat} />
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button className="gap-2 self-center px-6 py-3 mt-8 text-base text-white border border-solid bg-stone-400 border-stone-400 max-md:px-5">
+              Weitere Habitate hier
+            </button>
+          </section>
+
+          <section className="flex overflow-hidden flex-col px-16 pt-28 pb-16 w-full text-2xl font-bold text-black bg-[#E9F5DB] max-md:px-5 max-md:pt-24 max-md:max-w-full">
+            <h2 className="self-center text-4xl leading-tight text-center max-md:max-w-full">
+              Datenfluss und Qualitätssicherung
+            </h2>
+            <div className="flex flex-col mt-20 w-full leading-9 text-center max-md:mt-10 max-md:max-w-full">
+              <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 justify-center items-center w-full max-md:max-w-full">
+                {processSteps.map((step, index) => (
+                  <React.Fragment key={index}>
+                    <ProcessStep {...step} />
+                    {index < processSteps.length - 1 && (
+                      <div className="hidden lg:block">
+                        <ArrowRight />
+                      </div>
+                    )}
+                    {index < processSteps.length - 1 && (
+                      <div className="lg:hidden">
+                        <ArrowDown />
+                      </div>
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+
+              {/* Smart Analysis Information Box */}
+              <Card className={`mt-12 bg-[${colors.lightest}] border-[${colors.light}]`}>
+                <CardContent className="p-4">
+                  <div 
+                    className="flex items-center gap-2 cursor-pointer"
+                    onClick={() => setShowAIInfo(!showAIInfo)}
+                  >
+                    <Sparkles className={`w-5 h-5 text-[${colors.medium}]`} />
+                    <h3 className={`font-medium text-[${colors.dark}]`}>Innovative Unterstützung der Wissenschaft</h3>
+                    <Info className={`w-4 h-4 text-[${colors.medium}] ml-auto`} />
+                  </div>
+                  
+                  {showAIInfo && (
+                    <div className="mt-3 space-y-3 text-sm text-gray-600 text-left font-normal">
+                      <p>
+                        Modernste Computer-Vision-Systeme unterstützen die Voranalyse der Habitat-Aufnahmen. Diese smarte Technologie hilft, den Arbeitsaufwand der wissenschaftlichen Bewertung effizient zu gestalten.
+                      </p>
+                      <p>
+                        Die intelligente Voranalyse ermöglicht es unseren Expert:innen, sich auf ihre Kernkompetenz zu konzentrieren: Die fachkundige Bewertung und Klassifizierung der Habitate.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+
+          
+
+        </main>
+      </div>
+    </div>
+  );
+}

@@ -1,10 +1,5 @@
-import { NatureScout } from "../components/nature-scout/nature-scout";
-import 'leaflet/dist/leaflet.css';
+import { NatureScoutPage } from "@/components/LandingPage";
 
-export default function Home() {
-  return (
-    <>
-      <NatureScout />
-    </>
-  );
+export default function HomePage() {
+  return <NatureScoutPage />;
 }
