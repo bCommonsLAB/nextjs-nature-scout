@@ -80,6 +80,8 @@ export interface openAiResult {
 }
 
 export interface llmInfo {
+  llmModelPflanzenErkennung?: string;
+  llmModelHabitatErkennung?: string;
   llmSystemInstruction?: string;
   llmQuestion?: string;
   jsonSchema?: string;
@@ -131,8 +133,15 @@ export interface AnalyseErgebnis {
 export interface GetImageProps {
   imageTitle: string;
   anweisung: string;
-  onBildUpload: (imageTitle: string, filename: string, url: string, analysis: string) => void;
   existingImage?: Bild;
+  doAnalyzePlant?: boolean;
+  onBildUpload: (
+    imageTitle: string, 
+    filename: string, 
+    url: string, 
+    analyse: string,
+    plantnetResult?: PlantNetResult
+  ) => void;
 }
 
 export interface LocationMetadata {

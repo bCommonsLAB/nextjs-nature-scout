@@ -9,7 +9,6 @@ import { GetImage } from "./get-image";
 import { Summary } from "./summary";
 import { UploadedImageList } from "./uploaded-image-list";
 import { HabitatAnalysis } from "./habitat-analysis";
-import { PlantIdentification } from "./plant-identification"
 import { Bild, NatureScoutData, AnalyseErgebnis, llmInfo } from "@/types/nature-scout";
 import { LocationDetermination } from './locationDetermination';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -19,7 +18,6 @@ const schritte = [
   "Willkommen",
   "Standort bestimmen",
   "Bilder hochladen",
-  "Pflanzen bestimmen",
   "Habitat analysieren",
   "Abschlussbewertung"
 ];
@@ -52,7 +50,10 @@ export function NatureScout() {
       bilder: [
         ...prev.bilder.filter(bild => bild.imageKey !== imageKey),
         neuesBild
-      ]
+      ],
+      analyseErgebnis: undefined,
+      llmInfo: undefined,
+      kommentar: undefined
     }));
   };
 
@@ -70,15 +71,6 @@ export function NatureScout() {
   const handlePDFDownload = () => {
     console.log("PDF-Download wurde angefordert");
     // Hier würde die tatsächliche PDF-Generierung und der Download implementiert werden
-  };
-
-  const handlePlantIdentification = (updatedBilder: Bild[]) => {
-    setMetadata(prev => ({
-      ...prev,
-      bilder: prev.bilder.map(bild => 
-        updatedBilder.find(updated => updated.imageKey === bild.imageKey) || bild
-      )
-    }));
   };
 
   const handleKommentarChange = (kommentar: string) => {
@@ -104,37 +96,26 @@ export function NatureScout() {
                 anweisung="Laden Sie ein Panoramabild des gesamten Habitats hoch." 
                 onBildUpload={handleBildUpload}
                 existingImage={metadata.bilder.find(b => b.imageKey === "Panoramabild")}
+                doAnalyzePlant={false}
               />
               <GetImage 
                 imageTitle="Detailbild_1" 
-                anweisung="Laden Sie ein Detailbild des Habitats hoch." 
+                anweisung="Laden Sie ein Detailbild des Habitats hoch, das eine typische Pflanzenart zeigt." 
                 onBildUpload={handleBildUpload}
                 existingImage={metadata.bilder.find(b => b.imageKey === "Detailbild_1")}
+                doAnalyzePlant={true}
               />
               <GetImage 
                 imageTitle="Detailbild_2" 
-                anweisung="Laden Sie ein weiteres Detailbild des Habitats hoch." 
+                anweisung="Laden Sie ein weiteres Detailbild des Habitats hoch, das eine typische Pflanzenart zeigt." 
                 onBildUpload={handleBildUpload}
                 existingImage={metadata.bilder.find(b => b.imageKey === "Detailbild_2")}
+                doAnalyzePlant={true}
               />
             </div>
           </div>
         );
       case 3:
-        return (
-          <div className="space-y-4">
-            <div>
-              <UploadedImageList bilder={metadata.bilder.filter(b => b.imageKey.startsWith("Detailbild"))} />
-            </div>
-            <div>
-              <PlantIdentification 
-                bilder={metadata.bilder.filter(b => b.imageKey.startsWith("Detailbild"))}
-                onIdentificationComplete={handlePlantIdentification}
-              />
-            </div>
-          </div>
-        );
-      case 4:
         return (
           <div className="space-y-4">
             <div>
@@ -149,7 +130,7 @@ export function NatureScout() {
             </div>
           </div>
         );
-      case 5:
+      case 4:
         return (
           <Summary 
             metadata={metadata}

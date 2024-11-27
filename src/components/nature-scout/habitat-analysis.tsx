@@ -14,10 +14,6 @@ interface ImageAnalysisProps {
   onKommentarChange: (kommentar: string) => void;
 }
 
-function getHighestStatus(schutzstatus: Record<string, number>): [string, number] {
-  return Object.entries(schutzstatus).reduce((a, b) => a[1] > b[1] ? a : b);
-}
-
 // Tooltip-Definitionen hinzufügen
 const tooltips = {
   standort: {
@@ -62,8 +58,8 @@ const tooltips = {
   schutzstatus: {
     title: "Schutzstatus",
     description: "Bewertung des Schutzstatus",
-    gesetzlich: "Wahrscheinlichkeit, dass das Habitat gesetzlich geschützt ist",
-    hochwertig: "Wahrscheinlichkeit, dass es ein ökologisch hochwertiger, aber nicht gesetzlich geschützter Lebensraum ist",
+    gesetzlich: "Wahrscheinlichkeit, dass es ein Habitat, der im Naturschutzgesetz angeführt ist - Nass- und Feuchtflächen:Verlandungsbereiche von stehenden oder langsam fließenden Gewässern, Schilf-, Röhricht- und Großseggenbestände, Feucht- und Nasswiesen mit Seggen und Binsen, Moore, Auwälder, Sumpf- und Bruchwälder, Quellbereiche, Naturnahe und unverbaute Bach- und Flussabschnitte sowie Wassergräben inklusive der Ufervegetation. Bei Trockenstandorte: Trockenrasen, Felsensteppen",
+    hochwertig: "Wahrscheinlichkeit, das es ein ökologisch hochwertige Lebensraum, der nicht vom Gesetz erfasst ist: Magerwiese, Magerweide, Trockenrasen, Felsensteppen, Lehmbrüche",
     standard: "Wahrscheinlichkeit, dass es sich um einen Standardlebensraum handelt"
   },
   bewertung: {
@@ -114,31 +110,41 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
         body: JSON.stringify({ metadata })
       });
 
+      const responseData = await startResponse.json();
+
       if (!startResponse.ok) {
-        const errorData = await startResponse.json();
-        console.error("Analyse-Fehler:", errorData);
-        throw new Error(errorData.details || 'Ein Fehler ist bei der Analyse aufgetreten');
+        throw new Error(responseData.error || 'Ein Fehler ist bei der Analyse aufgetreten');
       }
 
-      const { jobId } = await startResponse.json();
+      const { jobId } = responseData;
 
       const checkStatus = async () => {
-        const statusResponse = await fetch(`/api/analyze/status?jobId=${jobId}`, {
-          method: "GET"
-        });
+        try {
+          const statusResponse = await fetch(`/api/analyze/status?jobId=${jobId}`, {
+            method: "GET"
+          });
 
-        const { status, result, llmInfo } = await statusResponse.json();
+          const statusData = await statusResponse.json();
 
-        if (status === 'completed' && result) {
-          onAnalysisComplete({
-            ...metadata.analyseErgebnis,
-            ...result,
-          }, llmInfo);
-          setIsAnalyzing(false);
-        } else if (status === 'failed') {
-          throw new Error('Analyse fehlgeschlagen');
-        } else {
-          setTimeout(checkStatus, 2000);
+          if (!statusResponse.ok) {
+            throw new Error(statusData.error || 'Fehler beim Abrufen des Analyse-Status');
+          }
+
+          const { status, result, llmInfo } = statusData;
+
+          if (status === 'completed' && result) {
+            onAnalysisComplete({
+              ...metadata.analyseErgebnis,
+              ...result,
+            }, llmInfo);
+            setIsAnalyzing(false);
+          } else if (status === 'failed') {
+            throw new Error(statusData.error || 'Analyse fehlgeschlagen');
+          } else {
+            setTimeout(checkStatus, 2000);
+          }
+        } catch (statusError) {
+          throw new Error(statusError instanceof Error ? statusError.message : 'Fehler bei der Statusabfrage');
         }
       };
 
@@ -189,13 +195,33 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  <div className="text-sm text-gray-500">Schutzstatus</div>
-                  <div className="bg-green-100 text-green-800 text-sm font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                    <CheckCircle2 className="w-4 h-4" />
-                    {(() => {
-                      const [status, prozent] = getHighestStatus(metadata.analyseErgebnis.schutzstatus);
-                      return `${status} (${prozent}%)`;
-                    })()}
+                  <div className="text-sm text-gray-500">Schutzstatus für Biodiversität</div>
+                  <div className="flex gap-1">
+                    {Object.entries(metadata.analyseErgebnis?.schutzstatus ?? {}).map(([status, prozent]) => {
+                      const isHighest = prozent === Math.max(...Object.values(metadata.analyseErgebnis?.schutzstatus ?? {}));
+                      const getStatusStyle = (type: string, isHighest: boolean) => {
+                        const baseStyle = "text-sm font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1";
+                        if (!isHighest) return `${baseStyle} bg-gray-100 text-gray-600`;
+                        
+                        switch(type) {
+                          case 'gesetzlich':
+                            return `${baseStyle} bg-red-100 text-red-800`;
+                          case 'hochwertig':
+                            return `${baseStyle} bg-orange-100 text-orange-800`;
+                          case 'standard':
+                            return `${baseStyle} bg-green-100 text-green-800`;
+                          default:
+                            return `${baseStyle} bg-gray-100 text-gray-600`;
+                        }
+                      };
+
+                      return (
+                        <div key={status} className={getStatusStyle(status, isHighest)}>
+                          {isHighest && <CheckCircle2 className="w-4 h-4" />}
+                          {`${status} (${prozent}%)`}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -418,8 +444,7 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                       />
 {`Dafür spricht:
 ${metadata.analyseErgebnis.evidenz?.dafürSpricht.map(punkt => `- ${punkt}`).join('\n') || ''}
-${metadata.analyseErgebnis.evidenz?.dagegenSpricht?.length ? `
-Dagegen spricht:
+${metadata.analyseErgebnis.evidenz?.dagegenSpricht?.length ? `Dagegen spricht:
 ${metadata.analyseErgebnis.evidenz.dagegenSpricht.map(punkt => `- ${punkt}`).join('\n')}` : ''}
 `}
 
@@ -430,7 +455,7 @@ ${metadata.analyseErgebnis.evidenz.dagegenSpricht.map(punkt => `- ${punkt}`).joi
                           Text: tooltips.zusammenfassung.text
                         }}
                       />
-{`- Zusammenfassung: ${metadata.analyseErgebnis.zusammenfassung || 'n/a'}
+{`${metadata.analyseErgebnis.zusammenfassung || 'n/a'}
 `}
                     </div>
                   </div>
