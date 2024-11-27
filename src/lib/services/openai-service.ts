@@ -202,14 +202,20 @@ Beachte bitte folgende zusätzliche Hinweise: ${metadata.kommentar}
         });
         const analysisResult =  completion.choices[0]?.message.content;
         if (analysisResult) {
-            //console.log("analysisResult", analysisResult);
-            const parsedResult: AnalyseErgebnis = JSON.parse(analysisResult).analyses[0]; // Falls die Antwort ein JSON-String ist
-            return { result: parsedResult,
-              llmInfo: {
-                llmSystemInstruction: llmSystemInstruction,
-                llmQuestion: llmQuestion,
-                jsonSchema: JSON.stringify(jsonSchema, null, 2)
-              }
+            const parsedResult: AnalyseErgebnis = {
+                ...JSON.parse(analysisResult).analyses[0],
+                kommentar: metadata.kommentar
+            };
+            
+            return { 
+                result: parsedResult,
+                llmInfo: {
+                    llmModelPflanzenErkennung: "PLANTNET",
+                    llmModelHabitatErkennung: serverConfig.OPENAI_VISION_MODEL,
+                    llmSystemInstruction: llmSystemInstruction,
+                    llmQuestion: llmQuestion,
+                    jsonSchema: JSON.stringify(jsonSchema, null, 2)
+                }
             };
         } else {
             return { result: null, error: "Keine Analyse verfügbar."};

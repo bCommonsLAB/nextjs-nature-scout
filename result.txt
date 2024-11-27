@@ -1,0 +1,146 @@
+{
+	"erfassungsperson": "Peter Aichner",
+	"email": "peter.aichner@crystal-design.com",
+	"gemeinde": "Campi Bisenzio",
+	"flurname": "Via Padule",
+	"latitude": 43.810152704993729,
+	"longitude": 11.14695661646828,
+	"standort": "Via Padule, 73, 50013, Campi Bisenzio, FI, Toskana, IT",
+	"bilder": [
+		{
+			"imageKey": "Panoramabild",
+			"filename": "1732573049468",
+			"url": "https://ragtempproject.blob.core.windows.net/biodiv/naturescout/1732573049468",
+			"analyse": null
+		},
+		{
+			"imageKey": "Detailbild_1",
+			"filename": "1732573055929",
+			"url": "https://ragtempproject.blob.core.windows.net/biodiv/naturescout/1732573055929",
+			"analyse": "Arnica montana L.",
+			"plantnetResult": {
+				"score": 0.79882,
+				"species": {
+					"scientificNameWithoutAuthor": "Arnica montana",
+					"scientificNameAuthorship": "L.",
+					"genus": {
+						"scientificNameWithoutAuthor": "Arnica",
+						"scientificNameAuthorship": "",
+						"scientificName": "Arnica"
+					},
+					"family": {
+						"scientificNameWithoutAuthor": "Asteraceae",
+						"scientificNameAuthorship": "",
+						"scientificName": "Asteraceae"
+					},
+					"commonNames": [
+						"Arnika",
+						"Berg-Wohlverleih",
+						"Echte Arnica"
+					],
+					"scientificName": "Arnica montana L."
+				},
+				"gbif": {
+					"id": "5405976"
+				},
+				"powo": {
+					"id": "30090722-2"
+				},
+				"iucn": {
+					"id": "162327",
+					"category": "LC"
+				}
+			}
+		},
+		{
+			"imageKey": "Detailbild_2",
+			"filename": "1732573059000",
+			"url": "https://ragtempproject.blob.core.windows.net/biodiv/naturescout/1732573059000",
+			"analyse": "Trifolium montanum L.",
+			"plantnetResult": {
+				"score": 0.3974,
+				"species": {
+					"scientificNameWithoutAuthor": "Trifolium montanum",
+					"scientificNameAuthorship": "L.",
+					"genus": {
+						"scientificNameWithoutAuthor": "Trifolium",
+						"scientificNameAuthorship": "",
+						"scientificName": "Trifolium"
+					},
+					"family": {
+						"scientificNameWithoutAuthor": "Fabaceae",
+						"scientificNameAuthorship": "",
+						"scientificName": "Fabaceae"
+					},
+					"commonNames": [
+						"Berg-Klee",
+						"Gewöhnlicher Bergklee"
+					],
+					"scientificName": "Trifolium montanum L."
+				},
+				"gbif": {
+					"id": "5359047"
+				},
+				"powo": {
+					"id": "523419-1"
+				}
+			}
+		}
+	],
+	"analyseErgebnis": {
+		"standort": {
+			"hangneigung": "leicht_geneigt",
+			"exposition": "weis nicht",
+			"bodenfeuchtigkeit": "frisch"
+		},
+		"pflanzenArten": [
+			{
+				"name": "Arnica montana",
+				"häufigkeit": "zerstreut",
+				"istZeiger": true
+			},
+			{
+				"name": "Trifolium montanum",
+				"häufigkeit": "häufig",
+				"istZeiger": true
+			}
+		],
+		"Vegetationsstruktur": {
+			"höhe": "mittel",
+			"dichte": "mittel",
+			"deckung": "offen"
+		},
+		"blühaspekte": {
+			"intensität": "reich",
+			"anzahlFarben": 2
+		},
+		"nutzung": {
+			"beweidung": false,
+			"mahd": true,
+			"düngung": false
+		},
+		"habitatTyp": "Magerwiese",
+		"schutzstatus": {
+			"gesetzlich": 30,
+			"hochwertig": 70,
+			"standard": 10
+		},
+		"bewertung": {
+			"artenreichtum": 15,
+			"konfidenz": 80
+		},
+		"evidenz": {
+			"dafürSpricht": [
+				"Vorhandensein von Indikatorarten wie Arnica montana"
+			],
+			"dagegenSpricht": [
+				"Keine intensiven Feuchtigkeitszeigerpflanzen vorhanden"
+			]
+		},
+		"zusammenfassung": "Der Standort zeigt Merkmale einer Magerwiese mit hoher Artenvielfalt. Indikatorarten wie Arnica montana weisen auf den ökologischen Wert hin. Der Schutzstatus ist als ökologisch hochwertig einzuschätzen, mit einer relativ hohen Konfidenz."
+	},
+	"llmInfo": {
+		"llmQuestion": "Analysiere das hochgeladenen Geasamtbild und einige Detailbilder unter Berücksichtigung der bekannten Geokoordinaten (43.810152704993726, 11.14695661646828), \nStandort: Via Padule, 73, 50013, Campi Bisenzio, FI, Toskana, IT und der bereits identifizierten Pflanzenarten:\nnull , Arnica montana L. , Trifolium montanum L.  \nBitte analysiere folgende Parameter:\n1. Erfasse die Standortbedingungen und deren Einfluss auf die Vegetation\n2. Wie häufig sind die erkannten Pflanzenarten im Bestand\n3. Beschreibe die Vegetationsstruktur und -dynamik\n4. Dokumentiere Nutzungsspuren und deren Auswirkungen\n5. Leite daraus den wahrscheinlichen Habitattyp ab\n6. Bewerte die ökologische Qualität und Schutzwürdigkeit\n7. Führe unterstützende und widersprechende Merkmale auf\n8. Schätze die Konfidenz deiner Einordnung\nBeachte bitte folgende zusätzliche Hinweise: undefined",
+		"llmSystemInstruction": "Du bist ein erfahrener Vegetationsökologe und sollst bei der Habitatanalyse unterstützen. \nBerücksichtige die bereits bekannten Standortdaten und Pflanzenarten in deiner Analyse.\nArgumentiere wissenschaftlich fundiert und berücksichtige alle verfügbaren Indizien \nfür eine möglichst präzise Einschätzung."
+	}
+}

@@ -57,17 +57,13 @@ export function NatureScout() {
   };
 
   const handleAnalysisComplete = (
-    analysedBilder: Bild[], 
     ergebnis: AnalyseErgebnis, 
-    llmInfo: llmInfo,
-    kommentar?: string
+    llmInfo: llmInfo
   ) => {
     setMetadata(prev => ({
       ...prev,
-      bilder: analysedBilder,
       analyseErgebnis: ergebnis,
-      llmInfo: llmInfo,
-      kommentar: kommentar
+      llmInfo: llmInfo
     }));
   };
 
