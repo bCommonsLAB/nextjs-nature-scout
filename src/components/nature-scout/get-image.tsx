@@ -32,7 +32,7 @@ const SAMPLE_IMAGES = [
     type: 'panorama'
   },
   {
-    src: '/detailsamples/Arnika.JPG',
+    src: '/detailsamples/Arnika.jpg',
     title: 'Arnika (typisch für Magerwiese)',
     type: 'detail'
   },
