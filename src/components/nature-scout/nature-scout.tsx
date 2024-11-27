@@ -100,14 +100,14 @@ export function NatureScout() {
               />
               <GetImage 
                 imageTitle="Detailbild_1" 
-                anweisung="Laden Sie ein Detailbild des Habitats hoch, das eine typische Pflanzenart zeigt." 
+                anweisung="Laden Sie ein Detailbild hoch, das eine typische Pflanzenart zeigt." 
                 onBildUpload={handleBildUpload}
                 existingImage={metadata.bilder.find(b => b.imageKey === "Detailbild_1")}
                 doAnalyzePlant={true}
               />
               <GetImage 
                 imageTitle="Detailbild_2" 
-                anweisung="Laden Sie ein weiteres Detailbild des Habitats hoch, das eine typische Pflanzenart zeigt." 
+                anweisung="Laden Sie ein weiteres Detailbild hoch, das eine typische Pflanzenart zeigt." 
                 onBildUpload={handleBildUpload}
                 existingImage={metadata.bilder.find(b => b.imageKey === "Detailbild_2")}
                 doAnalyzePlant={true}
@@ -152,9 +152,17 @@ export function NatureScout() {
     <div className="container mx-auto p-4">
       <div className="mb-8">
         <Progress value={(aktiverSchritt / (schritte.length - 1)) * 100} className="w-full" />
-        <div className="flex justify-between mt-2">
+        <div className="flex justify-between mt-2 px-1">
           {schritte.map((label, index) => (
-            <span key={label} className={`text-sm ${index === aktiverSchritt ? "font-bold" : ""}`}>
+            <span 
+              key={label} 
+              className={`
+                text-[10px] sm:text-sm 
+                text-center 
+                max-w-[60px] sm:max-w-none 
+                ${index === aktiverSchritt ? "font-bold" : ""}
+              `}
+            >
               {label}
             </span>
           ))}
@@ -189,7 +197,7 @@ export function NatureScout() {
               <DialogTrigger asChild>
                 <Button variant="outline" className="gap-2">
                   <Code className="h-4 w-4" />
-                  Analysierte Daten anzeigen
+                  Debug
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">

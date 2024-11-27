@@ -194,9 +194,9 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2">
                   <div className="text-sm text-gray-500">Schutzstatus für Biodiversität</div>
-                  <div className="flex gap-1">
+                  <div className="flex flex-col sm:flex-row gap-1">
                     {Object.entries(metadata.analyseErgebnis?.schutzstatus ?? {}).map(([status, prozent]) => {
                       const isHighest = prozent === Math.max(...Object.values(metadata.analyseErgebnis?.schutzstatus ?? {}));
                       const getStatusStyle = (type: string, isHighest: boolean) => {
@@ -243,7 +243,7 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
 
           <div className="space-y-4">
             
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white rounded-lg shadow-md p-3">
               <button
                 onClick={() => setIsDetailsOpen(!isDetailsOpen)}
                 className="flex items-center gap-2 text-blue-600 hover:text-blue-700 w-full"
@@ -306,7 +306,7 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
               )}
             </div>
 {/* Erkannte Parameter Accordion - NEU */}
-<div className="bg-white rounded-lg shadow-md p-6">
+<div className="bg-white rounded-lg shadow-md p-3">
               <button
                 onClick={() => setIsParametersOpen(!isParametersOpen)}
                 className="flex items-center gap-2 text-blue-600 hover:text-blue-700 w-full"
@@ -463,7 +463,7 @@ ${metadata.analyseErgebnis.evidenz.dagegenSpricht.map(punkt => `- ${punkt}`).joi
               )}
             </div>
 
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white rounded-lg shadow-md p-3">
               <button
                 onClick={() => setIsFeedbackOpen(!isFeedbackOpen)}
                 className="flex items-center gap-2 text-blue-600 hover:text-blue-700 w-full"
@@ -488,7 +488,7 @@ ${metadata.analyseErgebnis.evidenz.dagegenSpricht.map(punkt => `- ${punkt}`).joi
                     </p>
                   </div>
                   
-                  <div className="flex gap-4 items-start">
+                  <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-start">
                     <Textarea
                       placeholder="Beschreibe in Worten was nicht stimmt..."
                       className="flex-1 h-24 resize-none"
@@ -498,7 +498,7 @@ ${metadata.analyseErgebnis.evidenz.dagegenSpricht.map(punkt => `- ${punkt}`).joi
                     <Button 
                       onClick={handleAnalyzeClick}
                       disabled={isAnalyzing}
-                      className="min-w-[160px]"
+                      className="w-full md:w-auto md:min-w-[160px]"
                     >
                       {isAnalyzing ? "Analysiere..." : "Analyse neu starten"}
                     </Button>
