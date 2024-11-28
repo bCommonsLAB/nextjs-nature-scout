@@ -18,65 +18,110 @@ body {
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Hauptfarbschema */
+    --nature-50: 83 100% 97%;    /* #FAFFF3 - lightest */
+    --nature-100: 84 50% 91%;    /* #E9F5DB - light */
+    --nature-200: 84 35% 80%;    /* #CFE1B9 - medium */
+    --nature-300: 74 15% 65%;    /* #9BA881 - mediumDark */
+    --nature-600: 82 23% 36%;    /* #637047 - dark */
+    --nature-900: 82 23% 16%;    /* #2D3321 - darkest */
+
+    /* System-Farben */
+    --background: var(--nature-50);
+    --foreground: var(--nature-900);
+    
+    /* Card-Styles */
+    --card: var(--nature-50);
+    --card-foreground: var(--nature-900);
+    
+    /* Popover-Styles */
+    --popover: var(--nature-50);
+    --popover-foreground: var(--nature-900);
+    
+    /* Primary Button */
+    --primary: var(--nature-600);
+    --primary-foreground: var(--nature-50);
+    
+    /* Secondary Button */
+    --secondary: var(--nature-200);
+    --secondary-foreground: var(--nature-900);
+    
+    /* Weitere UI-Elemente */
+    --muted: var(--nature-100);
+    --muted-foreground: var(--nature-600);
+    --accent: var(--nature-200);
+    --accent-foreground: var(--nature-900);
+    
+    /* Formular-Elemente */
+    --border: var(--nature-200);
+    --input: var(--nature-200);
+    --ring: var(--nature-600);
+    
+    /* Warnungen/Fehler */
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --destructive-foreground: var(--nature-50);
+
     --radius: 0.5rem;
   }
+
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    /* Dunkles Theme */
+    --background: var(--nature-900);
+    --foreground: var(--nature-50);
+    
+    --card: var(--nature-900);
+    --card-foreground: var(--nature-50);
+    
+    --popover: var(--nature-900);
+    --popover-foreground: var(--nature-50);
+    
+    --primary: var(--nature-200);
+    --primary-foreground: var(--nature-900);
+    
+    --secondary: var(--nature-600);
+    --secondary-foreground: var(--nature-50);
+    
+    --muted: var(--nature-600);
+    --muted-foreground: var(--nature-200);
+    
+    --accent: var(--nature-600);
+    --accent-foreground: var(--nature-50);
+    
+    --border: var(--nature-600);
+    --input: var(--nature-600);
+    --ring: var(--nature-200);
   }
 }
 
-@layer base {
-  * {
-    @apply border-border;
+/* Zusätzliche Button-Styles */
+@layer components {
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90;
   }
-  body {
-    @apply bg-background text-foreground;
+  
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80;
   }
+}
+
+/* Landing Page Section Headings */
+.landing-section h2 {
+  @apply text-4xl 
+         font-bold 
+         leading-tight 
+         text-center 
+         text-stone-900 
+         mb-2
+         max-md:max-w-full 
+         self-center;
+}
+
+/* Landing Page Section Subheadings */
+.landing-section h2 + div {
+  @apply mt-3 
+         text-base 
+         leading-6 
+         text-stone-900 
+         mb-8 
+         text-center;
 }

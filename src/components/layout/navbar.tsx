@@ -1,27 +1,55 @@
 import React from 'react';
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
+import { Menu } from "lucide-react";
 
 export function Navbar() {
   return (
-    <header className="flex flex-col justify-center px-16 w-full bg-stone-50 min-h-[72px] max-md:px-5 max-md:max-w-full">
-      <nav className="flex flex-wrap gap-10 justify-between items-center w-full max-md:max-w-full">
+    <header className="flex flex-col justify-center px-16 w-full bg-stone-50 min-h-[72px] max-md:px-5">
+      <nav className="flex flex-wrap gap-10 justify-between items-center w-full">
         <div className="flex justify-center items-center self-stretch my-auto min-h-[40px] w-[198px]">
-          <img
-            loading="lazy"
-            src="https://cdn.builder.io/api/v1/image/assets/c4345af57a564f71b6050b95a82b3e60/a1aca6afe8d679ce8df02500685d33a6693876394de6b4d39eaed12db5b249a1?apiKey=c4345af57a564f71b6050b95a82b3e60&"
+          <Image
+            src="/images/naturescout.svg"
             alt="NatureScout Logo"
-            className="object-contain self-stretch my-auto aspect-[5.92] w-[213px]"
+            width={213}
+            height={36}
+            priority
+            className="object-contain"
           />
         </div>
-        <div className="flex gap-8 justify-center items-center self-stretch my-auto text-base min-w-[240px]">
-          <div className="flex gap-8 items-center self-stretch my-auto text-black">
-            <button className="flex gap-1 justify-center items-center self-stretch my-auto">
-              Über Uns
-            </button>
-          </div>
-          <button className="flex gap-4 justify-center items-center self-stretch my-auto text-white gap-2 px-5 py-2 border border-solid bg-stone-400 border-stone-400">
+
+        {/* Desktop Navigation */}
+        <div className="hidden md:flex gap-8 justify-center items-center self-stretch my-auto">
+          <Button variant="ghost" className="text-base">
+            Über Uns
+          </Button>
+          <Button variant="secondary" className="text-base">
             Jetzt Anmelden
-          </button>
+          </Button>
         </div>
+
+        {/* Mobile Navigation */}
+        <Sheet>
+          <SheetTrigger asChild className="md:hidden">
+            <Button variant="ghost" size="icon">
+              <Menu className="h-6 w-6" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent>
+            <SheetTitle className="text-left mb-4">
+              Navigation
+            </SheetTitle>
+            <div className="flex flex-col gap-4">
+              <Button variant="ghost" className="w-full text-base justify-start">
+                Über Uns
+              </Button>
+              <Button variant="secondary" className="w-full text-base justify-start">
+                Jetzt Anmelden
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
       </nav>
     </header>
   );

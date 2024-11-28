@@ -42,11 +42,12 @@ export function WelcomePopup() {
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Wichtiger Hinweis</DialogTitle>
+          <DialogTitle>Diese Anwendung ist ein Prototyp</DialogTitle>
           <DialogDescription>
-            Diese Anwendung ist ein Prototyp. Sie dient zur Erprobung neuer sinnvoller 
-            Ansätze im Zusammenwirken von Bürgerbeteiligung, Wissenschaftliche Expertise 
-            und Zukunftstechnologie zum Schutz unserer Umwelt. 
+            Ein Projekt zur Förderung des Naturschutzes und der Biodiversität in
+            Südtirol durch Bürgerbeteiligung und Wissenschaft.
+            Teile der Anwendung sind nur ein Klickmodell und noch in Konzeption.
+            Ihre Erfahrung ist wichtig und wir sind für jedes Feedback dankbar.
             Die erfassten Daten und Hinweise werden gespeichert und ausgewertet. 
           </DialogDescription>
         </DialogHeader>

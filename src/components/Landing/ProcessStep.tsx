@@ -20,14 +20,14 @@ export function ProcessStep({ iconSrc, title }: ProcessStepProps) {
 
   return (
     <div className="flex flex-col flex-1 shrink self-stretch my-auto basis-0 min-w-[240px]">
-      <div className="flex flex-col w-full">
+      <div className="flex flex-col w-full items-center">
         {IconComponent && (
           <IconComponent 
-            size={48}
-            className="object-contain self-center w-12 aspect-square"
+            size={32}
+            className="object-contain mb-2"
           />
         )}
-        <div className="mt-6 w-full">{title}</div>
+        <div className="mt-2 text-center">{title}</div>
       </div>
     </div>
   );

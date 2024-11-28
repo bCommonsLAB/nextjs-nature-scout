@@ -16,9 +16,10 @@ console.log('LandingPage wird gerendert');
 const colors = {
   lightest: "#FAFFF3",
   light: "#E9F5DB",
-  medium: "#90A955",
-  mediumDark: "#31572C",
-  dark: "#132A13"
+  medium: "#CFE1B9",
+  mediumDark: "#9BA881",
+  dark: "#637047",
+  darkest: "#2D3321"
 };
 
 const features = [
@@ -122,20 +123,20 @@ export function NatureScoutPage() {
                   Vielfalt Südtirols zu dokumentieren und zu schützen.
                 </p>
               </div>
-              <div className="flex gap-4 items-start self-start mt-8 text-base max-md:max-w-full">
+              <div className="flex flex-col md:flex-row gap-4 items-start self-start mt-8 text-base max-md:max-w-full">
                 <Button 
-                  size="lg" 
+                  size="lg"
                   variant="default"
-                  className="min-w-[240px] bg-stone-400 hover:bg-stone-500"
+                  className="min-w-[240px] w-full md:w-auto"
                 >
                   Jetzt als NatureScout anmelden
                 </Button>
                 
-                <Link href="/naturescout">
+                <Link href="/naturescout" className="w-full md:w-auto">
                   <Button 
-                    size="lg" 
-                    variant="outline"
-                    className="bg-white text-stone-600 hover:bg-stone-50"
+                    size="lg"
+                    variant="secondary"
+                    className="min-w-[240px] w-full"
                   >
                     Jetzt ausprobieren
                   </Button>
@@ -144,10 +145,11 @@ export function NatureScoutPage() {
             </div>
           </section>
 
-          <section className="flex overflow-hidden flex-col px-16 py-24 w-full bg-[#D3E0BD] max-md:px-5 max-md:max-w-full">
-            <h2 className="text-center text-4xl font-bold leading-tight text-stone-900 mb-16 max-md:max-w-full">
-              Ihre Rolle im Naturschutz
-            </h2>
+          <section className="landing-section flex overflow-hidden flex-col px-16 py-24 w-full bg-[#D3E0BD] max-md:px-5">
+            <h2>Ihre Rolle im Naturschutz</h2>
+            <div>
+              Viele Personen mit unterschiedlichsten Kompetenzen müssen zusammenwirken, damit es funktioniert.
+            </div>
             <div className="container mx-auto">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 justify-items-center">
                 {features.map((feature, index) => (
@@ -157,10 +159,11 @@ export function NatureScoutPage() {
             </div>
           </section>
 
-          <section className="flex overflow-hidden flex-col px-16 py-16 w-full bg-[#FAFFF3] max-md:px-5 max-md:max-w-full">
-            <h2 className="self-center max-w-full text-3xl font-bold leading-tight text-center text-black w-[768px] max-md:max-w-full">
-              Bisher verifizierte Habitate
-            </h2>
+          <section className="landing-section flex overflow-hidden flex-col px-16 py-16 w-full bg-[#FAFFF3] max-md:px-5">
+            <h2>Zuletzt verifizierte Habitate</h2>
+            <div>
+              Diese Habitate wurden von engagierten Mitbürgern erfasst und Experten verifiziert
+            </div>
             <div className="flex flex-col mt-10 w-full max-md:max-w-full">
               <div className="flex gap-8 items-start w-full max-md:max-w-full">
                 <div className="flex flex-wrap flex-1 shrink gap-8 items-center w-full basis-0 min-w-[240px] max-md:max-w-full">
@@ -177,10 +180,12 @@ export function NatureScoutPage() {
             </button>
           </section>
 
-          <section className="flex overflow-hidden flex-col px-16 pt-28 pb-16 w-full text-2xl font-bold text-black bg-[#E9F5DB] max-md:px-5 max-md:pt-24 max-md:max-w-full">
-            <h2 className="self-center text-4xl leading-tight text-center max-md:max-w-full">
-              Datenfluss und Qualitätssicherung
-            </h2>
+          <section className="landing-section flex overflow-hidden flex-col px-16 pt-28 pb-16 w-full bg-[#E9F5DB] max-md:px-5 max-md:pt-24">
+            <h2>Datenfluss und Qualitätssicherung</h2>
+            <div className="mt-3 text-base leading-6 text-stone-900  mb-8 text-center">
+              Die Schritte vom Erfassen der Habitate, verifizieren und informieren relevanter Institutionen
+            </div>
+            
             <div className="flex flex-col mt-20 w-full leading-9 text-center max-md:mt-10 max-md:max-w-full">
               <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 justify-center items-center w-full max-md:max-w-full">
                 {processSteps.map((step, index) => (
@@ -188,12 +193,12 @@ export function NatureScoutPage() {
                     <ProcessStep {...step} />
                     {index < processSteps.length - 1 && (
                       <div className="hidden lg:block">
-                        <ArrowRight />
+                        <ArrowRight size={32} className="text-stone-600" />
                       </div>
                     )}
                     {index < processSteps.length - 1 && (
                       <div className="lg:hidden">
-                        <ArrowDown />
+                        <ArrowDown size={32} className="text-stone-600" />
                       </div>
                     )}
                   </React.Fragment>

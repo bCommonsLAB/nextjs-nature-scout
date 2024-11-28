@@ -118,6 +118,15 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
               .int()
               .describe("Konfidenz der Habitatbestimmung in Prozent")
           }).describe("Bitte die Bewertung der ökologischen Qualität und Schutzwürdigkeit des Habitats beschreiben. Wenn nicht genau erkennbar, bitte 'weis nicht' angeben."),
+          "glaubwürdigkeit": z.object({
+            "konsistenzBewertung": z.number()
+              .int()
+              .describe("Prozentuale Einschätzung der Konsistenz (0-100%)"),
+            "indikatorenFürKonsistenz": z.array(z.string())
+              .describe("Merkmale, die für die Konsistenz sprechen"),
+            "indikatorenGegenKonsistenz": z.array(z.string())
+              .describe("Merkmale, die gegen die Konsistenz sprechen")
+          }).describe("Wie Konsistent ist das bereitgestellten Panoramabild, bereits erkannten Pflanzenarten, Standortdaten und Hinweise? "),
           "evidenz": z.object({
             "dafürSpricht": z.array(z.string())
               .describe("Merkmale, die für die Klassifizierung sprechen"),
@@ -161,9 +170,15 @@ für eine möglichst präzise Einschätzung.
         `.trim();
   
         const llmQuestion = `
-Analysiere das hochgeladenen Geasamtbild und einige Detailbilder unter Berücksichtigung der bekannten Geokoordinaten (${metadata.latitude}, ${metadata.longitude}), 
-Standort: ${metadata.standort} und der bereits identifizierten Pflanzenarten:
-${metadata.bilder.map(bild => `${bild.analyse} `).join(', ')} 
+Analysiere das hochgeladenen Geasamtbild und einige Detailbilder unter Berücksichtigung der bereits bekannten:
+- Geokoordinaten Latitude: (${metadata.latitude}, Longitude: ${metadata.longitude}), 
+- Standort: ${metadata.standort} 
+- bereits identifizierte Pflanzenarten:
+${metadata.bilder
+  .filter(bild => bild.analyse && bild.analyse.trim() !== '')
+  .map(bild => bild.analyse)
+  .join(', ')}
+${metadata.bilder.some(bild => bild.analyse && bild.analyse.trim() !== '') ? '\n' : ''}
 Bitte analysiere folgende Parameter:
 1. Erfasse die Standortbedingungen und deren Einfluss auf die Vegetation
 2. Wie häufig sind die erkannten Pflanzenarten im Bestand
@@ -172,8 +187,9 @@ Bitte analysiere folgende Parameter:
 5. Leite daraus den wahrscheinlichen Habitattyp ab
 6. Bewerte die ökologische Qualität und Schutzwürdigkeit
 7. Führe unterstützende und widersprechende Merkmale auf
-8. Schätze die Konfidenz deiner Einordnung
-Beachte bitte folgende zusätzliche Hinweise: ${metadata.kommentar}
+8. Schätze die Konsistent der bereitgestellten Informationen 
+9. Schätze die Konfidenz deiner Einordnung
+${metadata.kommentar ? `Beachte bitte folgende zusätzliche Hinweise: ${metadata.kommentar}` : ''}
 `.trim();
 
 
