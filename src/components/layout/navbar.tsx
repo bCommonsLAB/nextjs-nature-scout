@@ -12,7 +12,7 @@ export function Navbar() {
         <div className="flex justify-center items-center self-stretch my-auto max-w-[198px]">
           <Link href="/">
             <Image
-              src="/images/naturescout.svg"
+              src="/images/naturescout-normal.svg"
               alt="NatureScout Logo"
               width={213}
               height={36}

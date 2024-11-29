@@ -27,7 +27,7 @@ const SAMPLE_IMAGES = [
     type: 'panorama'
   },
   {
-    src: '/panoramasamples/fettwiese.jpg',
+    src: '/panoramasamples/fettwiese-standard.jpg',
     title: 'Fettwiese',
     type: 'panorama'
   },

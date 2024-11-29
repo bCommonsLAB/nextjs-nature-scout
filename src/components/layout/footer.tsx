@@ -9,7 +9,7 @@ export function Footer() {
         <div className="flex overflow-hidden flex-col max-w-[225px]">
           <Link href="/">
             <Image
-              src="/images/naturescout_invert.svg"
+              src="/images/naturescout-invert.svg"
               alt="NatureScout Logo"
               width={213}
               height={36}

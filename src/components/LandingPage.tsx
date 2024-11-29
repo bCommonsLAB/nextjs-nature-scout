@@ -51,7 +51,7 @@ const habitats = [
     org: "AVS Meran"
   },
   { 
-    imageSrc: "/panoramasamples/fettwiese.jpg", 
+    imageSrc: "/panoramasamples/fettwiese-standard.jpg", 
     title: "Fettwiese", 
     location: "Brixen", 
     recorder: "Thomas Hofer",
