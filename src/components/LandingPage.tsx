@@ -40,38 +40,39 @@ const features = [
   }
 ];
 
+
 const habitats = [
   { 
-    imageSrc: "/placeholder.svg?height=300&width=400", 
-    title: "Artenreiche Bergwiese", 
+    imageSrc: "/panoramasamples/magerwiese artenreich.jpg", 
+    title: "Magerwiese artenreich", 
     location: "Meran", 
     recorder: "Anna Mayer",
-    status: "protected",
-    org: "Naturschutzgruppe"
+    status: "hochwertig",
+    org: "AVS Meran"
   },
   { 
-    imageSrc: "/placeholder.svg?height=300&width=400", 
-    title: "Alter Obstgarten", 
+    imageSrc: "/panoramasamples/fettwiese.jpg", 
+    title: "Fettwiese", 
     location: "Brixen", 
     recorder: "Thomas Hofer",
-    status: "endangered",
-    org: "Umweltinitiative"
+    status: "standard",
+    org: "Heimatpflegeverband Südtirol"
   },
   { 
-    imageSrc: "/placeholder.svg?height=300&width=400", 
-    title: "Feuchtbiotop", 
+    imageSrc: "/panoramasamples/moor verlandungsmoor.jpg", 
+    title: "Verlandungsmoor", 
     location: "Bozen", 
     recorder: "Lisa Pichler",
-    status: "stable",
-    org: "Biotopschutz"
+    status: "gesetzlich",
+    org: "Klima Club Südtirol"
   },
   { 
-    imageSrc: "/placeholder.svg?height=300&width=400", 
-    title: "Trockenmauer", 
-    location: "Meran", 
+    imageSrc: "/panoramasamples/trockenrasen kurzgrasig.jpg", 
+    title: "Trockenrasen kurzgrasig", 
+    location: "Schlanders", 
     recorder: "Michael Gruber",
-    status: "endangered",
-    org: "Naturscouts"
+    status: "gesetzlich",
+    org: "Umweltschutzgruppe Vinschgau"
   }
 ];
 
@@ -165,14 +166,14 @@ export function NatureScoutPage() {
               Diese Habitate wurden von engagierten Mitbürgern erfasst und Experten verifiziert
             </div>
             <div className="flex flex-col mt-10 w-full max-md:max-w-full">
-              <div className="flex gap-8 items-start w-full max-md:max-w-full">
-                <div className="flex flex-wrap flex-1 shrink gap-8 items-center w-full basis-0 min-w-[240px] max-md:max-w-full">
-                  {habitats.map((habitat, index) => (
-                    <React.Fragment key={index}>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-8 w-full max-md:max-w-full">
+                {habitats.map((habitat, index) => (
+                  <React.Fragment key={index}>
+                    <div className="aspect-w-16 aspect-h-9 w-full">
                       <HabitatCard {...habitat} />
-                    </React.Fragment>
-                  ))}
-                </div>
+                    </div>
+                  </React.Fragment>
+                ))}
               </div>
             </div>
             <button className="gap-2 self-center px-6 py-3 mt-8 text-base text-white border border-solid bg-stone-400 border-stone-400 max-md:px-5">
