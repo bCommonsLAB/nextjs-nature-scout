@@ -5,14 +5,14 @@ export function Footer() {
   return (
     <footer className="flex overflow-hidden flex-col px-16 py-20 w-full bg-[#75825A] max-md:px-5 max-md:max-w-full">
       <div className="flex flex-col max-w-full w-[493px]">
-        <div className="flex overflow-hidden flex-col max-w-full w-[225px]">
-        <Image
+        <div className="flex overflow-hidden flex-col max-w-[225px]">
+          <Image
             src="/images/naturescout_invert.svg"
             alt="NatureScout Logo"
             width={213}
             height={36}
             priority
-            className="object-contain"
+            className="w-auto h-[36px] object-contain"
           />
         </div>
         <p className="mt-8 text-sm font-medium leading-5 text-stone-50">

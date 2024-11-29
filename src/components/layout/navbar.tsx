@@ -8,14 +8,14 @@ export function Navbar() {
   return (
     <header className="flex flex-col justify-center px-16 w-full bg-stone-50 min-h-[72px] max-md:px-5">
       <nav className="flex flex-wrap gap-10 justify-between items-center w-full">
-        <div className="flex justify-center items-center self-stretch my-auto min-h-[40px] w-[198px]">
+        <div className="flex justify-center items-center self-stretch my-auto max-w-[198px]">
           <Image
             src="/images/naturescout.svg"
             alt="NatureScout Logo"
             width={213}
             height={36}
             priority
-            className="object-contain"
+            className="w-auto h-[36px] object-contain"
           />
         </div>
 
