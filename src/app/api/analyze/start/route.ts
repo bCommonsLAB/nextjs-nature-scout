@@ -21,48 +21,51 @@ export async function POST(request: NextRequest) {
 
     const jobId = new ObjectId().toString();
     console.log(`[Start-Route] Erstelle neuen Job mit ID: ${jobId}`);
-    
-    try {
-      await createAnalysisJob(jobId, metadata, 'pending');
-    } catch (dbError) {
-      console.error('[Start-Route] Datenbankfehler:', dbError);
-      return NextResponse.json(
-        { 
-          error: 'Datenbankfehler',
-          details: 'Die Verbindung zur Datenbank konnte nicht hergestellt werden',
-          technicalDetails: dbError instanceof Error ? dbError.message : 'Unbekannter Fehler'
-        },
-        { status: 503 }
-      );
+    const createJob = true;
+    if (createJob) {
+      try {
+        await createAnalysisJob(jobId, metadata, 'pending');
+      } catch (dbError) {
+        console.error('[Start-Route] Datenbankfehler:', dbError);
+        return NextResponse.json(
+          { 
+            error: 'Datenbankfehler',
+            details: 'Die Verbindung zur Datenbank konnte nicht hergestellt werden',
+            technicalDetails: dbError instanceof Error ? dbError.message : 'Unbekannter Fehler'
+          },
+          { status: 503 }
+        );
+      }
+      const job = await getAnalysisJob(jobId);
+      
+      if (!job) {
+        console.error(`[Start-Route] Job ${jobId} wurde nicht erfolgreich erstellt`);
+        return NextResponse.json(
+          { error: 'Fehler beim Erstellen des Analyse-Jobs' },
+          { status: 500 }
+        );
+      }
     }
-    const job = await getAnalysisJob(jobId);
-    
-    if (!job) {
-      console.error(`[Start-Route] Job ${jobId} wurde nicht erfolgreich erstellt`);
-      return NextResponse.json(
-        { error: 'Fehler beim Erstellen des Analyse-Jobs' },
-        { status: 500 }
-      );
-    }
-
     // Starte die Analyse asynchron
     (async () => {
       try {
         const analysisResult: openAiResult = await analyzeImageStructured(metadata);
+        if (createJob) {
         
-        if (analysisResult.error) {
-          await updateAnalysisJob(jobId, {
-            status: 'failed',
-            error: analysisResult.error
-          });
-          return;
-        }
+          if (analysisResult.error) {
+            await updateAnalysisJob(jobId, {
+              status: 'failed',
+              error: analysisResult.error
+            });
+            return;
+          }
 
-        await updateAnalysisJob(jobId, {
-          status: 'completed',
-          result: analysisResult.result,
-          llmInfo: analysisResult.llmInfo
-        });
+          await updateAnalysisJob(jobId, {
+            status: 'completed',
+            result: analysisResult.result,
+            llmInfo: analysisResult.llmInfo
+          });
+        }
       } catch (error) {
         console.error(`[Start-Route] Fehler bei der Analyse für Job ${jobId}:`, error);
         await updateAnalysisJob(jobId, {

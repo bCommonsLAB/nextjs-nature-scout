@@ -1,10 +1,10 @@
 import OpenAI from 'openai';
 import { z } from "zod";
-import { zodResponseFormat } from "openai/helpers/zod";
 import { openAiResult, AnalyseErgebnis, NatureScoutData } from '@/types/nature-scout';
 import { serverConfig } from '../config';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-
+import { zodResponseFormat } from "openai/helpers/zod";
+import { ChatCompletionMessageParam } from 'openai/resources/index.mjs';
 const openai = new OpenAI({
     apiKey: serverConfig.OPENAI_API_KEY
 });
@@ -48,95 +48,87 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
     });
     */
     const zSchema = z.object({
-        "analyses": z.array(z.object({
-          "standort": z.object({
-            "hangneigung": z.enum(["eben", "leicht_geneigt", "steil", "weis nicht"])
-              .describe("Hangneigung des Geländes evtl. unter Berücksichtigung von Hinweisen aus der Fragestellung"),
-            "exposition": z.enum(["N", "NO", "O", "SO", "S", "SW", "W", "NW", "weis nicht"])
-              .describe("Ausrichtung des Habitats evtl. unter Berücksichtigung von Hinweisen aus der Fragestellung"),
-            "bodenfeuchtigkeit": z.enum(["trocken", "frisch", "feucht", "nass", "wasserzügig", "weis nicht"])
-              .describe("Feuchtigkeit des Bodens evtl. unter Berücksichtigung von Hinweisen aus der Fragestellung"),
-          }),
-          "pflanzenArten": z.array(
-            z.object({
-              "name": z.string().describe("Name der Pflanzenart in deutscher Sprache"),
-              "häufigkeit": z.enum(["einzeln", "zerstreut", "häufig", "dominant"])
-                .describe("Häufigkeit der Art im Bestand"),
-              "istZeiger": z.boolean().optional()
-                .describe("Ist die Art ein wichtiger Indikator?")
-            })
-          ).describe("Liste der erkannten Pflanzenarten mit Details, bitte nur die Arten auflisten, die in der Fragestellung genannt wurden."),
-          "Vegetationsstruktur": z.object({
-            "höhe": z.enum(["kurz", "mittel", "hoch"])
-              .describe("Höhe des Hauptbestandes"),
-            "dichte": z.enum(["dünn", "mittel", "dicht"])
-              .describe("Dichte der Vegetation"),
-            "deckung": z.enum(["offen", "mittel", "geschlossen"])
-              .describe("Bodendeckung der Vegetation")
-          }).describe("Bitte die vegetationsstruktur beschreiben. Wenn nicht genau erkennbar, bitte 'weis nicht' angeben."),
-          "blühaspekte": z.object({
-            "intensität": z.enum(["keine", "vereinzelt", "reich"])
-              .describe("Intensität der Blüte"),
-            "anzahlFarben": z.number()
-              .int()
-              .describe("Anzahl verschiedener Blütenfarben")
-          }).describe("Bitte die Blühaspekte beschreiben. Wenn nicht genau erkennbar, bitte 'weis nicht' angeben."),
-          "nutzung": z.object({
-            "beweidung": z.boolean()
-              .describe("Beweidungsspuren vorhanden"),
-            "mahd": z.boolean()
-              .describe("Mahdspuren vorhanden"),
-            "düngung": z.boolean()
-              .describe("Düngungsspuren vorhanden")
-          }).describe("Bitte die Nutzungsspuren beschreiben. Wenn nicht genau erkennbar, bitte 'weis nicht' angeben."),
-          "habitatTyp": z.enum([
-            "Magerwiese",
-            "Trockenrasen",
-            "Fettwiese",
-            "Magerweide",
-            "Fettweide",
-            "Niedermoor",
-            "Hochmoor",
-            "sonstiges"
-          ]).describe("Klassifizierung des Habitattyps"),
-          "schutzstatus": z.object({
-            "gesetzlich": z.number()
-              .int()
-              .describe("Mit welcher Wahrscheinlichkeit in Prozent ist es ein Habitat, der im Naturschutzgesetz angeführt ist - Nass- und Feuchtflächen:Verlandungsbereiche von stehenden oder langsam fließenden Gewässern, Schilf-, Röhricht- und Großseggenbestände, Feucht- und Nasswiesen mit Seggen und Binsen, Moore, Auwälder, Sumpf- und Bruchwälder, Quellbereiche, Naturnahe und unverbaute Bach- und Flussabschnitte sowie Wassergräben inklusive der Ufervegetation. Bei Trockenstandorte: Trockenrasen, Felsensteppen, Lehmbrüche?"),
-            "hochwertig": z.number()
-              .int()
-              .describe("Mit welcher Wahrscheinlichkeit in Prozent ist es ein ökologisch hochwertige Lebensraum, der nicht vom Gesetz erfasst ist: Magerwiese, Magerweide, Trockenrasen, Felsensteppen, Lehmbrüche?"),
-            "standard": z.number()
-              .int()
-              .describe("Mit Welcher Wahrscheinlichkeit in Prozent ist es ein ökologisch nicht hochwertige Lebensraum, wie Fettwiese, Fettweide, Kunstrasen aller Art, Parkanlagen, Ruderalflächen, u. a. Standardlebensraum?")
-          }),
-          "bewertung": z.object({
-            "artenreichtum": z.number()
-              .int()
-              .describe("Geschätzte Anzahl Arten pro 25m²"),
-            "konfidenz": z.number()
-              .int()
-              .describe("Konfidenz der Habitatbestimmung in Prozent")
-          }).describe("Bitte die Bewertung der ökologischen Qualität und Schutzwürdigkeit des Habitats beschreiben. Wenn nicht genau erkennbar, bitte 'weis nicht' angeben."),
-          "glaubwürdigkeit": z.object({
-            "konsistenzBewertung": z.number()
-              .int()
-              .describe("Prozentuale Einschätzung der Konsistenz (0-100%)"),
-            "indikatorenFürKonsistenz": z.array(z.string())
-              .describe("Merkmale, die für die Konsistenz sprechen"),
-            "indikatorenGegenKonsistenz": z.array(z.string())
-              .describe("Merkmale, die gegen die Konsistenz sprechen")
-          }).describe("Wie Konsistent ist das bereitgestellten Panoramabild, bereits erkannten Pflanzenarten, Standortdaten und Hinweise? "),
-          "evidenz": z.object({
-            "dafürSpricht": z.array(z.string())
-              .describe("Merkmale, die für die Klassifizierung sprechen"),
-            "dagegenSpricht": z.array(z.string())
-              .describe("Merkmale, die gegen die Klassifizierung sprechen")
-          }),
-          "zusammenfassung": z.string()
-              .describe("Wie könnte man das Habitat und die Einschätzung des Schutzstatus zusammenfassen?")
-        })
-        )
+      "analyses": z.array(z.object({
+        "standort": z.object({
+          "hangneigung": z.string()
+            .describe("Beschreibe die Hangneigung des Geländes als 'eben', 'leicht geneigt', 'steil' oder 'weis nicht', wenn du dir nicht sicher bist"),
+          "exposition": z.string()
+            .describe("Beschreibe die Ausrichtung des Habitats als 'Nord', 'Nordost', 'Ost', 'Südost', 'Süd', 'Südwest', 'West', 'Nordwest' oder 'weis nicht', wenn du dir nicht sicher bist"),
+          "bodenfeuchtigkeit": z.string()
+            .describe("Beschreibe die Feuchtigkeit des Bodens als 'trocken', 'frisch', 'feucht', 'nass' oder 'wasserzügig' oder 'weis nicht', wenn du dir nicht sicher bist"),
+        }),/*
+        "pflanzenArten": z.array(
+          z.object({
+            "name": z.string().describe("Name der Pflanzenart in deutscher Sprache"),
+            "häufigkeit": z.string()
+              .describe("Beschreibe die Häufigkeit der Art im Bestand als 'einzeln', 'zerstreut', 'häufig' oder 'dominant'"),
+            "istZeiger": z.boolean().optional()
+              .describe("Ist die Art ein wichtiger Indikator?")
+          })
+        ).describe("Liste der erkannten Pflanzenarten mit Details, bitte nur die Arten auflisten, die in der Fragestellung genannt wurden."),*/
+        "Vegetationsstruktur": z.object({
+          "höhe": z.string()
+            .describe("Beschreibe die Höhe des Hauptbestandes als 'kurz', 'mittel', 'hoch' oder 'weis nicht', wenn du dir nicht sicher bist"),
+          "dichte": z.string()
+            .describe("Beschreibe die Dichte der Vegetation als 'dünn', 'mittel', 'dicht' oder 'weis nicht', wenn du dir nicht sicher bist"),
+          "deckung": z.string()
+            .describe("Beschreibe die Bodendeckung der Vegetation als 'offen', 'mittel', 'geschlossen' oder 'weis nicht', wenn du dir nicht sicher bist")
+        }).describe("Beschreibe die Vegetationsstruktur."),
+        "blühaspekte": z.object({
+          "intensität": z.string()
+            .describe("Intensität der Blüte als 'keine', 'vereinzelt', 'reich' oder 'weis nicht', wenn du dir nicht sicher bist"),
+          "anzahlFarben": z.number()
+            .int()
+            .describe("Anzahl verschiedener Blütenfarben")
+        }).describe("Bitte die Blühaspekte beschreiben. Wenn nicht genau erkennbar, bitte 'weis nicht' angeben."),
+        "nutzung": z.object({
+          "beweidung": z.boolean()
+            .describe("Beweidungsspuren vorhanden oder weis nicht, wenn du dir nicht sicher bist"),
+          "mahd": z.boolean()
+            .describe("Mahdspuren vorhanden oder weis nicht, wenn du dir nicht sicher bist"),
+          "düngung": z.boolean()
+            .describe("Düngungsspuren vorhanden oder weis nicht, wenn du dir nicht sicher bist")
+        }).describe("Bitte die Nutzungsspuren beschreiben. Wenn nicht genau erkennbar, bitte 'weis nicht' angeben."),
+        "habitatTyp": z.string()
+          .describe("Klassifizierung des Habitattyps nach 'Magerwiese', 'Trockenrasen', 'Fettwiese', 'Magerweide', 'Fettweide', 'Niedermoor', 'Hochmoor', 'Rasen' oder 'sonstiges', wenn es keines dieser Habitate ist oder du dir nicht sicher bist"),
+        "schutzstatus": z.object({
+          "gesetzlich": z.number()
+            .int()
+            .describe("Mit welcher Wahrscheinlichkeit in Prozent ist es ein Habitat, der im Naturschutzgesetz angeführt ist - Nass- und Feuchtflächen:Verlandungsbereiche von stehenden oder langsam fließenden Gewässern, Schilf-, Röhricht- und Großseggenbestände, Feucht- und Nasswiesen mit Seggen und Binsen, Moore, Auwälder, Sumpf- und Bruchwälder, Quellbereiche, Naturnahe und unverbaute Bach- und Flussabschnitte sowie Wassergräben inklusive der Ufervegetation. Bei Trockenstandorte: Trockenrasen, Felsensteppen, Lehmbrüche?"),
+          "hochwertig": z.number()
+            .int()
+            .describe("Mit welcher Wahrscheinlichkeit in Prozent ist es ein ökologisch hochwertige Lebensraum, der nicht vom Gesetz erfasst ist: Magerwiese, Magerweide, Trockenrasen, Felsensteppen, Lehmbrüche?"),
+          "standard": z.number()
+            .int()
+            .describe("Mit Welcher Wahrscheinlichkeit in Prozent ist es ein ökologisch nicht hochwertige Lebensraum, wie Fettwiese, Fettweide, Kunstrasen aller Art, Parkanlagen, Ruderalflächen, u. a. Standardlebensraum?")
+        }),
+        "bewertung": z.object({
+          "artenreichtum": z.number()
+            .int()
+            .describe("Geschätzte Anzahl Arten pro 25m²"),
+          "konfidenz": z.number()
+            .int()
+            .describe("Konfidenz der Habitatbestimmung in Prozent")
+        }).describe("Bitte die Bewertung der ökologischen Qualität und Schutzwürdigkeit des Habitats beschreiben."),
+        "glaubwürdigkeit": z.object({
+          "konsistenzBewertung": z.number()
+            .int()
+            .describe("Prozentuale Einschätzung der Konsistenz (0-100%)"),
+          "indikatorenFürKonsistenz": z.array(z.string())
+            .describe("Merkmale, die für die Konsistenz sprechen"),
+          "indikatorenGegenKonsistenz": z.array(z.string())
+            .describe("Merkmale, die gegen die Konsistenz sprechen")
+        }).describe("Wie Konsistent ist das bereitgestellten Panoramabild, bereits erkannten Pflanzenarten, Standortdaten und Hinweise? "),
+        "evidenz": z.object({
+          "dafürSpricht": z.array(z.string())
+            .describe("Merkmale, die für die Klassifizierung sprechen"),
+          "dagegenSpricht": z.array(z.string())
+            .describe("Merkmale, die gegen die Klassifizierung sprechen")
+        }),
+        "zusammenfassung": z.string()
+            .describe("Wie könnte man das Habitat und die Einschätzung des Schutzstatus zusammenfassen?")
+      })
+      )
     });
 
     const jsonSchema = zodToJsonSchema(zSchema, 'analyseSchema');
@@ -150,36 +142,55 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
           metadata.bilder.map(bild => urlToBase64(bild.url))
         );
 
-        const imageContents = imageBase64Contents.map(base64 => ({
-            type: "image_url" as const,
-            image_url: {
-                url: `data:image/jpeg;base64,${base64}`,
-                detail: "high" as const
-            }
-        }));
+        // Schwarzer 1x1 Pixel als Base64
+        const DUMMY_IMAGE = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+        const imageContents = imageBase64Contents.length ? 
+            imageBase64Contents.map(base64 => ({
+                type: "image_url" as const,
+                image_url: {
+                    url: `data:image/jpeg;base64,${base64}`,
+                    detail: "high" as const
+                }
+            })) : [{
+                type: "image_url" as const,
+                image_url: {
+                    url: `data:image/png;base64,${DUMMY_IMAGE}`,
+                    detail: "high" as const
+                }
+            }];
 
         console.log('✅ Bildkonvertierung abgeschlossen', {
-            numberOfImages: imageContents.length
+            numberOfImages: imageContents.length,
+            isDummy: imageBase64Contents.length === 0
         });
 
+        
+        const randomId = Math.floor(Math.random() * 9000000000) + 1000000000;
+
         const llmSystemInstruction = `
+[ID:${randomId}]
 Du bist ein erfahrener Vegetationsökologe und sollst bei der Habitatanalyse unterstützen. 
 Berücksichtige die bereits bekannten Standortdaten und Pflanzenarten in deiner Analyse.
-Argumentiere wissenschaftlich fundiert und berücksichtige alle verfügbaren Indizien 
-für eine möglichst präzise Einschätzung.
+argumentiere wissenschaftlich fundiert nur auf Basis der bereitgestellten Informationen.
         `.trim();
   
+        
         const llmQuestion = `
-Analysiere das hochgeladenen Geasamtbild und einige Detailbilder unter Berücksichtigung der bereits bekannten:
-- Geokoordinaten Latitude: (${metadata.latitude}, Longitude: ${metadata.longitude}), 
-- Standort: ${metadata.standort} 
-- bereits identifizierte Pflanzenarten:
+[ID:${randomId}]
+Analysiere das hochgeladenen Gesamtbild und einige Detailbilder ` +
+/*`unter Berücksichtigung der bereits bekannten:` +
+`- Geokoordinaten Latitude: (${metadata.latitude}, Longitude: ${metadata.longitude}), ` +
+`- Standort: ${metadata.standort} ` +
+`- bereits identifizierte Pflanzenarten:
 ${metadata.bilder
   .filter(bild => bild.analyse && bild.analyse.trim() !== '')
   .map(bild => bild.analyse)
   .join(', ')}
 ${metadata.bilder.some(bild => bild.analyse && bild.analyse.trim() !== '') ? '\n' : ''}
-Bitte analysiere folgende Parameter:
+` + */
+`Bitte analysiere folgende Parameter:
+0. Schätze die Konsistent der bereitgestellten Informationen 
 1. Erfasse die Standortbedingungen und deren Einfluss auf die Vegetation
 2. Wie häufig sind die erkannten Pflanzenarten im Bestand
 3. Beschreibe die Vegetationsstruktur und -dynamik
@@ -187,38 +198,43 @@ Bitte analysiere folgende Parameter:
 5. Leite daraus den wahrscheinlichen Habitattyp ab
 6. Bewerte die ökologische Qualität und Schutzwürdigkeit
 7. Führe unterstützende und widersprechende Merkmale auf
-8. Schätze die Konsistent der bereitgestellten Informationen 
-9. Schätze die Konfidenz deiner Einordnung
+8. Schätze die Konfidenz deiner Einordnung
 ${metadata.kommentar ? `Beachte bitte folgende zusätzliche Hinweise: ${metadata.kommentar}` : ''}
 `.trim();
 
 
         console.log("Question", llmQuestion);
 
+        const messages: ChatCompletionMessageParam[] = [{ 
+              role: "system", 
+              content: llmSystemInstruction // Allgemeine Anweisungen für das Modell
+          },
+          {
+              role: "user",
+              content: [
+                  { 
+                      type: "text", 
+                      text: llmQuestion // Die aktuelle Benutzerfrage
+                  },
+                  ...imageContents // Zusätzliche Inhalte wie Bilder                  
+              ],
+          }
+        ];
+
         const completion = await openai.chat.completions.create({
             model: serverConfig.OPENAI_VISION_MODEL,
-            messages: [
-                { 
-                    role: "system", 
-                    content: llmSystemInstruction 
-                },
-                {
-                    role: "user",
-                    content: [
-                        { 
-                            type: "text", 
-                            text: llmQuestion
-                        },
-                        ...imageContents
-                    ],
-                },
-            ],
+            messages: messages,
+            temperature: 0.1,
+            top_p: 0.1,
             response_format: zodResponseFormat(zSchema, "structured_analysis"),
             max_tokens: 2000,
         });
+        const usage = completion.usage;
+        console.log("usage", usage);
         const analysisResult =  completion.choices[0]?.message.content;
         if (analysisResult) {
-            const parsedResult: AnalyseErgebnis = {
+          console.log("analysisResult", analysisResult);
+          const parsedResult: AnalyseErgebnis = {
                 ...JSON.parse(analysisResult).analyses[0],
                 kommentar: metadata.kommentar
             };
