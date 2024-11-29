@@ -56,16 +56,16 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
             .describe("Beschreibe die Ausrichtung des Habitats als 'Nord', 'Nordost', 'Ost', 'Südost', 'Süd', 'Südwest', 'West', 'Nordwest' oder 'weis nicht', wenn du dir nicht sicher bist"),
           "bodenfeuchtigkeit": z.string()
             .describe("Beschreibe die Feuchtigkeit des Bodens als 'trocken', 'frisch', 'feucht', 'nass' oder 'wasserzügig' oder 'weis nicht', wenn du dir nicht sicher bist"),
-        }),/*
+        }),
         "pflanzenArten": z.array(
           z.object({
             "name": z.string().describe("Name der Pflanzenart in deutscher Sprache"),
             "häufigkeit": z.string()
-              .describe("Beschreibe die Häufigkeit der Art im Bestand als 'einzeln', 'zerstreut', 'häufig' oder 'dominant'"),
+              .describe("Beschreibe die Häufigkeit der Art im Bestand als 'einzeln', 'zerstreut', 'häufig', 'dominant' oder 'weis nicht"),
             "istZeiger": z.boolean().optional()
               .describe("Ist die Art ein wichtiger Indikator?")
           })
-        ).describe("Liste der erkannten Pflanzenarten mit Details, bitte nur die Arten auflisten, die in der Fragestellung genannt wurden."),*/
+        ).describe("Liste der in der fragestellung genannten  Pflanzenarten mit Details"),
         "Vegetationsstruktur": z.object({
           "höhe": z.string()
             .describe("Beschreibe die Höhe des Hauptbestandes als 'kurz', 'mittel', 'hoch' oder 'weis nicht', wenn du dir nicht sicher bist"),
@@ -181,14 +181,14 @@ argumentiere wissenschaftlich fundiert nur auf Basis der bereitgestellten Inform
 Analysiere das hochgeladenen Gesamtbild und einige Detailbilder ` +
 /*`unter Berücksichtigung der bereits bekannten:` +
 `- Geokoordinaten Latitude: (${metadata.latitude}, Longitude: ${metadata.longitude}), ` +
-`- Standort: ${metadata.standort} ` +
+`- Standort: ${metadata.standort} ` + */
 `- bereits identifizierte Pflanzenarten:
 ${metadata.bilder
   .filter(bild => bild.analyse && bild.analyse.trim() !== '')
   .map(bild => bild.analyse)
   .join(', ')}
 ${metadata.bilder.some(bild => bild.analyse && bild.analyse.trim() !== '') ? '\n' : ''}
-` + */
+` + 
 `Bitte analysiere folgende Parameter:
 0. Schätze die Konsistent der bereitgestellten Informationen 
 1. Erfasse die Standortbedingungen und deren Einfluss auf die Vegetation
