@@ -54,7 +54,7 @@ function DebugLogger({ metadata }: { metadata: NatureScoutData }) {
   return null;
 }
 
-export function NatureScout() {
+export default function NatureScout() {
   const router = useRouter();
   const [aktiverSchritt, setAktiverSchritt] = useState(0);
   const [metadata, setMetadata] = useState<NatureScoutData>({
