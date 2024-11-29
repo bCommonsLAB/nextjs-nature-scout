@@ -43,7 +43,7 @@ const features = [
 
 const habitats = [
   { 
-    imageSrc: "/panoramasamples/magerwiese artenreich.jpg", 
+    imageSrc: "/panoramasamples/magerwiese-artenreich.jpg", 
     title: "Magerwiese artenreich", 
     location: "Meran", 
     recorder: "Anna Mayer",
@@ -59,7 +59,7 @@ const habitats = [
     org: "Heimatpflegeverband Südtirol"
   },
   { 
-    imageSrc: "/panoramasamples/moor verlandungsmoor.jpg", 
+    imageSrc: "/panoramasamples/verlandungsmoor.jpg", 
     title: "Verlandungsmoor", 
     location: "Bozen", 
     recorder: "Lisa Pichler",
@@ -67,7 +67,7 @@ const habitats = [
     org: "Klima Club Südtirol"
   },
   { 
-    imageSrc: "/panoramasamples/trockenrasen kurzgrasig.jpg", 
+    imageSrc: "/panoramasamples/trockenrasen-kurzgrasig.jpg", 
     title: "Trockenrasen kurzgrasig", 
     location: "Schlanders", 
     recorder: "Michael Gruber",

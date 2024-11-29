@@ -12,17 +12,17 @@ const { maxWidth: MAX_WIDTH, maxHeight: MAX_HEIGHT, quality: IMAGE_QUALITY } = p
 
 const SAMPLE_IMAGES = [
   {
-    src: '/panoramasamples/trockenrasen kurzgrasig.jpg',
+    src: '/panoramasamples/trockenrasen-kurzgrasig.jpg',
     title: 'Trockenrasen kurzgrasig',
     type: 'panorama'
   },
   {
-    src: '/panoramasamples/moor verlandungsmoor.jpg',
+    src: '/panoramasamples/verlandungsmoor.jpg',
     title: 'Moor Verlandungsmoor',
     type: 'panorama'
   },
   {
-    src: '/panoramasamples/magerwiese artenreich.jpg',
+    src: '/panoramasamples/magerwiese-artenreich.jpg',
     title: 'Magerwiese artenreich',
     type: 'panorama'
   },
