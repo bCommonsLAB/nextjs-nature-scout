@@ -3,6 +3,8 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from '@/components/layout/footer';  
+import '../styles/leaflet-custom.css';
+
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
   variable: "--font-geist-sans",
@@ -27,10 +29,12 @@ export default function RootLayout({
   return (
     <html lang="de">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
       >
         <Navbar />
-        {children}
+        <main>
+          {children}
+        </main>
         <Footer />
       </body>
     </html>

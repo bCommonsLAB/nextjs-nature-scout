@@ -13,7 +13,7 @@ interface MapProps {
 
 const Map: React.FC<MapProps> = ({ position, zoom, onCenterChange }) => {
   return (
-    <div>
+    <div className="w-full h-full relative">
       <MapNoSSR position={position} zoom={zoom} onCenterChange={onCenterChange} />
     </div>
   );

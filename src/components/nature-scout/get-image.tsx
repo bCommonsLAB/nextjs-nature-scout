@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Upload } from "lucide-react";
 import { Progress } from "../ui/progress";
 import { publicConfig } from '@/lib/config';
-import { GetImageProps, PlantNetResponse } from "@/types/nature-scout";
+import { Bild, PlantNetResponse, PlantNetResult } from "@/types/nature-scout";
 import { toast } from "sonner";
 import Image from 'next/image';
 
@@ -27,8 +27,8 @@ const SAMPLE_IMAGES = [
     type: 'panorama'
   },
   {
-    src: '/panoramasamples/Moor Verlandungsmoor.JPG',
-    title: 'Moor Verlandungsmoor',
+    src: '/panoramasamples/Fettwiese.JPG',
+    title: 'Fettwiese',
     type: 'panorama'
   },
   {
@@ -48,15 +48,32 @@ const SAMPLE_IMAGES = [
   }
 ];
 
+interface GetImageProps {
+  imageTitle: string;
+  anweisung: string;
+  onBildUpload: (
+    imageKey: string,
+    filename: string,
+    url: string,
+    bestMatch: string,
+    result?: PlantNetResult
+  ) => void;
+  existingImage: Bild | undefined;
+  doAnalyzePlant?: boolean;
+  isUploading: boolean;
+  setIsUploading: (value: boolean) => void;
+}
+
 export function GetImage({ 
   imageTitle, 
   anweisung, 
   onBildUpload, 
   existingImage, 
-  doAnalyzePlant = false 
+  doAnalyzePlant = false,
+  isUploading,
+  setIsUploading 
 }: GetImageProps) {
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [localUploadProgress, setLocalUploadProgress] = useState(0);
   const [uploadedImage, setUploadedImage] = useState<string | null>(existingImage?.url || null);
   const [backgroundImageStyle, setBackgroundImageStyle] = useState<React.CSSProperties>(
     existingImage?.url ? {
@@ -82,7 +99,10 @@ export function GetImage({
   }, [existingImage]);
 
   const compressImage = async (file: File): Promise<Blob> => {
-    console.log("compressImage");
+    if (typeof window === 'undefined') {
+      return file;
+    }
+
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -143,9 +163,9 @@ export function GetImage({
   const handleBildUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    console.log("🚀 Start handleBildUpload");
+    
     setIsUploading(true);
-    setUploadProgress(0);
+    setLocalUploadProgress(0);
 
     try {
       const compressedBlob = await compressImage(file);
@@ -158,7 +178,7 @@ export function GetImage({
 
       const formData = new FormData();
       formData.append("image", compressedFile);
-      setUploadProgress(20);
+      setLocalUploadProgress(20);
 
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
@@ -175,11 +195,11 @@ export function GetImage({
       // Pflanzenanalyse nur wenn doAnalyzePlant true ist
       let plantAnalysis = null;
       if (doAnalyzePlant) {
-        setUploadProgress(70);
+        setLocalUploadProgress(70);
         plantAnalysis = await analyzePlants([data.url]);
-        setUploadProgress(90);
+        setLocalUploadProgress(90);
       } else {
-        setUploadProgress(90);
+        setLocalUploadProgress(90);
       }
 
       setUploadedImage(data.url);
@@ -198,7 +218,7 @@ export function GetImage({
         plantAnalysis?.results[0]
       );
 
-      setUploadProgress(100);
+      setLocalUploadProgress(100);
       toast.success(
         doAnalyzePlant 
           ? 'Bild hochgeladen und Pflanze analysiert'
@@ -216,7 +236,7 @@ export function GetImage({
 
   const handleSampleImageClick = async (sampleSrc: string) => {
     setIsUploading(true);
-    setUploadProgress(20);
+    setLocalUploadProgress(20);
 
     try {
       const response = await fetch(sampleSrc);
@@ -235,7 +255,7 @@ export function GetImage({
       
       const formData = new FormData();
       formData.append("image", compressedFile);
-      setUploadProgress(40);
+      setLocalUploadProgress(40);
 
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
@@ -250,9 +270,9 @@ export function GetImage({
       
       let plantAnalysis = null;
       if (doAnalyzePlant) {
-        setUploadProgress(70);
+        setLocalUploadProgress(70);
         plantAnalysis = await analyzePlants([data.url]);
-        setUploadProgress(90);
+        setLocalUploadProgress(90);
       }
 
       setUploadedImage(data.url);
@@ -271,7 +291,7 @@ export function GetImage({
         plantAnalysis?.results[0]
       );
 
-      setUploadProgress(100);
+      setLocalUploadProgress(100);
       toast.success(
         doAnalyzePlant 
           ? 'Beispielbild hochgeladen und Pflanze analysiert'
@@ -313,8 +333,8 @@ export function GetImage({
           <label htmlFor={`dropzone-file-${imageTitle}`} className="flex flex-col items-center justify-center w-full h-full">
             {isUploading ? (
               <div className="w-full px-4">
-                <Progress value={uploadProgress} className="w-full" />
-                <p className="text-xs text-center mt-2">{Math.round(uploadProgress)}% hochgeladen</p>
+                <Progress value={localUploadProgress} className="w-full" />
+                <p className="text-xs text-center mt-2">{Math.round(localUploadProgress)}% hochgeladen</p>
               </div>
             ) : !uploadedImage ? (
               <>

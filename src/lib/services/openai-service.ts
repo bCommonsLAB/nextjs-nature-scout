@@ -126,7 +126,7 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
             .describe("Merkmale, die gegen die Klassifizierung sprechen")
         }),
         "zusammenfassung": z.string()
-            .describe("Wie könnte man das Habitat und die Einschätzung des Schutzstatus zusammenfassen?")
+            .describe("Wie könnte man das Habitat und die Einschätzung des Schutzstatus zusammenfassen? Bitte den Satz beginnen mit 'Das Habitat ist wahrscheinlich ein...'")
       })
       )
     });

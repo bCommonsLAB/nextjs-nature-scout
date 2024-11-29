@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import Map from '../map/maps';
 import { GeocodingResult, NatureScoutData } from "@/types/nature-scout";
+import MapNoSSR from '../map/mapNoSSR';
 
 export function LocationDetermination({ metadata, setMetadata }: { metadata: NatureScoutData; setMetadata: React.Dispatch<React.SetStateAction<NatureScoutData>> }) {
   // Initialisiere initialPosition direkt mit den Metadaten-Werten
@@ -114,8 +114,14 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
 
   return (
     <div className="space-y-4">
-      <div className="h-[400px] rounded-lg overflow-hidden">
-        <Map position={initialPosition} zoom={13} onCenterChange={handleCenterChange} />
+      <div className="h-[50vh] min-h-[400px] rounded-lg overflow-hidden relative">
+        <div className="absolute inset-0">
+          <MapNoSSR 
+            position={initialPosition} 
+            zoom={13} 
+            onCenterChange={handleCenterChange} 
+          />
+        </div>
       </div>
       <div className="bg-gray-50 p-4 rounded-lg space-y-2">
         <p className="text-sm font-medium">Aktuelle Position:</p>

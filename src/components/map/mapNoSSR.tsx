@@ -59,7 +59,7 @@ function MapNoSSR({ position, zoom, onCenterChange }: MapNoSSRProps) {
     }
   }, [position, zoom]);
 
-  return <div ref={mapContainerRef} style={{ width: '100%', height: '500px' }} />;
+  return <div ref={mapContainerRef} className="leaflet-container" style={{ width: '100%', height: '100%', position: 'relative', zIndex: 9999, overflow: 'hidden' }} />;
 }
 
 export default React.memo(MapNoSSR);

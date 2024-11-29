@@ -9,20 +9,47 @@ import { GetImage } from "./get-image";
 import { Summary } from "./summary";
 import { UploadedImageList } from "./uploaded-image-list";
 import { HabitatAnalysis } from "./habitat-analysis";
-import { Bild, NatureScoutData, AnalyseErgebnis, llmInfo } from "@/types/nature-scout";
+import { Bild, NatureScoutData, AnalyseErgebnis, llmInfo, PlantNetResult } from "@/types/nature-scout";
 import { LocationDetermination } from './locationDetermination';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Code, ChevronLeft, ChevronRight } from "lucide-react";
+import { useRouter } from 'next/navigation';
 
 const schritte = [
   "Willkommen",
   "Standort bestimmen",
   "Bilder hochladen",
   "Habitat analysieren",
-  "Abschlussbewertung"
+  "Verifizierung"
 ];
 
+function isNextButtonDisabled(schritt: number, metadata: NatureScoutData, isAnyUploadActive: boolean): boolean {
+  if (schritt === schritte.length - 1) return true;
+  if (isAnyUploadActive) return true;
+
+  switch (schritt) {
+    case 0: // Willkommen
+      return !metadata.erfassungsperson || !metadata.email;
+    
+    case 1: // Standort bestimmen
+      return !metadata.gemeinde || !metadata.flurname || !metadata.latitude || !metadata.longitude;
+    
+    case 2: // Bilder hochladen
+      return !metadata.bilder.some(b => b.imageKey === "Panoramabild");
+    
+    case 3: // Habitat analysieren
+      return !metadata.analyseErgebnis || !metadata.llmInfo;
+
+    default:
+      return false;
+  }
+}
+
+
+
+
 export function NatureScout() {
+  const router = useRouter();
   const [aktiverSchritt, setAktiverSchritt] = useState(0);
   const [metadata, setMetadata] = useState<NatureScoutData>({
     erfassungsperson: "",
@@ -36,13 +63,28 @@ export function NatureScout() {
     analyseErgebnis: undefined
   });
   const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
+  const [activeUploads, setActiveUploads] = useState<Record<string, boolean>>({
+    "Panoramabild": false,
+    "Detailbild_1": false,
+    "Detailbild_2": false
+  });
 
-  const handleBildUpload = (imageKey: string, filename: string, url: string, analysis: string) => {
+  const isAnyUploadActive = Object.values(activeUploads).some(isUploading => isUploading);
+
+  const setUploadStatus = (imageKey: string, isUploading: boolean) => {
+    setActiveUploads(prev => ({
+      ...prev,
+      [imageKey]: isUploading
+    }));
+  };
+
+  const handleBildUpload = (imageKey: string, filename: string, url: string, analysis: string, plantnetResult?: PlantNetResult) => {
     const neuesBild: Bild = {
       imageKey,
       filename,
       url,
-      analyse: analysis 
+      analyse: analysis,
+      plantnetResult
     };
       
     setMetadata(prev => ({
@@ -66,11 +108,6 @@ export function NatureScout() {
       analyseErgebnis: ergebnis,
       llmInfo: llmInfo
     }));
-  };
-
-  const handlePDFDownload = () => {
-    console.log("PDF-Download wurde angefordert");
-    // Hier würde die tatsächliche PDF-Generierung und der Download implementiert werden
   };
 
   const handleKommentarChange = (kommentar: string) => {
@@ -97,6 +134,8 @@ export function NatureScout() {
                 onBildUpload={handleBildUpload}
                 existingImage={metadata.bilder.find(b => b.imageKey === "Panoramabild")}
                 doAnalyzePlant={false}
+                isUploading={activeUploads["Panoramabild"] ?? false}
+                setIsUploading={(value) => setUploadStatus("Panoramabild", value)}
               />
               <GetImage 
                 imageTitle="Detailbild_1" 
@@ -104,6 +143,8 @@ export function NatureScout() {
                 onBildUpload={handleBildUpload}
                 existingImage={metadata.bilder.find(b => b.imageKey === "Detailbild_1")}
                 doAnalyzePlant={true}
+                isUploading={activeUploads["Detailbild_1"] ?? false}
+                setIsUploading={(value) => setUploadStatus("Detailbild_1", value)}
               />
               <GetImage 
                 imageTitle="Detailbild_2" 
@@ -111,6 +152,8 @@ export function NatureScout() {
                 onBildUpload={handleBildUpload}
                 existingImage={metadata.bilder.find(b => b.imageKey === "Detailbild_2")}
                 doAnalyzePlant={true}
+                isUploading={activeUploads["Detailbild_2"] ?? false}
+                setIsUploading={(value) => setUploadStatus("Detailbild_2", value)}
               />
             </div>
           </div>
@@ -134,7 +177,6 @@ export function NatureScout() {
         return (
           <Summary 
             metadata={metadata}
-            handlePDFDownload={handlePDFDownload}
           />
         );
       default:
@@ -146,7 +188,6 @@ export function NatureScout() {
   useEffect(() => {
     console.log("Aktuelle Bilder:", metadata.bilder);
   }, [metadata.bilder]);
-
 
   return (
     <div className="container mx-auto p-4">
@@ -183,8 +224,8 @@ export function NatureScout() {
       <div className="flex justify-between items-center mt-4 gap-4">
         <div className="flex gap-2">
           <Button 
-            onClick={() => setAktiverSchritt(prev => prev - 1)} 
-            disabled={aktiverSchritt === 0}
+            onClick={() => aktiverSchritt === 0 ? router.push('/') : setAktiverSchritt(prev => prev - 1)} 
+            disabled={aktiverSchritt === 0 && false}
             variant="outline"
             className="gap-2"
           >
@@ -214,7 +255,7 @@ export function NatureScout() {
 
         <Button 
           onClick={() => setAktiverSchritt(prev => prev + 1)} 
-          disabled={aktiverSchritt === schritte.length - 1}
+          disabled={isNextButtonDisabled(aktiverSchritt, metadata, isAnyUploadActive)}
           className="gap-2"
         >
           Weiter

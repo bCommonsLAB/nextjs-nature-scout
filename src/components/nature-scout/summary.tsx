@@ -1,60 +1,24 @@
 "use client";
 
-import { FileDown } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { NatureScoutData } from "@/types/nature-scout";
 
 interface SummaryProps {
   metadata: NatureScoutData;
-  handlePDFDownload: () => void;
+  
 }
 
-const saveMetadata = async (metadata: NatureScoutData) => {
-  try {
-    const response = await fetch('/api/save-metadata', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(metadata),
-    });
-
-    if (!response.ok) {
-      throw new Error('Fehler beim Speichern der Metadaten');
-    }
-
-    const data = await response.json();
-    console.log(data.message);
-  } catch (error) {
-    console.error(error);
-  }
-};
-
-
-export function Summary({ metadata, handlePDFDownload }: SummaryProps) {
+export function Summary({ metadata }: SummaryProps) {
   if (!metadata.analyseErgebnis) return null;
 
   return (
     <div className="space-y-4">
       <Alert>
-        <AlertTitle>Zusammenfassung der Analyse</AlertTitle>
+        <AlertTitle>Vielen Dank für Ihre Hilfe!</AlertTitle>
         <AlertDescription className="whitespace-pre-line">
-          {metadata.analyseErgebnis.zusammenfassung}
+          Ihre erfasstes Habitat wird nun von einem Experten analysiert. Wir geben Ihnen eine kurze Rückmeldung, sobald das Ergebnis verfügbar ist.
         </AlertDescription>
       </Alert>
-      <Button onClick={handlePDFDownload}>
-        <FileDown className="mr-2 h-4 w-4" /> Bericht herunterladen (PDF)
-      </Button>
-      <Button onClick={() => saveMetadata(metadata)}>
-        <FileDown className="mr-2 h-4 w-4" /> speichern
-      </Button>
-      <div className="p-4">
-        <h2 className="text-lg font-semibold">Zusammenfassung der Erkenntnisse</h2>
-        <p>Erfassungsperson: {metadata.erfassungsperson}</p>
-        {/* Hier können Sie die einzelnen Metadatenfelder anzeigen */}
-        {/* ... weitere Metadatenfelder ... */}
-      </div>
     </div>
   );
-} 
+}
