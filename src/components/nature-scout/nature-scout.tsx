@@ -45,8 +45,14 @@ function isNextButtonDisabled(schritt: number, metadata: NatureScoutData, isAnyU
   }
 }
 
-
-
+// Verschiebe useEffect in einen separaten Client-Komponenten
+function DebugLogger({ metadata }: { metadata: NatureScoutData }) {
+  useEffect(() => {
+    console.log("Aktuelle Bilder:", metadata.bilder);
+  }, [metadata.bilder]);
+  
+  return null;
+}
 
 export function NatureScout() {
   const router = useRouter();
@@ -184,13 +190,9 @@ export function NatureScout() {
     }
   };
 
-  // Debug-Komponente, um die aktuellen metadata als JSON anzuzeigen
-  useEffect(() => {
-    console.log("Aktuelle Bilder:", metadata.bilder);
-  }, [metadata.bilder]);
-
   return (
     <div className="container mx-auto p-4">
+      <DebugLogger metadata={metadata} />
       <div className="mb-8">
         <Progress value={(aktiverSchritt / (schritte.length - 1)) * 100} className="w-full" />
         <div className="flex justify-between mt-2 px-1">
