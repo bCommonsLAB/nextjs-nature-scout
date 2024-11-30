@@ -4,6 +4,8 @@ import "./globals.css";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from '@/components/layout/footer';  
 import '../styles/leaflet-custom.css';
+import 'leaflet/dist/leaflet.css';
+import './leaflet-custom.css';  // Ihre custom Styles
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",

@@ -1,8 +1,11 @@
+"use client";
+
 import React from 'react';
 import dynamic from 'next/dynamic';
 
 const MapNoSSR = dynamic(() => import('./mapNoSSR'), {
   ssr: false,
+  loading: () => <div className="w-full h-full bg-gray-100" />
 });
 
 interface MapProps {

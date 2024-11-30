@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { GeocodingResult, NatureScoutData } from "@/types/nature-scout";
 import MapNoSSR from '../map/mapNoSSR';
