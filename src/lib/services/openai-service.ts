@@ -31,6 +31,64 @@ async function urlToBase64(url: string): Promise<string> {
   }
 }
 
+interface SimplifiedSchema {
+  [key: string]: string | SimplifiedSchema | { [key: string]: string };
+}
+
+function convertZodSchemaToSimpleDoc(schema: z.ZodObject<z.ZodRawShape>): SimplifiedSchema {
+  const shape = schema.shape;
+  
+  if (!shape.analyses || !(shape.analyses instanceof z.ZodArray)) {
+    throw new Error('Schema muss ein analyses Array enthalten');
+  }
+  
+  const analysesShape = shape.analyses.element.shape;
+  
+  const simplifiedDoc: SimplifiedSchema = {};
+
+  for (const [key, value] of Object.entries(analysesShape)) {
+    if (value instanceof z.ZodObject) {
+      // Für verschachtelte Objekte
+      const nestedDoc: { [key: string]: string } = {};
+      
+      for (const [nestedKey, nestedValue] of Object.entries(value.shape)) {
+        if (nestedValue instanceof z.ZodString) {
+          nestedDoc[nestedKey] = nestedValue.description || '';
+        } else if (nestedValue instanceof z.ZodNumber) {
+          nestedDoc[nestedKey] = nestedValue.description || '';
+        } else if (nestedValue instanceof z.ZodBoolean) {
+          nestedDoc[nestedKey] = nestedValue.description || '';
+        }
+      }
+      
+      simplifiedDoc[key] = nestedDoc;
+    } else if (value instanceof z.ZodArray) {
+      // Für Arrays (wie pflanzenArten)
+      if (value.element instanceof z.ZodObject) {
+        const arrayItemDoc: { [key: string]: string } = {};
+        
+        for (const [arrayKey, arrayValue] of Object.entries(value.element.shape)) {
+          if (arrayValue instanceof z.ZodString || 
+              arrayValue instanceof z.ZodNumber || 
+              arrayValue instanceof z.ZodBoolean) {
+            arrayItemDoc[arrayKey] = arrayValue.description || '';
+          }
+        }
+        
+        simplifiedDoc[key] = arrayItemDoc;
+      }
+    } else if (value instanceof z.ZodString) {
+      // Für einfache Strings
+      simplifiedDoc[key] = value.description || '';
+    }
+  }
+
+  return simplifiedDoc;
+}
+
+
+
+
 export async function analyzeImageStructured(metadata: NatureScoutData): Promise<openAiResult> {
     /*
     const zSchema = z.object({
@@ -94,13 +152,36 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
         "schutzstatus": z.object({
           "gesetzlich": z.number()
             .int()
-            .describe("Mit welcher Wahrscheinlichkeit in Prozent ist es ein Habitat, der im Naturschutzgesetz angeführt ist - Nass- und Feuchtflächen:Verlandungsbereiche von stehenden oder langsam fließenden Gewässern, Schilf-, Röhricht- und Großseggenbestände, Feucht- und Nasswiesen mit Seggen und Binsen, Moore, Auwälder, Sumpf- und Bruchwälder, Quellbereiche, Naturnahe und unverbaute Bach- und Flussabschnitte sowie Wassergräben inklusive der Ufervegetation. Bei Trockenstandorte: Trockenrasen, Felsensteppen, Lehmbrüche?"),
+            .describe(`Mit welcher Wahrscheinlichkeit in Prozent ist es ein Habitat, der im Naturschutzgesetz angeführt ist:
+              Nass- und Feuchtflächen:
+              - Verlandungsbereiche von stehenden oder langsam fließenden Gewässern
+              - Schilf-, Röhricht- und Großseggenbestände
+              - Feucht- und Nasswiesen mit Seggen und Binsen
+              - Moore, Auwälder, Sumpf- und Bruchwälder
+              - Quellbereiche
+              - Naturnahe und unverbaute Bach- und Flussabschnitte
+              - Wassergräben inklusive der Ufervegetation
+              Trockenstandorte:
+              - Trockenrasen und Felsensteppen mit typischen Arten wie:
+                • Stipa
+                • Bothriochloa
+                • Festuca
+                • Astragalus onobrychis
+                • Achillea tomentosa`),
           "hochwertig": z.number()
             .int()
-            .describe("Mit welcher Wahrscheinlichkeit in Prozent ist es ein ökologisch hochwertige Lebensraum, der nicht vom Gesetz erfasst ist: Magerwiese, Magerweide, Trockenrasen, Felsensteppen, Lehmbrüche?"),
+            .describe(`Mit welcher Wahrscheinlichkeit in Prozent ist es ein ökologisch hochwertige Lebensraum, der nicht vom Gesetz erfasst ist: 
+              - Magerwiese, 
+              - Magerweide`),
           "standard": z.number()
             .int()
-            .describe("Mit Welcher Wahrscheinlichkeit in Prozent ist es ein ökologisch nicht hochwertige Lebensraum, wie Fettwiese, Fettweide, Kunstrasen aller Art, Parkanlagen, Ruderalflächen, u. a. Standardlebensraum?")
+            .describe(`Mit Welcher Wahrscheinlichkeit in Prozent ist es ein ökologisch nicht hochwertige Lebensraum:
+               - Fettwiese, 
+               - Fettweide, 
+               - Kunstrasen aller Art, 
+               - Parkanlagen, 
+               - Ruderalflächen, 
+               - und andere Standardlebensräume?`)
         }),
         "bewertung": z.object({
           "artenreichtum": z.number()
@@ -132,7 +213,8 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
     });
 
     const jsonSchema = zodToJsonSchema(zSchema, 'analyseSchema');
-    console.log(JSON.stringify(jsonSchema, null, 2));
+    const simplifiedSchema = convertZodSchemaToSimpleDoc(zSchema);
+    console.log(JSON.stringify(simplifiedSchema, null, 2));
 
     try {
         
