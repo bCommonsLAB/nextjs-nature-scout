@@ -32,7 +32,7 @@ export function Footer() {
       <div className="flex flex-col mt-20 w-full text-sm text-stone-50 max-md:mt-10 max-md:max-w-full">
         <div className="flex w-full border border-solid bg-stone-50 border-stone-50 min-h-[1px]" />
         <div className="flex flex-col md:flex-row gap-6 justify-between items-start mt-8 w-full">
-          <div>© 2024 NatureScout. Alle Rechte vorbehalten.</div>
+          <div>© 2024 NatureScout. Alle Rechte vorbehalten.  Version: {process.env.VERSION}</div>
           <nav className="flex flex-wrap gap-4 items-start w-full md:w-auto">
             <Link href="/" className="underline decoration-auto decoration-solid underline-offset-auto">
               Datenschutzrichtlinie
