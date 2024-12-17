@@ -15,10 +15,10 @@ export async function GET(request: NextRequest) {
   try {
     
     const job = await getAnalysisJob(jobId);
-    console.log(`[Status-Route] Service-Antwort für Job ${jobId}:`, job?.status);
+    //console.log(`[Status-Route] Service-Antwort für Job ${jobId}:`, job?.status);
 
     if (!job) {
-      console.warn(`[Status-Route] Job ${jobId} nicht gefunden`);
+      //console.warn(`[Status-Route] Job ${jobId} nicht gefunden`);
       return NextResponse.json(
         { error: 'Analyse-Job nicht gefunden' },
         { status: 404 }

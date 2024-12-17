@@ -197,12 +197,9 @@ export function GetImage({
     try {
       const pathParts = sampleSrc.split('/');
       const originalFileName = pathParts[pathParts.length - 1];
-      
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || '';
-      const fullSampleUrl = `${baseUrl}${sampleSrc}`;
 
       const { url, filename, analysis } = await processImage(
-        fullSampleUrl,
+        sampleSrc,
         originalFileName || '',
         doAnalyzePlant
       );

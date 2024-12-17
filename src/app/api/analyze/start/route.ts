@@ -6,13 +6,13 @@ import { ObjectId } from 'mongodb';
 
 export async function POST(request: NextRequest) {
   const startTime = performance.now();
-  console.log('[Start-Route] Neue Analyse-Anfrage empfangen');
+  //console.log('[Start-Route] Neue Analyse-Anfrage empfangen');
 
   try {
     const { metadata } = await request.json();
     
     if (!metadata) {
-      console.warn('[Start-Route] Keine Metadaten in der Anfrage');
+      //console.warn('[Start-Route] Keine Metadaten in der Anfrage');
       return NextResponse.json(
         { error: 'Keine Metadaten übergeben.' },
         { status: 400 }
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     const jobId = new ObjectId().toString();
-    console.log(`[Start-Route] Erstelle neuen Job mit ID: ${jobId}`);
+    //console.log(`[Start-Route] Erstelle neuen Job mit ID: ${jobId}`);
     const createJob = true;
     if (createJob) {
       try {
