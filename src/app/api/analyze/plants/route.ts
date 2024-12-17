@@ -15,6 +15,7 @@ export async function POST(request: Request) {
       );
     }
 
+    //console.log("imageUrls", imageUrls);
     // Erstelle die URL mit Query-Parametern
     const baseUrl = "https://my-api.plantnet.org/v2/identify/all";
     const urlParams = new URLSearchParams();

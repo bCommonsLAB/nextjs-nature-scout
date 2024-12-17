@@ -79,12 +79,19 @@ export interface openAiResult {
   error?: string;
 }
 
+export interface SimplifiedSchema {
+  [key: string]: string | SimplifiedSchema | { [key: string]: string };
+}
+
 export interface llmInfo {
-  llmModelPflanzenErkennung?: string;
-  llmModelHabitatErkennung?: string;
-  llmSystemInstruction?: string;
-  llmQuestion?: string;
-  jsonSchema?: string;
+  modelPflanzenErkennung?: string;
+  modelHabitatErkennung?: string;
+  modelSchutzstatusErkennung?: string;
+  systemInstruction?: string;
+  hapitatQuestion?: string;
+  habitatStructuredOutput?: SimplifiedSchema;
+  schutzstatusQuestion?: string;
+  schutzstatusStructuredOutput?: SimplifiedSchema;
 }
 
 export interface AnalyseErgebnis {
@@ -93,38 +100,34 @@ export interface AnalyseErgebnis {
     exposition: string;
     bodenfeuchtigkeit: string;
   };
-  pflanzenArten: Array<{
+  pflanzenarten: Array<{
     name: string;
     häufigkeit: string;
-    istZeiger: boolean;
+    istzeiger: boolean;
   }>;
-  Vegetationsstruktur: {
+  vegetationsstruktur: {
     höhe: string;
     dichte: string;
     deckung: string;
   };
   blühaspekte: {
     intensität: string;
-    anzahlFarben: number;
+    anzahlfarben: number;
   };
   nutzung: {
     beweidung: boolean;
     mahd: boolean;
     düngung: boolean;
   };
-  habitatTyp: string;
-  schutzstatus: {
-    gesetzlich: number;
-    hochwertig: number;
-    standard: number;
-  };
+  habitattyp: string;
+  schutzstatus: string;
   bewertung: {
     artenreichtum: number;
     konfidenz: number;
   };
   evidenz: {
-    dafürSpricht: string[];
-    dagegenSpricht: string[];
+    dafür_spricht: string[];
+    dagegen_spricht: string[];
   };
   zusammenfassung: string;
   kommentar?: string;

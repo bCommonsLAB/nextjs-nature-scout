@@ -123,6 +123,16 @@ export default function NatureScout() {
     }));
   };
 
+  const handleDeleteImage = (imageKey: string) => {
+    setMetadata(prev => ({
+      ...prev,
+      bilder: prev.bilder.filter(bild => bild.imageKey !== imageKey),
+      analyseErgebnis: undefined,
+      llmInfo: undefined,
+      kommentar: undefined
+    }));
+  };
+
   const renderSchrittInhalt = (schritt: number) => {
     switch (schritt) {
       case 0:
@@ -138,6 +148,7 @@ export default function NatureScout() {
                 imageTitle="Panoramabild" 
                 anweisung="Laden Sie ein Panoramabild des gesamten Habitats hoch." 
                 onBildUpload={handleBildUpload}
+                onDeleteImage={handleDeleteImage}
                 existingImage={metadata.bilder.find(b => b.imageKey === "Panoramabild")}
                 doAnalyzePlant={false}
                 isUploading={activeUploads["Panoramabild"] ?? false}
@@ -147,6 +158,7 @@ export default function NatureScout() {
                 imageTitle="Detailbild_1" 
                 anweisung="Laden Sie ein Detailbild hoch, das eine typische Pflanzenart zeigt." 
                 onBildUpload={handleBildUpload}
+                onDeleteImage={handleDeleteImage}
                 existingImage={metadata.bilder.find(b => b.imageKey === "Detailbild_1")}
                 doAnalyzePlant={true}
                 isUploading={activeUploads["Detailbild_1"] ?? false}
@@ -156,6 +168,7 @@ export default function NatureScout() {
                 imageTitle="Detailbild_2" 
                 anweisung="Laden Sie ein weiteres Detailbild hoch, das eine typische Pflanzenart zeigt." 
                 onBildUpload={handleBildUpload}
+                onDeleteImage={handleDeleteImage}
                 existingImage={metadata.bilder.find(b => b.imageKey === "Detailbild_2")}
                 doAnalyzePlant={true}
                 isUploading={activeUploads["Detailbild_2"] ?? false}

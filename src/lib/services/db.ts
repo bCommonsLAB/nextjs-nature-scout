@@ -4,13 +4,11 @@ let client: MongoClient | null = null;
 
 export async function connectToDatabase() {
   try {
-    console.log("MONGODB_DATABASE_NAME: ", process.env.MONGODB_DATABASE_NAME);
     // Check if client exists and is connected
     if (client?.connect && client.db(process.env.MONGODB_DATABASE_NAME)) {
       return client.db(process.env.MONGODB_DATABASE_NAME);
     }
 
-    console.log("MONGODB_URI: ", process.env.MONGODB_URI);
     // Wenn keine Verbindung besteht, neue aufbauen
     client = new MongoClient(process.env.MONGODB_URI as string, {
       maxPoolSize: 10,
@@ -45,7 +43,6 @@ export async function closeDatabaseConnection() {
   if (client) {
     await client.close();
     client = null;
-    console.log('MongoDB Verbindung geschlossen');
   }
 }
 

@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Info, Sparkles } from "lucide-react";
 import Link from 'next/link';
 import { WelcomePopup } from "./welcome-popup";
-console.log('LandingPage wird gerendert');
+//console.log('LandingPage wird gerendert');
 
 const colors = {
   lightest: "#FAFFF3",
@@ -96,7 +96,7 @@ const processSteps = [
 ];
 
 export function NatureScoutPage() {
-  console.log('NatureScoutPage Component wird gerendert');
+  //console.log('NatureScoutPage Component wird gerendert');
 
   const [showAIInfo, setShowAIInfo] = useState(false);
 

@@ -12,31 +12,20 @@ import {
 import { Button } from "@/components/ui/button";
 
 export function WelcomePopup() {
-  console.log('WelcomePopup wird gerendert');
-  
   const [isOpen, setIsOpen] = useState(true);
-  console.log('isOpen Status:', isOpen);
 
   useEffect(() => {
-    console.log('useEffect wird ausgeführt');
     const hasSeenWelcome = window.localStorage.getItem('hasSeenWelcome');
-    console.log('hasSeenWelcome aus localStorage:', hasSeenWelcome);
     
     if (hasSeenWelcome) {
-      console.log('Popup wird geschlossen, da bereits gesehen');
       setIsOpen(false);
-    } else {
-      console.log('Popup sollte angezeigt werden');
-    }
+    } 
   }, []);
 
   const handleClose = () => {
-    console.log('handleClose wird ausgeführt');
     setIsOpen(false);
     window.localStorage.setItem('hasSeenWelcome', 'true');
   };
-
-  console.log('Render mit isOpen:', isOpen);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>

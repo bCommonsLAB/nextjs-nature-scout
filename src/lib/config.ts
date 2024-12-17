@@ -1,5 +1,6 @@
 // Public (client-side) Konfiguration
 export const publicConfig = {
+    baseUrl: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
     imageSettings: {
         maxWidth: Number(process.env.NEXT_PUBLIC_MAX_IMAGE_WIDTH) || 2000,
         maxHeight: Number(process.env.NEXT_PUBLIC_MAX_IMAGE_HEIGHT) || 2000,

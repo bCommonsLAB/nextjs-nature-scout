@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { ChevronDown, ChevronUp, Flower2, Sparkles, CheckCircle2, Camera, MessagesSquare, MessageSquare, Terminal, AlertTriangle, Loader2 } from 'lucide-react';
-import { NatureScoutData, AnalyseErgebnis, llmInfo } from "@/types/nature-scout";
+import { NatureScoutData, AnalyseErgebnis, llmInfo, SimplifiedSchema } from "@/types/nature-scout";
 import { ParameterHeading } from './parameter-heading';
 
 interface ImageAnalysisProps {
@@ -14,73 +14,40 @@ interface ImageAnalysisProps {
   onKommentarChange: (kommentar: string) => void;
 }
 
-// Tooltip-Definitionen hinzufügen
-const tooltips = {
-  standort: {
-    title: "Standort",
-    description: "Physische Eigenschaften und Umweltbedingungen des Standorts",
-    hangneigung: "Neigungsgrad des Geländes, z. B. eben, geneigt oder steil",
-    exposition: "Ausrichtung des Standorts, z. B. nach Norden, Osten oder Süden",
-    bodenfeuchtigkeit: "Feuchtigkeitszustand des Bodens, von trocken bis nass"
-  },
-  pflanzenarten: {
-    title: "Pflanzenarten",
-    description: "Erkannte Pflanzenarten und deren Eigenschaften",
-    name: "Deutsche Bezeichnung der Pflanzenart",
-    häufigkeit: "Häufigkeit der Pflanzenart im Bestand, von einzeln bis dominant",
-    istZeiger: "Gibt an, ob die Pflanzenart ein Indikator für die Standortbedingungen ist"
-  },
-  vegetationsstruktur: {
-    title: "Vegetationsstruktur",
-    description: "Strukturelle Merkmale der Vegetation",
-    höhe: "Hauptbestandshöhe, z. B. kurz, mittel oder hoch",
-    dichte: "Dichte der Vegetation, von dünn bis dicht",
-    deckung: "Grad der Bodendeckung, von offen bis geschlossen"
-  },
-  blühaspekte: {
-    title: "Blühaspekte",
-    description: "Merkmale der Blütenbildung",
-    intensität: "Blühintensität, von keine bis reich",
-    anzahlFarben: "Anzahl verschiedener Blütenfarben"
-  },
-  nutzung: {
-    title: "Nutzung",
-    description: "Erkennbare Nutzungsspuren",
-    beweidung: "Gibt an, ob Beweidungsspuren vorhanden sind",
-    mahd: "Gibt an, ob Mahdspuren vorhanden sind",
-    düngung: "Gibt an, ob Düngungsspuren vorhanden sind"
-  },
-  habitattyp: {
-    title: "Habitattyp",
-    description: "Klassifizierung des Lebensraums",
-    typ: "Klassifizierung des Lebensraums, z. B. Magerwiese, Hochmoor oder Trockenrasen"
-  },
-  schutzstatus: {
-    title: "Schutzstatus",
-    description: "Bewertung des Schutzstatus",
-    gesetzlich: "Wahrscheinlichkeit, dass es ein Habitat, der im Naturschutzgesetz angeführt ist - Nass- und Feuchtflächen:Verlandungsbereiche von stehenden oder langsam fließenden Gewässern, Schilf-, Röhricht- und Großseggenbestände, Feucht- und Nasswiesen mit Seggen und Binsen, Moore, Auwälder, Sumpf- und Bruchwälder, Quellbereiche, Naturnahe und unverbaute Bach- und Flussabschnitte sowie Wassergräben inklusive der Ufervegetation. Bei Trockenstandorte: Trockenrasen, Felsensteppen",
-    hochwertig: "Wahrscheinlichkeit, das es ein ökologisch hochwertige Lebensraum, der nicht vom Gesetz erfasst ist: Magerwiese, Magerweide, Trockenrasen, Felsensteppen, Lehmbrüche",
-    standard: "Wahrscheinlichkeit, dass es sich um einen Standardlebensraum handelt"
-  },
-  bewertung: {
-    title: "Bewertung",
-    description: "Qualitative Bewertung des Habitats",
-    artenreichtum: "Geschätzte Artenanzahl auf 25 m²",
-    konfidenz: "Sicherheit der Habitatbestimmung in Prozent"
-  },
-  evidenz: {
-    title: "Evidenz",
-    description: "Begründung der Habitatklassifizierung",
-    dafürSpricht: "Merkmale, die die Klassifizierung des Habitats unterstützen",
-    dagegenSpricht: "Merkmale, die gegen die Klassifizierung sprechen"
-  },
-  zusammenfassung: {
-    title: "Zusammenfassung",
-    description: "Zusammenfassende Beschreibung",
-    text: "Beschreibung des Habitats und eine Einschätzung des Schutzstatus"
-  }
-};
+interface TooltipDefinition {
+  title: string;
+  description: string;
+  [key: string]: string;
+}
 
+interface TooltipMap {
+  [key: string]: TooltipDefinition;
+}
+
+function transformSchemaToTooltips(schema: SimplifiedSchema): TooltipMap {
+  const tooltips: TooltipMap = {};
+
+  for (const [key, value] of Object.entries(schema)) {
+    if (typeof value === 'string') {
+      // Direkter String-Wert wird als Beschreibung verwendet
+      tooltips[key] = {
+        title: key,
+        description: value
+      };
+    } else if (typeof value === 'object') {
+      tooltips[key] = {
+        title: key,
+        description: '', // Leere Beschreibung für Objekte
+        ...Object.entries(value).reduce((acc, [subKey, subValue]) => ({
+          ...acc,
+          [subKey]: typeof subValue === 'string' ? subValue : ''
+        }), {})
+      };
+    }
+  }
+  console.log(tooltips);
+  return tooltips;
+}
 
 export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChange }: ImageAnalysisProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -100,7 +67,8 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
   const handleAnalyzeClick = async () => {
     setIsAnalyzing(true);
     setAnalysisError(null);
-
+    metadata.analyseErgebnis = undefined;
+    metadata.llmInfo = undefined;
     try {
       const startResponse = await fetch('/api/analyze/start', {
         method: "POST",
@@ -161,6 +129,20 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
     onKommentarChange(event.target.value);
   };
 
+  const habitatTooltips = useMemo(() => 
+    metadata.llmInfo?.habitatStructuredOutput 
+      ? transformSchemaToTooltips(metadata.llmInfo.habitatStructuredOutput)
+      : {},
+    [metadata.llmInfo?.habitatStructuredOutput]
+  );
+
+  const schutzstatusTooltips = useMemo(() => 
+    metadata.llmInfo?.schutzstatusStructuredOutput 
+      ? transformSchemaToTooltips(metadata.llmInfo.schutzstatusStructuredOutput)
+      : {},
+    [metadata.llmInfo?.schutzstatusStructuredOutput]
+  );
+
   return (
     <div className="space-y-4">
       {analysisError && (
@@ -190,25 +172,26 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                 <div>
                   <div className="text-sm text-gray-500">Erkanntes Habitat</div>
                   <div className="text-xl font-bold text-gray-900">
-                    {metadata.analyseErgebnis.habitatTyp}
+                    {metadata.analyseErgebnis.habitattyp}
                   </div>
                 </div>
                 
                 <div className="flex flex-col gap-2">
                   <div className="text-sm text-gray-500">Schutzstatus für Biodiversität</div>
-                  <div className="flex flex-col sm:flex-row gap-1">
-                    {Object.entries(metadata.analyseErgebnis?.schutzstatus ?? {}).map(([status, prozent]) => {
-                      const isHighest = prozent === Math.max(...Object.values(metadata.analyseErgebnis?.schutzstatus ?? {}));
-                      const getStatusStyle = (type: string, isHighest: boolean) => {
-                        const baseStyle = "text-sm font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1";
-                        if (!isHighest) return `${baseStyle} bg-gray-100 text-gray-600`;
+                  <div className="space-y-2">
+                    {(() => {
+                      const status = metadata.analyseErgebnis?.schutzstatus;
+                      if (!status) return null;
+
+                      const getStatusStyle = (type: string) => {
+                        const baseStyle = "text-sm font-medium px-3.5 py-2.5 rounded-full flex items-center gap-1";
                         
                         switch(type) {
-                          case 'gesetzlich':
+                          case 'gesetzlich geschützt':
                             return `${baseStyle} bg-red-100 text-red-800`;
-                          case 'hochwertig':
+                          case 'ökologisch hochwertig':
                             return `${baseStyle} bg-orange-100 text-orange-800`;
-                          case 'standard':
+                          case 'ökologisch niedrigwertig':
                             return `${baseStyle} bg-green-100 text-green-800`;
                           default:
                             return `${baseStyle} bg-gray-100 text-gray-600`;
@@ -216,12 +199,12 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                       };
 
                       return (
-                        <div key={status} className={getStatusStyle(status, isHighest)}>
-                          {isHighest && <CheckCircle2 className="w-4 h-4" />}
-                          {`${status} (${prozent}%)`}
+                        <div className={getStatusStyle(status)}>
+                          <CheckCircle2 className="w-4 h-4" />
+                          {status}
                         </div>
                       );
-                    })}
+                    })()}
                   </div>
                 </div>
 
@@ -267,15 +250,15 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                           Zunächst wurden die hochgeladenen Detailbilder nach Pflanzenarten analysiert. Anschliessend wurde das hochgeladene Panoramabild mit den erkannten Pflanzenarten und bekannten Standortinformationen analysiert.
                         </p>
                         <p>
-                          Vision Modell Pflanzenerkennung: {metadata.llmInfo.llmModelPflanzenErkennung}
+                          Vision Modell Pflanzenerkennung: {metadata.llmInfo.modelPflanzenErkennung}
                         </p>
                         <p>
-                          Vision Modell Habitaterkennung: {metadata.llmInfo.llmModelHabitatErkennung}
+                          Vision Modell Habitaterkennung: {metadata.llmInfo.modelHabitatErkennung}
                         </p>
                       </div>
                     </div>
                   )}
-                  {metadata.llmInfo?.llmSystemInstruction && (
+                  {metadata.llmInfo?.systemInstruction && (
                     <div className="space-y-4">
                       <h3 className="font-medium text-gray-900 flex items-center gap-2">
                         <Terminal className="w-5 h-5 text-blue-500" />
@@ -283,13 +266,13 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                       </h3>
                       <div className="bg-blue-50 p-4 rounded-lg space-y-3">
                         <div className="text-xs font-mono whitespace-pre-wrap">
-                          {metadata.llmInfo.llmSystemInstruction}
+                          {metadata.llmInfo.systemInstruction}
                         </div>
                       </div>
                     </div>
                   )}
 
-                  {metadata.llmInfo?.llmQuestion && (
+                  {metadata.llmInfo?.hapitatQuestion && (
                     <div className="space-y-4">
                       <h3 className="font-medium text-gray-900 flex items-center gap-2">
                         <MessageSquare className="w-5 h-5 text-blue-500" />
@@ -297,11 +280,26 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                       </h3>
                       <div className="bg-blue-50 p-4 rounded-lg space-y-3">
                         <div className="text-xs font-mono whitespace-pre-wrap">
-                          {metadata.llmInfo.llmQuestion}
+                          {metadata.llmInfo.hapitatQuestion}
                         </div>
                       </div>
                     </div>
                   )}
+
+                  {metadata.llmInfo?.schutzstatusQuestion && (
+                    <div className="space-y-4">
+                      <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                        <MessageSquare className="w-5 h-5 text-blue-500" />
+                        Fragestellung zur Schutzstatus-Erkennung
+                      </h3>
+                      <div className="bg-blue-50 p-4 rounded-lg space-y-3">
+                        <div className="text-xs font-mono whitespace-pre-wrap">
+                          {metadata.llmInfo.schutzstatusQuestion}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
               )}
             </div>
@@ -328,12 +326,12 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                   <div className="bg-blue-50 p-4 rounded-lg space-y-3">
                     <div className="text-xs font-mono whitespace-pre-wrap">
                       <ParameterHeading 
-                        title={tooltips.standort.title}
-                        description={tooltips.standort.description}
+                        title={habitatTooltips.standort?.title || ''}
+                        description={habitatTooltips.standort?.description || ''}
                         details={{
-                          Hangneigung: tooltips.standort.hangneigung,
-                          Exposition: tooltips.standort.exposition,
-                          Bodenfeuchtigkeit: tooltips.standort.bodenfeuchtigkeit
+                          Hangneigung: habitatTooltips.standort?.hangneigung || '',
+                          Exposition: habitatTooltips.standort?.exposition || '',
+                          Bodenfeuchtigkeit: habitatTooltips.standort?.bodenfeuchtigkeit || ''
                         }}
                       />
 {`- Hangneigung: ${metadata.analyseErgebnis.standort?.hangneigung || 'n/a'}
@@ -342,52 +340,52 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
 `}
 
                       <ParameterHeading 
-                        title={tooltips.pflanzenarten.title}
-                        description={tooltips.pflanzenarten.description}
+                        title={habitatTooltips.pflanzenarten?.title || ''}
+                        description={habitatTooltips.pflanzenarten?.description || ''}
                         details={{
-                          Name: tooltips.pflanzenarten.name,
-                          Häufigkeit: tooltips.pflanzenarten.häufigkeit,
-                          "Ist Zeiger": tooltips.pflanzenarten.istZeiger
+                          Name: habitatTooltips.pflanzenarten?.name || '',
+                          Häufigkeit: habitatTooltips.pflanzenarten?.häufigkeit || '',
+                          "Ist Zeiger": habitatTooltips.pflanzenarten?.istzeiger || ''
                         }}
                       />
-{`${metadata.analyseErgebnis.pflanzenArten?.map(art => 
-  `- ${art.name} ${art.istZeiger ? '(Zeiger)' : ''}: ${art.häufigkeit}`
-).join('\n') || '- keine erkannt'}
+{`${metadata.analyseErgebnis.pflanzenarten?.map(art => 
+  `- ${art.name} ${art.istzeiger ? '(Zeiger)' : ''}: ${art.häufigkeit}`
+).join('\n') || ''}
 `}
 
                       <ParameterHeading 
-                        title={tooltips.vegetationsstruktur.title}
-                        description={tooltips.vegetationsstruktur.description}
+                        title={habitatTooltips.vegetationsstruktur?.title || ''}
+                        description={habitatTooltips.vegetationsstruktur?.description || ''}
                         details={{
-                          Höhe: tooltips.vegetationsstruktur.höhe,
-                          Dichte: tooltips.vegetationsstruktur.dichte,
-                          Deckung: tooltips.vegetationsstruktur.deckung
+                          Höhe: habitatTooltips.vegetationsstruktur?.höhe || '',
+                          Dichte: habitatTooltips.vegetationsstruktur?.dichte || '',
+                          Deckung: habitatTooltips.vegetationsstruktur?.deckung || ''
                         }}
                       />
-{`- Höhe: ${metadata.analyseErgebnis.Vegetationsstruktur?.höhe || 'n/a'}
-- Dichte: ${metadata.analyseErgebnis.Vegetationsstruktur?.dichte || 'n/a'}
-- Deckung: ${metadata.analyseErgebnis.Vegetationsstruktur?.deckung || 'n/a'}
+{`- Höhe: ${metadata.analyseErgebnis.vegetationsstruktur?.höhe || ''}
+- Dichte: ${metadata.analyseErgebnis.vegetationsstruktur?.dichte || ''}
+- Deckung: ${metadata.analyseErgebnis.vegetationsstruktur?.deckung || ''}
 `}
 
                       <ParameterHeading 
-                        title={tooltips.blühaspekte.title}
-                        description={tooltips.blühaspekte.description}
+                        title={habitatTooltips.blühaspekte?.title || ''}
+                        description={habitatTooltips.blühaspekte?.description || ''}
                         details={{
-                          Intensität: tooltips.blühaspekte.intensität,
-                          "Anzahl Farben": tooltips.blühaspekte.anzahlFarben
+                          Intensität: habitatTooltips.blühaspekte?.intensität || '',
+                          "Anzahl Farben": habitatTooltips.blühaspekte?.anzahlfarben || ''
                         }}
                       />
-{`- Intensität: ${metadata.analyseErgebnis.blühaspekte?.intensität || 'n/a'}
-- Anzahl Farben: ${metadata.analyseErgebnis.blühaspekte?.anzahlFarben || 'n/a'}
+{`- Intensität: ${metadata.analyseErgebnis.blühaspekte?.intensität || ''}
+- Anzahl Farben: ${metadata.analyseErgebnis.blühaspekte?.anzahlfarben || ''}
 `}
 
                       <ParameterHeading 
-                        title={tooltips.nutzung.title}
-                        description={tooltips.nutzung.description}
+                        title={habitatTooltips.nutzung?.title || ''}
+                        description={habitatTooltips.nutzung?.description || ''}
                         details={{
-                          Beweidung: tooltips.nutzung.beweidung,
-                          Mahd: tooltips.nutzung.mahd,
-                          Düngung: tooltips.nutzung.düngung
+                          Beweidung: habitatTooltips.nutzung?.beweidung || '',
+                          Mahd: habitatTooltips.nutzung?.mahd || '',
+                          Düngung: habitatTooltips.nutzung?.düngung || ''
                         }}
                       />
 
@@ -397,65 +395,66 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
 `}
 
                       <ParameterHeading 
-                        title={tooltips.habitattyp.title}
-                        description={tooltips.habitattyp.description}
-                        details={{
-                          Typ: tooltips.habitattyp.typ
-                        }}
+                        title={habitatTooltips.habitattyp?.title || ''}
+                        description={habitatTooltips.habitattyp?.description || ''}
+                        details={{}}
                       />
-{`- Typ: ${metadata.analyseErgebnis.habitatTyp || 'n/a'}
+{`- Typ: ${metadata.analyseErgebnis.habitattyp || ''}
 `}
 
+                      <ParameterHeading 
+                        title={habitatTooltips.evidenz?.title || ''}
+                        description={habitatTooltips.evidenz?.description || ''}
+                        details={{
+                          dafür_spricht: habitatTooltips.evidenz?.dafür_spricht || '',
+                          dagegen_spricht: habitatTooltips.evidenz?.dagegen_spricht || ''
+                        }}
+                      />
+{`${metadata.analyseErgebnis.evidenz?.dafür_spricht?.length ? 'Dafür spricht:\n' : ''}${metadata.analyseErgebnis.evidenz?.dafür_spricht?.map(punkt => `- ${punkt}`).join('\n') || ''}
+${metadata.analyseErgebnis.evidenz?.dagegen_spricht?.length ? '\nDagegen spricht:\n' : ''}${metadata.analyseErgebnis.evidenz?.dagegen_spricht?.map(punkt => `- ${punkt}`).join('\n') || ''}
+`}
                       
                       <ParameterHeading 
-                        title={tooltips.schutzstatus.title}
-                        description={tooltips.schutzstatus.description}
+                        title={schutzstatusTooltips.schutzstatus?.title || ''}
+                        description={schutzstatusTooltips.schutzstatus?.description || ''}
+                        details={{}}
+                      />
+{`- ${metadata.analyseErgebnis.schutzstatus || ''}`}
+
+{/*
+                      <ParameterHeading 
+                        title={tooltips.bewertung?.title || ''}
+                        description={tooltips.bewertung?.description || ''}
                         details={{
-                          Gesetzlich: tooltips.schutzstatus.gesetzlich,
-                          Hochwertig: tooltips.schutzstatus.hochwertig,
-                          Standard: tooltips.schutzstatus.standard
+                          Artenreichtum: tooltips.bewertung?.artenreichtum || '',
+                          Konfidenz: tooltips.bewertung?.konfidenz || ''
                         }}
                       />
-
-{`- Gesetzlich: ${metadata.analyseErgebnis.schutzstatus?.gesetzlich}%
-- Hochwertig: ${metadata.analyseErgebnis.schutzstatus?.hochwertig}%
-- Standard: ${metadata.analyseErgebnis.schutzstatus?.standard}%
+{`- Artenreichtum: ${metadata.analyseErgebnis.bewertung?.artenreichtum || ''}
+- Konfidenz: ${metadata.analyseErgebnis.bewertung?.konfidenz || ''}%
 `}
 
-                      <ParameterHeading 
-                        title={tooltips.bewertung.title}
-                        description={tooltips.bewertung.description}
+<ParameterHeading 
+                        title={tooltips.glaubwürdigkeit?.title || ''}
+                        description={tooltips.glaubwürdigkeit?.description || ''}
                         details={{
-                          Artenreichtum: tooltips.bewertung.artenreichtum,
-                          Konfidenz: tooltips.bewertung.konfidenz
+                          Konsistenzbewertung: tooltips.glaubwürdigkeit?.konsistenzbewertung || '',
+                          Indikatoren_für_konsistenz: tooltips.glaubwürdigkeit?.indikatoren_für_konsistenz || '',
+                          Indikatoren_gegen_konsistenz: tooltips.glaubwürdigkeit?.indikatoren_gegen_konsistenz || ''
                         }}
                       />
-{`- Artenreichtum: ${metadata.analyseErgebnis.bewertung?.artenreichtum || 'n/a'}
-- Konfidenz: ${metadata.analyseErgebnis.bewertung?.konfidenz || 'n/a'}%
+{`- Konsistenzbewertung: ${metadata.analyseErgebnis.glaubwürdigkeit?.konsistenzbewertung || ''}
+- Indikatoren für Konsistenz: ${metadata.analyseErgebnis.glaubwürdigkeit?.indikatoren_für_konsistenz || ''}
+- Indikatoren gegen Konsistenz: ${metadata.analyseErgebnis.glaubwürdigkeit?.indikatoren_gegen_konsistenz || ''}
 `}
+*/}
 
                       <ParameterHeading 
-                        title={tooltips.evidenz.title}
-                        description={tooltips.evidenz.description}
-                        details={{
-                          Dafür_spricht: tooltips.evidenz.dafürSpricht,
-                          Dagegen_spricht: tooltips.evidenz.dagegenSpricht
-                        }}
+                        title={habitatTooltips.zusammenfassung?.title || ''}
+                        description={habitatTooltips.zusammenfassung?.description || ''}
+                        details={{}}
                       />
-{`Dafür spricht:
-${metadata.analyseErgebnis.evidenz?.dafürSpricht.map(punkt => `- ${punkt}`).join('\n') || ''}
-${metadata.analyseErgebnis.evidenz?.dagegenSpricht?.length ? `Dagegen spricht:
-${metadata.analyseErgebnis.evidenz.dagegenSpricht.map(punkt => `- ${punkt}`).join('\n')}` : ''}
-`}
-
-                      <ParameterHeading 
-                        title={tooltips.zusammenfassung.title}
-                        description={tooltips.zusammenfassung.description}
-                        details={{
-                          Text: tooltips.zusammenfassung.text
-                        }}
-                      />
-{`${metadata.analyseErgebnis.zusammenfassung || 'n/a'}
+{`${metadata.analyseErgebnis.zusammenfassung || ''}
 `}
                     </div>
                   </div>
