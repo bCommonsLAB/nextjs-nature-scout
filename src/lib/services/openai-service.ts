@@ -245,7 +245,29 @@ async function performHabitatAnalysis(metadata: NatureScoutData) : Promise<openA
           .describe("Konfidenz der Habitatbestimmung in Prozent")
       }).describe("Bitte die Bewertung der ökologischen Qualität und Schutzwürdigkeit des Habitats beschreiben."),
       "habitattyp": z.string()
-        .describe("Klassifiziere den wahrscheinlichsten Habitattyps nach 'Verlandungsbereich', 'Schilf', 'Röhricht', 'Großsegge', 'Hochmoor', 'Niedermoor', 'Übergangsmoor', 'Quellmoor', 'Kastenmoor', 'Auwald', 'Sumpfwald', 'Bruchwald', 'Quellbereich', 'Naturnaher Bachlauf', 'Wassergraben', 'Trockenrasen', 'Felsensteppe', 'Magerwiese', 'Magerweide', 'Fettwiese', 'Fettweide', 'Kunstrasen', 'Parkanlage', 'Ruderalfläche' oder 'sonstiges', wenn es keines dieser Habitate ist oder du dir nicht sicher bist"),
+        .describe(`
+Klassifiziere den wahrscheinlichsten Habitattyps nach:
+'Verlandungsbereich': mit typischen Arten wie Typha latifolia (Breitblättriger Rohrkolben), Iris pseudacorus (Gelbe Schwertlilie), Lythrum salicaria (Blutweiderich), Myosotis palustris (Sumpf-Vergissmeinnicht)
+'Schilf': mit typischen Arten wie Phragmites australis (Gemeines Schilfrohr), Phalaris arundinacea (Rohrglanzgras), Glyceria maxima (Wasserschwaden)
+'Röhricht': mit typischen Arten wie Typha angustifolia (Schmalblättriger Rohrkolben), Schoenoplectus lacustris (Seebinse), Bolboschoenus maritimus (Gewöhnliche Strandsimse)
+'Großsegge': mit typischen Arten wie Carex elata (Steife Segge), Carex acutiformis (Sumpf-Segge), Carex riparia (Ufer-Segge), Carex paniculata (Rispen-Segge)
+'Moor': mit typischen Arten wie Sphagnum sp. (Torfmoose), Drosera rotundifolia (Rundblättriger Sonnentau), Eriophorum vaginatum (Scheidiges Wollgras), Vaccinium oxycoccos (Moosbeere)
+'Auwald': mit typischen Arten wie Alnus incana (Grauerle), Fraxinus excelsior (Gewöhnliche Esche), Salix alba (Silber-Weide), Populus nigra (Schwarz-Pappel)
+'Sumpfwald': mit typischen Arten wie Alnus glutinosa (Schwarzerle), Salix cinerea (Grau-Weide), Frangula alnus (Faulbaum), Caltha palustris (Sumpfdotterblume)
+'Bruchwald': mit typischen Arten wie Betula pubescens (Moor-Birke), Carex elongata (Walzen-Segge), Dryopteris carthusiana (Dorniger Wurmfarn)
+'Quellbereich': mit typischen Arten wie Cardamine amara (Bitteres Schaumkraut), Chrysosplenium alternifolium (Wechselblättriges Milzkraut), Veronica beccabunga (Bachbunge)
+'Naturnaher Bachlauf': mit typischen Arten wie Petasites hybridus (Gewöhnliche Pestwurz), Mentha aquatica (Wasserminze), Nasturtium officinale (Brunnenkresse)
+'Wassergraben': mit typischen Arten wie Berula erecta (Aufrechter Merk), Veronica anagallis-aquatica (Gauchheil-Ehrenpreis), Glyceria fluitans (Flutender Schwaden)
+'Trockenrasen': mit typischen Arten wie Bromus erectus (Aufrechte Trespe), Festuca valesiaca (Walliser Schwingel), Artemisia campestris (Feld-Beifuß), Dianthus carthusianorum (Karthäuser-Nelke)
+'Felsensteppe': mit typischen Arten wie Stipa pennata (Federgras), Bothriochloa ischaemum (Bartgras), Festuca rupicola (Felsen-Schwingel), Astragalus onobrychis (Esparsetten-Tragant), Achillea tomentosa (Filzige Schafgarbe)
+'Magerwiese': mit typischen Arten wie Briza media (Zittergras), Salvia pratensis (Wiesen-Salbei), Anthyllis vulneraria (Wundklee), Centaurea scabiosa (Skabiosen-Flockenblume)
+'Magerweide': mit typischen Arten wie Nardus stricta (Borstgras), Thymus praecox (Früher Thymian), Potentilla erecta (Blutwurz), Carlina acaulis (Silberdistel)
+'Fettwiese': mit typischen Arten wie Arrhenatherum elatius (Glatthafer), Trifolium pratense (Rot-Klee), Dactylis glomerata (Knaulgras), Taraxacum officinale (Löwenzahn)
+'Fettweide': mit typischen Arten wie Lolium perenne (Deutsches Weidelgras), Trifolium repens (Weiß-Klee), Cynosurus cristatus (Kammgras), Bellis perennis (Gänseblümchen)
+'Kunstrasen': mit typischen Arten wie Poa annua (Einjähriges Rispengras), Plantago major (Breit-Wegerich), Polygonum aviculare (Vogel-Knöterich)
+'Parkanlage': mit typischen Arten wie Acer pseudoplatanus (Berg-Ahorn), Tilia cordata (Winter-Linde), Poa pratensis (Wiesen-Rispengras), Hedera helix (Efeu)
+'Ruderalfläche': mit typischen Arten wie Artemisia vulgaris (Gemeiner Beifuß), Urtica dioica (Große Brennnessel), Chenopodium album (Weißer Gänsefuß), Cirsium arvense (Acker-Kratzdistel)
+oder 'sonstiges', wenn es keines dieser Habitate ist oder du dir nicht sicher bist`),
       "evidenz": z.object({
         "dafür_spricht": z.array(z.string())
           .describe("Merkmale die für die Klassifizierung sprechen"),
@@ -337,13 +359,11 @@ async function performSchutzStatusAnalysis(habitatAnalyse: AnalyseErgebnis) : Pr
   const schutzstatusSchema = z.object({
     "analyses": z.array(z.object({
       "schutzstatus": z.string()
-      .describe(`Ist der Schutzstatus dieses Habitat ${habitatAnalyse.habitattyp} 'gesetzlich geschützt', 'ökologisch hochwertig' oder 'ökologisch niederwertig'?  
-
-'gesetzlich geschützt': Wenn es eine Nass- und Feuchtfläche wie Verlandungsbereiche von stehenden oder langsam fließenden Gewässern, Schilfbestand, Röhrichtbestand, Großseggenbestand, Feuchtwiese, Nasswiese mit Seggen und Binsen, Moore wie Hochmoor, Niedermoor, Übergangsmoor, Quellmoor, Kastenmoor, Auwälder, Sumpfwald, Bruchwald, Quellbereiche, Naturnahe und unverbauter Bach und Flussabschnitt, Wassergraben mit Ufervegetation oder wenn es ein Trockenstandort wie Trockenrasen und Felsensteppen mit typischen Arten wie Stipa, Bothriochloa, Festuca, Astragalus onobrychis, Achillea tomentosa ist
-
-'ökologisch hochwertig': Wenn es ein Habitat wie Magerwiese oder Magerweide ist 
-
-'ökologisch niederwertig': Wenn es ein Habitat wie Fettwiese, Fettweide, Kunstrasen, Parkanlagen, Ruderalflächen oder sonstige Lebensräume ist`
+      .describe(`
+Ist der Schutzstatus dieses Habitat ${habitatAnalyse.habitattyp} 'gesetzlich geschützt', 'ökologisch hochwertig' oder 'ökologisch niederwertig'?
+'gesetzlich geschützt': Wenn es sich beim Habitat handelt um ein Feuchtgebiet wie Verlandungsbereich, Schilf, Röhricht, Großsegge, Moor (alle Typen), Auwald, Sumpfwald, Bruchwald, Quellbereich, Naturnaher Bachlauf, Wassergraben mit Ufervegetation und alle Trockenstandorte wie Trockenrasen, Felsensteppe.
+'ökologisch hochwertig': Wenn es sich beim Habitat handelt um eine extensiv bewirtschaftete Grünlandfläche wie Magerwiese, Magerweide.
+'ökologisch niederwertig': Wenn es sich beim Habitat handelt um eine intensiv genutzte oder anthropogen stark veränderte Flächen wie Fettwiese, Fettweide, Kunstrasen, Parkanlage, Ruderalfläche, sonstige Lebensräume.`
       )
     })
     )

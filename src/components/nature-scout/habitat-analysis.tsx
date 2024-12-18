@@ -243,18 +243,13 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                     <div className="space-y-4">
                       <h3 className="font-medium text-gray-900 flex items-center gap-2">
                         <Camera className="w-5 h-5 text-blue-500" />
-                        Bildanalyse Prozess
+                        Analyse Prozess
                       </h3>
                       <div className="bg-blue-50 p-4 rounded-lg space-y-3">
-                        <p>
-                          Zunächst wurden die hochgeladenen Detailbilder nach Pflanzenarten analysiert. Anschliessend wurde das hochgeladene Panoramabild mit den erkannten Pflanzenarten und bekannten Standortinformationen analysiert.
-                        </p>
-                        <p>
-                          Vision Modell Pflanzenerkennung: {metadata.llmInfo.modelPflanzenErkennung}
-                        </p>
-                        <p>
-                          Vision Modell Habitaterkennung: {metadata.llmInfo.modelHabitatErkennung}
-                        </p>
+                        <p>Mit folgenden Schritten wurde das Ergebnis erzielt:</p>
+                        <p>Zunächst wurden die hochgeladenen Detailbilder mit dem spezialisierten Visionmodell <span className="font-bold">{metadata.llmInfo.modelPflanzenErkennung}</span> nach Pflanzenarten analysiert.</p>
+                        <p>Anschliessend wurde das hochgeladene Panoramabild mit den erkannten Pflanzenarten und bekannten Standortinformationen analysiert und diewerse Prameter und der Habitattyp mit dem Visionmodell <span className="font-bold">{metadata?.llmInfo?.modelHabitatErkennung?.toUpperCase()}</span> erkannt.</p>
+                        <p>Und in einem 3.Schritt wurde dann auf Basis des erkannten Habitattyp der Schutzstatus für Biodiversität mit dem Large Language Modell <span className="font-bold">{metadata?.llmInfo?.modelSchutzstatusErkennung?.toUpperCase()}</span> analysiert.</p>
                       </div>
                     </div>
                   )}
@@ -262,7 +257,7 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                     <div className="space-y-4">
                       <h3 className="font-medium text-gray-900 flex items-center gap-2">
                         <Terminal className="w-5 h-5 text-blue-500" />
-                        Systeminstruktion zur Habitat-Erkennung
+                        Systeminstruktion
                       </h3>
                       <div className="bg-blue-50 p-4 rounded-lg space-y-3">
                         <div className="text-xs font-mono whitespace-pre-wrap">
@@ -319,7 +314,7 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                 <div className="mt-4">
                   <div className="text-sm text-gray-600 space-y-2 mb-6">
                       <p>
-                        Diese Parameter wurden aufgrund von Wahrscheinlichkeiten analysiert. Es kann sein, dass einige falsch sind. Aber es hilft die Entscheidung nachzuvollziehen und evtl. Fehlerentscheidungen zu analysieren. 
+                        Diese Parameter wurden aufgrund von Wahrscheinlichkeiten analysiert. Technisch wir jeder Parameter durch eine gezielte Fargestellung erkannt, die hinter dem Fragesymbol erklärt wird. Es kann sein, dass einige erkannte Parameter falsch sind. Aber es hilft die Einschätzugen nachzuvollziehen und evtl. Fehler zu analysieren. 
                         Wenn ein Parameter so falsch ist, dass es Auswirkungen auf den erkannten Habitattyp hätte, bitten wir sie, das im nächsten Abschnitt zu anzumerken.                      
                       </p>
                   </div>
