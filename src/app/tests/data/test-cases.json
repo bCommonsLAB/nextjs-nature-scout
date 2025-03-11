@@ -1,0 +1,25 @@
+{
+  "testCases": [
+    {
+      "id": "test-001",
+      "imageUrl": "/test-images/meadow-001.jpg",
+      "plants": ["Taraxacum officinale", "Bellis perennis", "Trifolium pratense"],
+      "expectedHabitat": "Lowland hay meadow",
+      "description": "Typische Frühlingswiese mit Löwenzahn und Klee"
+    },
+    {
+      "id": "test-002",
+      "imageUrl": "/test-images/forest-001.jpg",
+      "plants": ["Fagus sylvatica", "Anemone nemorosa", "Galium odoratum"],
+      "expectedHabitat": "Beech forest",
+      "description": "Buchenwald im Frühjahr mit typischer Bodenvegetation"
+    },
+    {
+      "id": "test-003",
+      "imageUrl": "/test-images/wetland-001.jpg",
+      "plants": ["Phragmites australis", "Typha latifolia", "Iris pseudacorus"],
+      "expectedHabitat": "Reed bed",
+      "description": "Schilfgürtel mit typischer Feuchtgebietsvegetation"
+    }
+  ]
+} 
