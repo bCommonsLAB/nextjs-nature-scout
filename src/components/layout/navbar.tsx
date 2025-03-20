@@ -3,7 +3,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import { Menu } from "lucide-react";
+import { Menu, Settings, TestTube2, FolderArchive, Users } from "lucide-react";
+import { SignInButton, UserButton, SignedIn, SignedOut } from "@clerk/nextjs";
 
 export function Navbar() {
   return (
@@ -17,7 +18,8 @@ export function Navbar() {
               width={213}
               height={36}
               priority
-              className="w-auto h-[36px] object-contain"
+              className="h-[36px] object-contain"
+              style={{ width: 'auto' }}
             />
           </Link>
         </div>
@@ -29,11 +31,49 @@ export function Navbar() {
               Über Uns
             </Button>
           </Link>
-          <Link href="/">
-            <Button variant="secondary" className="text-base">
-              Jetzt Anmelden
+          <Link href="/archiv">
+            <Button variant="ghost" className="text-base">
+              <FolderArchive className="h-4 w-4 mr-2" />
+              Archiv
             </Button>
           </Link>
+          <SignedIn>
+            <Link href="/admin/config">
+              <Button variant="ghost" className="text-base">
+                <Settings className="h-4 w-4 mr-2" />
+                Admin
+              </Button>
+            </Link>
+            <Link href="/admin/users">
+              <Button variant="ghost" className="text-base">
+                <Users className="h-4 w-4 mr-2" />
+                Benutzer
+              </Button>
+            </Link>
+          </SignedIn>
+          <Link href="/tests">
+            <Button variant="ghost" className="text-base">
+              <TestTube2 className="h-4 w-4 mr-2" />
+              Tests
+            </Button>
+          </Link>
+          <SignedOut>
+            <SignInButton mode="modal">
+              <Button variant="secondary" className="text-base">
+                Jetzt Anmelden
+              </Button>
+            </SignInButton>
+          </SignedOut>
+          <SignedIn>
+            <UserButton
+              afterSignOutUrl="/"
+              appearance={{
+                elements: {
+                  userButtonAvatarBox: "h-10 w-10"
+                }
+              }}
+            />
+          </SignedIn>
         </div>
 
         {/* Mobile Navigation */}
@@ -53,11 +93,51 @@ export function Navbar() {
                   Über Uns
                 </Button>
               </Link>
-              <Link href="/">
-                <Button variant="secondary" className="w-full text-base justify-start">
-                  Jetzt Anmelden
+              <Link href="/archiv">
+                <Button variant="ghost" className="w-full text-base justify-start">
+                  <FolderArchive className="h-4 w-4 mr-2" />
+                  Archiv
                 </Button>
               </Link>
+              <SignedIn>
+                <Link href="/admin/config">
+                  <Button variant="ghost" className="w-full text-base justify-start">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Admin
+                  </Button>
+                </Link>
+                <Link href="/admin/users">
+                  <Button variant="ghost" className="w-full text-base justify-start">
+                    <Users className="h-4 w-4 mr-2" />
+                    Benutzer
+                  </Button>
+                </Link>
+              </SignedIn>
+              <Link href="/tests">
+                <Button variant="ghost" className="w-full text-base justify-start">
+                  <TestTube2 className="h-4 w-4 mr-2" />
+                  Tests
+                </Button>
+              </Link>
+              <SignedOut>
+                <SignInButton mode="modal">
+                  <Button variant="secondary" className="w-full text-base justify-start">
+                    Jetzt Anmelden
+                  </Button>
+                </SignInButton>
+              </SignedOut>
+              <SignedIn>
+                <div className="pt-2 pl-2">
+                  <UserButton
+                    afterSignOutUrl="/"
+                    appearance={{
+                      elements: {
+                        userButtonAvatarBox: "h-10 w-10"
+                      }
+                    }}
+                  />
+                </div>
+              </SignedIn>
             </div>
           </SheetContent>
         </Sheet>

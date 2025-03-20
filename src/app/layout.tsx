@@ -6,6 +6,7 @@ import { Footer } from '@/components/layout/footer';
 import '../styles/leaflet-custom.css';
 import 'leaflet/dist/leaflet.css';
 import './leaflet-custom.css';  // Ihre custom Styles
+import { ClerkProvider } from "@clerk/nextjs";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -30,15 +31,17 @@ export default function RootLayout({
 }) {
   return (
     <html lang="de">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
-      >
-        <Navbar />
-        <main>
-          {children}
-        </main>
-        <Footer />
-      </body>
+      <ClerkProvider>
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
+        >
+          <Navbar />
+          <main>
+            {children}
+          </main>
+          <Footer />
+        </body>
+      </ClerkProvider>
     </html>
   );
 }

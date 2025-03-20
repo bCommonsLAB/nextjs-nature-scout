@@ -1,55 +1,50 @@
-interface TestCase {
+export interface TestCase {
   id: string;
-  imageUrls: string[];  // Array von Bild-URLs statt einzelner URL
-  plants: string[];
+  name: string;
+  category: string;
+  subcategory: string;
   expectedHabitat: string;
-  description?: string;
-  category: string;      // z.B. "Grasland_Wiesen"
-  subCategory: string;   // z.B. "alpines Grasland"
-  example: string;       // z.B. "Beispiel1"
+  imageUrls: string[] | "Bilder fehlen";
+  plants: string[] | "Pflanzenliste fehlt";
+  status: "vollständig" | "unvollständig";
 }
 
-interface TestResult {
+export interface TestResult {
   testCaseId: string;
-  success: boolean;
-  detectedHabitat: string;
   expectedHabitat: string;
+  predictedHabitat: string;
+  confidence: number;
+  isCorrect: boolean;
   timestamp: string;
-  analysis?: {
-    habitattyp: string;
-    standort: any;
-    vegetationsstruktur: any;
-    blühaspekte: any;
-    nutzung: any;
-    zusammenfassung: string;
-  };
 }
 
-interface TestRun {
+export interface TestRun {
   id: string;
   timestamp: string;
   results: TestResult[];
   successRate: number;
-  algorithmVersion: string;
-  category?: string;     // Die Kategorie für die der Test durchgeführt wurde
 }
 
-interface GroupedTestCases {
-  [category: string]: TestCase[];
-}
-
-interface TestMetadata {
+export interface TestMetadata {
   count: number;
   categoryCounts: Record<string, number>;
-  timestamp: string;
 }
 
-interface TestState {
-  selectedCategory: string;  // "all" oder eine spezifische Kategorie
+export type GroupedTestCases = Record<string, TestCase[]>;
+
+export interface TestState {
   isRunning: boolean;
   progress: number;
-  currentExample?: string;   // Aktuell analysiertes Beispiel
-  currentResults?: TestRun;
+  currentExample: string;
+  selectedCategory: string;
+  selectedTestCaseId?: string;
+}
+
+export interface TestHistory {
+  runs: TestRun[];
+  averageSuccessRate: number;
+  totalRuns: number;
+  lastRun?: TestRun;
 }
 
 export type { 
@@ -58,5 +53,6 @@ export type {
   TestRun, 
   GroupedTestCases, 
   TestMetadata,
-  TestState 
+  TestState,
+  TestHistory 
 }; 

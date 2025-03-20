@@ -3,70 +3,132 @@
 ## Überblick der Komponenten
 
 ### 1. Test-Seite (`/app/tests/page.tsx`)
-- Hauptseite für die Testausführung
-- Lädt initiale Testfälle beim Start
+- Hauptseite für die Testausführung (Client-Komponente)
+- Lädt initiale Testfälle beim Start via `useEffect`
 - Enthält drei Hauptkomponenten:
-  - `TestControls`: Steuerung der Tests
-  - `TestTable`: Anzeige der Testfälle
-  - `TestHistory`: Historie der Testläufe
+  - `TestControls`: Steuerung der Tests und Kategorie-Auswahl
+  - `TestTable`: Anzeige der Testfälle und Ergebnisse
+  - `TestHistory`: Anzeige vergangener Testläufe
+- Implementiert strukturiertes Logging über `logTestEvent`
+- Verwaltet den Zustand für Testfälle, Ergebnisse und Warnungen
 
-### 2. API-Routen
+### 2. Komponenten-Struktur
+
+#### a) TestControls (`/app/tests/components/test-controls.tsx`)
+- Ermöglicht Auswahl von Testkategorien und einzelnen Testfällen
+- Startet Testläufe und zeigt Fortschritt an
+- Eigenschaften:
+  ```typescript
+  interface TestControlsProps {
+    testCases: GroupedTestCases;
+    onReload?: () => Promise<void>;
+    onTestProgress?: (current: string, progress: number) => void;
+    onTestResult?: (result: TestResult) => void;
+    onTestComplete?: (testRun: TestRun) => void;
+    data?: {
+      warning?: string;
+      invalidHabitats?: { testCase: string; habitat: string }[];
+    };
+    selectedCategory: string;
+    onCategoryChange: (category: string) => void;
+  }
+  ```
+
+#### b) TestTable (`/app/tests/components/test-table.tsx`)
+- Zeigt Testfälle in einer tabellarischen Struktur
+- Gruppiert nach Kategorien und Subkategorien
+- Umfasst Bildvorschau-Dialoge für Testbilder
+- Zeigt Ergebnisstatus (Erfolg/Misserfolg) für jeden Test an
+- Eigenschaften:
+  ```typescript
+  interface TestTableProps {
+    testCases: TestCase[];
+    results?: TestResult[];
+    selectedCategory?: string;
+  }
+  ```
+
+#### c) TestHistory (`/app/tests/components/test-history.tsx`)
+- Zeigt vergangene Testläufe mit Zeitstempel und Erfolgsrate
+- Ermöglicht Auswahl vergangener Testläufe
+- Eigenschaften:
+  ```typescript
+  interface TestHistoryProps {
+    testRuns?: TestRun[];
+    onSelectTestRun?: (testRun: TestRun) => void;
+  }
+  ```
+
+### 3. API-Routen
 
 #### a) Test-Daten Laden (`/api/tests/load-cases/route.ts`)
 - Liest Testfälle aus dem Dateisystem
 - Gruppiert Testfälle nach Kategorien
+- Validiert Habitattypen und meldet ungültige Typen
 - Struktur:
   ```typescript
   POST /api/tests/load-cases
   Response: {
-    testCases: GroupedTestCases;
+    testCases: Record<string, TestCaseInfo[]>;
     metadata: {
       count: number;
       categoryCounts: Record<string, number>;
       timestamp: string;
-    }
+    };
+    warning?: string;
+    invalidHabitats?: { testCase: string; habitat: string }[];
   }
   ```
 
 #### b) Test Ausführen (`/api/tests/run/route.ts`)
 - Führt die Habitat-Erkennung für Testfälle durch
-- Aktuell: Mock-Implementierung
-- Geplante Integration mit OpenAI-Service
+- Nutzt den OpenAI-Service für die Analyse
+- Implementiert Server-Sent Events (SSE) für Echtzeit-Updates
+- Umfasst detailliertes Logging mit `logTestEvent`
 - Struktur:
   ```typescript
-  POST /api/tests/run
-  Body: {
-    category?: string; // Optional: Filtert nach Kategorie
-  }
-  Response: TestRun
+  GET/POST /api/tests/run
+  Parameter:
+    - category: string (optional, default: 'all')
+    - testCaseId: string (optional)
+  Response: SSE Stream mit:
+    - Progress Updates (type: 'progress')
+    - Einzelne Testergebnisse (type: 'result')
+    - Finales TestRun-Objekt (type: 'complete')
   ```
 
-### 3. Analyse-Service Integration
+### 4. Typdefinitionen
 
-#### a) OpenAI-Service (`/lib/services/openai-service.ts`)
-- Hauptlogik für Habitat-Erkennung
-- Verwendet OpenAI's Vision-Modell
-- Analysiert:
-  - Standortbedingungen
-  - Pflanzenarten
-  - Vegetationsstruktur
-  - Nutzungsspuren
-  - Habitattyp
-  - Schutzstatus
+Die wichtigsten Typen in `/app/tests/types/test-types.ts`:
 
-#### b) Analyse-API-Routen
-1. `/api/analyze/start/route.ts`:
-   - Startet einen neuen Analyse-Job
-   - Erstellt Job in der Datenbank
-   - Führt Analyse asynchron durch
+```typescript
+export interface TestCase {
+  id: string;
+  name: string;
+  category: string;
+  subcategory: string;
+  expectedHabitat: string;
+  imageUrls: string[] | "Bilder fehlen";
+  plants: string[] | "Pflanzenliste fehlt";
+  status: "vollständig" | "unvollständig";
+}
 
-2. `/api/analyze/status/route.ts`:
-   - Prüft Status eines laufenden Jobs
-   - Liefert Ergebnisse zurück
+export interface TestResult {
+  testCaseId: string;
+  expectedHabitat: string;
+  predictedHabitat: string;
+  confidence: number;
+  isCorrect: boolean;
+  timestamp: string;
+}
 
-3. `/api/analyze/plants/route.ts`:
-   - Integriert PlantNet API
-   - Identifiziert Pflanzen in Bildern
+export interface TestRun {
+  id: string;
+  timestamp: string;
+  results: TestResult[];
+  successRate: number;
+}
+```
 
 ## Datenfluss
 
@@ -76,89 +138,59 @@
    TestPage->>LoadCasesAPI: Lade Testfälle
    LoadCasesAPI->>Filesystem: Lese Testbilder
    Filesystem->>LoadCasesAPI: Testfall-Daten
-   LoadCasesAPI->>TestPage: Gruppierte Testfälle
+   LoadCasesAPI->>TestPage: Gruppierte Testfälle mit Metadaten
    ```
 
 2. **Test-Ausführung**:
    ```mermaid
    sequenceDiagram
-   TestControls->>RunAPI: Starte Test
-   RunAPI->>OpenAIService: Analysiere Bilder
-   OpenAIService->>PlantNetAPI: Identifiziere Pflanzen
-   PlantNetAPI->>OpenAIService: Pflanzendaten
-   OpenAIService->>RunAPI: Habitat-Analyse
-   RunAPI->>TestControls: Testergebnisse
+   TestControls->>RunAPI: Starte Test (POST mit category/testCaseId)
+   RunAPI->>LoadCasesAPI: Lade Testfälle
+   RunAPI-->>TestControls: SSE Progress Updates
+   RunAPI->>OpenAIService: Analysiere Bilder mit analyzeImageStructured
+   OpenAIService->>RunAPI: Analyse-Ergebnis
+   RunAPI-->>TestControls: SSE Einzelresultate
+   RunAPI-->>TestControls: SSE Testlauf komplett
    ```
 
-## Integration der OpenAI-Service Logik
+## Verzeichnisstruktur für Testfälle
 
-Um die Mock-Implementierung durch die echte Habitat-Erkennung zu ersetzen, sind folgende Schritte notwendig:
+Die Tests erwarten folgende Verzeichnisstruktur:
 
-1. **Anpassung der Test-Run-Route**:
-   ```typescript
-   import { analyzeImageStructured } from '@/lib/services/openai-service';
+```
+/test-images/
+  /{kategorie}/              # z.B. "Wiesen", "Wälder"
+    /{habitattyp}/           # z.B. "Feuchtwiese", "Buchenwald"
+      /pflanzen.md           # Optional: Standard-Pflanzenliste für alle Beispiele
+      /Beispiel1/            # Testfall-Verzeichnis (muss mit "Beispiel" beginnen)
+        /bild1.jpg           # Beliebige Anzahl Bilder
+        /bild2.jpg
+        /pflanzen.md         # Optional: Spezifische Pflanzenliste für dieses Beispiel
+      /Beispiel2/
+        ...
+```
 
-   export async function POST(request: Request) {
-     const { category } = await request.json();
-     const results: TestResult[] = [];
-     
-     for (const testCase of testCases) {
-       if (category && testCase.category !== category) continue;
-       
-       const analysisResult = await analyzeImageStructured({
-         bilder: testCase.imageUrls.map(url => ({
-           url,
-           analyse: testCase.plants.join(', ')
-         }))
-       });
+## Testresultate
 
-       results.push({
-         testCaseId: testCase.id,
-         success: analysisResult.result?.habitattyp === testCase.expectedHabitat,
-         detectedHabitat: analysisResult.result?.habitattyp || 'unbekannt',
-         expectedHabitat: testCase.expectedHabitat,
-         timestamp: new Date().toISOString()
-       });
-     }
-     
-     return NextResponse.json({
-       id: crypto.randomUUID(),
-       timestamp: new Date().toISOString(),
-       results,
-       successRate: (results.filter(r => r.success).length / results.length) * 100,
-       algorithmVersion: '1.0.0'
-     });
-   }
-   ```
-
-2. **Erweiterung der TestResult-Schnittstelle**:
-   ```typescript
-   interface TestResult {
-     testCaseId: string;
-     success: boolean;
-     detectedHabitat: string;
-     expectedHabitat: string;
-     timestamp: string;
-     confidence?: number;
-     analysis?: {
-       standort: any;
-       vegetationsstruktur: any;
-       blühaspekte: any;
-       nutzung: any;
-     };
-   }
-   ```
+Die Testresultate enthalten:
+- Erkanntes Habitat (`predictedHabitat`)
+- Erwartetes Habitat (`expectedHabitat`)
+- Erfolgsstatus (`isCorrect`)
+- Zeitstempel (`timestamp`)
+- Vollständige Analyse-Ergebnisse (`analysis`)
 
 ## Konfiguration und Umgebungsvariablen
 
 Erforderliche Umgebungsvariablen:
 - `OPENAI_API_KEY`: Für Vision-Modell
-- `PLANTNET_API_KEY`: Für Pflanzenidentifikation
 - `HABITAT_TEST_IMAGES_PATH`: Pfad zu Testbildern
+- `NEXT_PUBLIC_BASE_URL`: Basis-URL für absolute Bildpfade (default: 'http://localhost:3000')
 
 ## Nächste Schritte
 
-1. Integration der OpenAI-Service Logik in die Test-Run-Route
-2. Implementierung der Fortschrittsanzeige während der Tests
-3. Erweiterung der Testfall-Anzeige um detaillierte Analyseergebnisse
-4. Hinzufügen von Konfidenzwerten und Analyseparametern zur Testauswertung 
+1. Implementierung von Konfidenz-Schwellenwerten für Testresultate
+2. Erweiterung der Testfall-Anzeige um detaillierte Analyseergebnisse
+3. Hinzufügen von Statistiken und Metriken zur Testauswertung
+4. Integration von Performance-Metriken für die Analyse
+5. Verbesserung der Filterung nach Kategorien/Subkategorien
+6. Speichern von Testläufen in einer Datenbank für langfristige Auswertung 
