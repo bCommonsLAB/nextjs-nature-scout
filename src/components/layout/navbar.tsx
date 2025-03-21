@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import { Menu, Settings, TestTube2, FolderArchive, Users } from "lucide-react";
+import { Menu, Settings, TestTube2, Folder, Users } from "lucide-react";
 import { SignInButton, SignedIn, SignedOut, useUser } from "@clerk/nextjs";
 import { UserProfileButton } from "@/components/user-profile";
 
@@ -60,10 +60,10 @@ export function Navbar() {
             </Button>
           </Link>
           <SignedIn>
-            <Link href="/archiv">
+            <Link href="/habitat">
               <Button variant="ghost" className="text-base">
-                <FolderArchive className="h-4 w-4 mr-2" />
-                Archiv
+                <Folder className="h-4 w-4 mr-2" />
+                Habitate
               </Button>
             </Link>
           </SignedIn>
@@ -121,10 +121,10 @@ export function Navbar() {
                 </Button>
               </Link>
               <SignedIn>
-                <Link href="/archiv">
+                <Link href="/habitat">
                   <Button variant="ghost" className="w-full text-base justify-start">
-                    <FolderArchive className="h-4 w-4 mr-2" />
-                    Archiv
+                    <Folder className="h-4 w-4 mr-2" />
+                    Habitat
                   </Button>
                 </Link>
               </SignedIn>

@@ -18,7 +18,7 @@ interface ErgebnisStats {
 
 /**
  * WARNUNG: Dieser Endpunkt ist NUR FÜR ENTWICKLUNGSZWECKE.
- * Er erstellt Benutzer aus Archiv-Einträgen ohne Authentifizierung.
+ * Er erstellt Benutzer aus Habitat-Einträgen ohne Authentifizierung.
  * Er sollte NICHT in Produktion verfügbar sein.
  */
 export async function GET() {
@@ -34,7 +34,7 @@ export async function GET() {
     // Verbinde zur Datenbank
     await connectToDatabase();
     
-    // Hole die Analyse-Jobs Sammlung (anstatt archiv)
+    // Hole die Analyse-Jobs Sammlung (anstatt habitat)
     const analyseJobsCollection = mongoose.connection.collection('analyseJobs');
     
     // Debug: Prüfe, ob die Collection existiert und Dokumente enthält
@@ -77,7 +77,7 @@ export async function GET() {
       benutzer: []
     };
     
-    // Für jede Person aus dem Archiv
+    // Für jede Person aus dem Habitat
     for (const person of allPersonsAggregation) {
       const email = person.email as string;
       const personName = person.name as string || '';
@@ -103,7 +103,7 @@ export async function GET() {
         continue;
       }
       
-      // Verwende den Namen aus dem Archiv, oder generiere einen aus der E-Mail
+      // Verwende den Namen aus dem Habitat, oder generiere einen aus der E-Mail
       let name = personName.trim();
       if (!name) {
         // Erstelle einen Namen aus dem Teil vor dem @

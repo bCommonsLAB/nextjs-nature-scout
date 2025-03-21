@@ -114,7 +114,7 @@ async function handleWebhookEvent(evt: WebhookEvent) {
       if (existingUser) {
         console.log('Benutzer wird aktualisiert:', existingUser.email);
         
-        // Falls der Benutzer eine temporäre ID hat (aus dem Archiv-Import), mit der tatsächlichen Clerk-ID aktualisieren
+        // Falls der Benutzer eine temporäre ID hat (aus dem Habitat-Import), mit der tatsächlichen Clerk-ID aktualisieren
         if (existingUser.clerkId.startsWith('temp_')) {
           console.log(`Temporäre Clerk-ID wird aktualisiert: ${existingUser.clerkId} -> ${id}`);
         }

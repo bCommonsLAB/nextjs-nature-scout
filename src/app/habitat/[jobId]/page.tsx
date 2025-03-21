@@ -12,23 +12,96 @@ import {
   HelpCircle, 
   Check, 
   X,
-  Trash2
+  Trash2,
+  RefreshCw,
+  Edit
 } from 'lucide-react';
+import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
 
-export default function ArchiveDetailPage() {
+interface HabitatBild {
+  url: string;
+  plantnetResult?: {
+    species: {
+      scientificName: string;
+    };
+    score: number;
+  };
+}
+
+interface Pflanze {
+  name: string;
+  häufigkeit: string;
+}
+
+interface HabitatData {
+  jobId: string;
+  status: string;
+  verified?: boolean;
+  verifiedAt?: string;
+  metadata?: {
+    erfassungsperson?: string;
+    email?: string;
+    gemeinde?: string;
+    flurname?: string;
+    latitude?: number;
+    longitude?: number;
+    standort?: string;
+    bilder?: HabitatBild[];
+    kommentar?: string;
+  };
+  result?: {
+    habitattyp?: string;
+    schutzstatus?: string;
+    zusammenfassung?: string;
+    standort?: {
+      hangneigung?: string;
+      exposition?: string;
+      bodenfeuchtigkeit?: string;
+    };
+    pflanzenarten?: Pflanze[];
+    evidenz?: {
+      dafür_spricht?: string[];
+      dagegen_spricht?: string[];
+    };
+  };
+  error?: string;
+  updatedAt?: string;
+  history?: {
+    user?: {
+      userName?: string;
+      role?: string;
+    };
+    date?: string;
+    module?: string;
+    changes?: {
+      habitattyp?: string;
+      schutzstatus?: string;
+      bildCount?: number;
+      kommentar?: string;
+    };
+    previousResult?: {
+      habitattyp?: string;
+      schutzstatus?: string;
+      kommentar?: string;
+    };
+  }[];
+}
+
+export default function HabitateDetailPage() {
   const { jobId } = useParams();
   const router = useRouter();
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<HabitatData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/archiv/${jobId}`);
+        const response = await fetch(`/api/habitat/${jobId}`);
         
         if (!response.ok) {
           throw new Error(`Fehler beim Laden der Daten: ${response.status}`);
@@ -37,8 +110,9 @@ export default function ArchiveDetailPage() {
         const result = await response.json();
         setData(result);
         setError(null);
-      } catch (err: any) {
-        setError(err.message || 'Unbekannter Fehler');
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Unbekannter Fehler';
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -54,7 +128,7 @@ export default function ArchiveDetailPage() {
     
     setVerifying(true);
     try {
-      const response = await fetch(`/api/archiv/${jobId}`, {
+      const response = await fetch(`/api/habitat/${jobId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -73,9 +147,10 @@ export default function ArchiveDetailPage() {
         verifiedAt: new Date().toISOString()
       });
       
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Verifizierungsfehler:', err);
-      alert('Fehler bei der Verifizierung: ' + (err.message || 'Unbekannter Fehler'));
+      const errorMessage = err instanceof Error ? err.message : 'Unbekannter Fehler';
+      alert('Fehler bei der Verifizierung: ' + errorMessage);
     } finally {
       setVerifying(false);
     }
@@ -86,7 +161,7 @@ export default function ArchiveDetailPage() {
     
     setDeleting(true);
     try {
-      const response = await fetch(`/api/archiv/${jobId}`, {
+      const response = await fetch(`/api/habitat/${jobId}`, {
         method: 'DELETE'
       });
       
@@ -95,14 +170,53 @@ export default function ArchiveDetailPage() {
         throw new Error(errorData.error || 'Fehler beim Löschen des Eintrags');
       }
       
-      // Zurück zur Archivübersicht navigieren
-      router.push('/archiv');
+      // Zurück zur Habitatübersicht navigieren
+      router.push('/habitat');
     } catch (error) {
       console.error('Fehler beim Löschen:', error);
       alert(`Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler beim Löschen'}`);
     } finally {
       setDeleting(false);
     }
+  };
+
+  const handleReanalyze = async () => {
+    if (!data) return;
+    
+    if (!confirm('Möchten Sie diesen Eintrag neu analysieren?')) return;
+    
+    setAnalyzing(true);
+    try {
+      const response = await fetch(`/api/habitat/${jobId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          newAnalysisModule: 'Standard-Reanalyse',
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Fehler bei der erneuten Analyse');
+      }
+      
+      // Seite neu laden, um die aktualisierten Daten zu sehen
+      window.location.reload();
+    } catch (error) {
+      console.error('Fehler bei der erneuten Analyse:', error);
+      alert(`Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler bei der Analyse'}`);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+  
+  const handleEdit = () => {
+    // Weiterleiten zum Analyseflow mit vorausgefüllten Daten
+    // Wir kodieren die Job-ID als URL-Parameter, damit der Flow weiß, 
+    // dass es sich um eine Bearbeitung handelt
+    router.push(`/naturescout?editJobId=${jobId}`);
   };
 
   const getVerificationStatus = () => {
@@ -141,7 +255,8 @@ export default function ArchiveDetailPage() {
   };
   
   const getSchutzstatusColor = (status: string) => {
-    switch (status) {
+    const normalizedStatus = normalizeSchutzstatus(status);
+    switch (normalizedStatus) {
       case 'gesetzlich geschützt':
         return 'bg-red-500 text-white';
       case 'schützenswert':
@@ -208,7 +323,7 @@ export default function ArchiveDetailPage() {
               </div>
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => handleVerify(true)}
                 disabled={verifying || data.verified === true}
@@ -226,9 +341,24 @@ export default function ArchiveDetailPage() {
               </button>
 
               <button
+                onClick={handleReanalyze}
+                disabled={analyzing}
+                className="inline-flex items-center px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" /> {analyzing ? 'Analysiere...' : 'Neu analysieren'}
+              </button>
+
+              <button
+                onClick={handleEdit}
+                className="inline-flex items-center px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded transition-colors"
+              >
+                <Edit className="h-4 w-4 mr-2" /> Bearbeiten
+              </button>
+
+              <button
                 onClick={handleDelete}
                 disabled={deleting}
-                className="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
+                className="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Trash2 className="h-4 w-4 mr-2" /> {deleting ? 'Wird gelöscht...' : 'Löschen'}
               </button>
@@ -237,9 +367,7 @@ export default function ArchiveDetailPage() {
           
           {data.result?.schutzstatus && (
             <div className={`inline-block mb-6 px-3 py-1 rounded-full text-sm font-medium ${getSchutzstatusColor(typeof data.result.schutzstatus === 'string' ? data.result.schutzstatus : 'unbekannt')}`}>
-              {typeof data.result.schutzstatus === 'string' 
-                ? data.result.schutzstatus 
-                : 'Status prüfen'}
+              {normalizeSchutzstatus(data.result.schutzstatus)}
             </div>
           )}
           
@@ -248,7 +376,7 @@ export default function ArchiveDetailPage() {
             <div>
               <h2 className="text-xl font-semibold mb-4">Bilder</h2>
               <div className="space-y-4">
-                {data.metadata?.bilder?.map((bild: any, index: number) => (
+                {data.metadata?.bilder?.map((bild: HabitatBild, index: number) => (
                   <div key={index} className="bg-gray-50 p-3 rounded">
                     <div className="relative h-64 w-full">
                       <Image
@@ -318,7 +446,7 @@ export default function ArchiveDetailPage() {
                     <div className="bg-gray-50 p-4 rounded">
                       <h3 className="font-semibold">Pflanzenarten</h3>
                       <ul className="mt-2 space-y-1">
-                        {data.result.pflanzenarten.map((pflanze: any, index: number) => (
+                        {data.result.pflanzenarten.map((pflanze: Pflanze, index: number) => (
                           <li key={index} className="flex justify-between">
                             <span>{pflanze.name}</span>
                             <span className="text-gray-500">{pflanze.häufigkeit}</span>
@@ -341,7 +469,7 @@ export default function ArchiveDetailPage() {
                           </ul>
                         </div>
                       )}
-                      {data.result.evidenz.dagegen_spricht && data.result.evidenz.dagegen_spricht.length > 0 && (
+                      {data.result.evidenz?.dagegen_spricht && data.result.evidenz.dagegen_spricht.length > 0 && (
                         <div className="mt-2">
                           <h4 className="text-sm font-medium text-red-500">Dagegen spricht:</h4>
                           <ul className="list-disc pl-5 space-y-1">
@@ -354,10 +482,10 @@ export default function ArchiveDetailPage() {
                     </div>
                   )}
                   
-                  {data.metadata.kommentar && (
+                  {data.metadata?.kommentar && (
                     <div className="bg-blue-50 p-4 rounded">
                       <h3 className="font-semibold text-blue-700">Kommentar des Erfassers</h3>
-                      <p className="mt-2 italic">{data.metadata.kommentar}</p>
+                      <p className="mt-2 italic">{data.metadata?.kommentar}</p>
                     </div>
                   )}
                 </div>
@@ -366,6 +494,79 @@ export default function ArchiveDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Nach dem Abschnitt mit den Analyseergebnissen, vor dem Seitenende */}
+      {data.history && data.history.length > 0 && (
+        <div className="mt-8 bg-gray-50 p-6 rounded-lg shadow-sm">
+          <h2 className="text-xl font-semibold mb-4">Änderungsverlauf</h2>
+          <div className="space-y-6">
+            {data.history.map((entry, index) => (
+              <div key={index} className="border-l-4 border-primary pl-4 py-2">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium">
+                    {entry.user?.userName || 'Unbekannter Benutzer'} 
+                    <span className="text-sm font-normal text-gray-500 ml-2">
+                      ({entry.user?.role || 'Benutzer'})
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    {entry.date && format(new Date(entry.date), 'dd. MMMM yyyy, HH:mm', { locale: de })}
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <div className="text-sm text-gray-600">
+                    Verwendetes Modul: <span className="font-medium">{entry.module || 'Standard'}</span>
+                  </div>
+                  
+                  {entry.changes && (
+                    <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {entry.changes.habitattyp && (
+                        <div className="text-sm">
+                          <span className="text-gray-500">Habitattyp:</span> {entry.changes.habitattyp}
+                        </div>
+                      )}
+                      {entry.changes.schutzstatus && (
+                        <div className="text-sm">
+                          <span className="text-gray-500">Schutzstatus:</span> {normalizeSchutzstatus(entry.changes.schutzstatus)}
+                        </div>
+                      )}
+                      {entry.changes.bildCount && (
+                        <div className="text-sm">
+                          <span className="text-gray-500">Bilder:</span> {entry.changes.bildCount}
+                        </div>
+                      )}
+                      {entry.changes.kommentar && (
+                        <div className="text-sm col-span-2">
+                          <span className="text-gray-500">Kommentar:</span> {entry.changes.kommentar}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {entry.previousResult && (
+                    <div className="mt-3 text-xs text-gray-500">
+                      <details>
+                        <summary className="cursor-pointer">Vorherige Werte anzeigen</summary>
+                        <div className="mt-2 pl-2 border-l-2 border-gray-200">
+                          {entry.previousResult.habitattyp && (
+                            <div>Habitattyp: {entry.previousResult.habitattyp}</div>
+                          )}
+                          {entry.previousResult.schutzstatus && (
+                            <div>Schutzstatus: {normalizeSchutzstatus(entry.previousResult.schutzstatus)}</div>
+                          )}
+                          {entry.previousResult.kommentar && (
+                            <div>Kommentar: {entry.previousResult.kommentar}</div>
+                          )}
+                        </div>
+                      </details>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

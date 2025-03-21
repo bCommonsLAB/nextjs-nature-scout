@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import Image from 'next/image';
 import Link from 'next/link';
+import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
 import { 
   ChevronDown, 
   ChevronUp, 
@@ -14,15 +15,35 @@ import {
   Trash2 
 } from 'lucide-react';
 
-interface ArchiveListProps {
-  entries: any[];
+interface HabitateEntry {
+  jobId: string;
+  status: string;
+  updatedAt: string;
+  verified?: boolean;
+  metadata?: {
+    erfassungsperson?: string;
+    email?: string;
+    gemeinde?: string;
+    flurname?: string;
+    standort?: string;
+    bilder?: Array<{url: string}>;
+  };
+  result?: {
+    habitattyp?: string;
+    schutzstatus?: string;
+  };
+  error?: string;
+}
+
+interface HabitateListProps {
+  entries: HabitateEntry[];
   onSort: (field: string) => void;
   currentSortBy: string;
   currentSortOrder: string;
   onDelete?: (jobId: string) => void;
 }
 
-export function ArchiveList({ entries, onSort, currentSortBy, currentSortOrder, onDelete }: ArchiveListProps) {
+export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder, onDelete }: HabitateListProps) {
   if (!entries || entries.length === 0) {
     return <div className="text-center py-12 text-gray-500">Keine Einträge gefunden</div>;
   }
@@ -42,7 +63,7 @@ export function ArchiveList({ entries, onSort, currentSortBy, currentSortOrder, 
     }`;
   };
   
-  const getVerificationIcon = (entry: any) => {
+  const getVerificationIcon = (entry: HabitateEntry) => {
     if (entry.verified === true) {
       return <CheckCircle className="h-5 w-5 text-green-500" />;
     } else if (entry.verified === false) {
@@ -53,7 +74,8 @@ export function ArchiveList({ entries, onSort, currentSortBy, currentSortOrder, 
   };
   
   const getSchutzstatusColor = (status: string) => {
-    switch (status) {
+    const normalizedStatus = normalizeSchutzstatus(status);
+    switch (normalizedStatus) {
       case 'gesetzlich geschützt':
         return 'bg-red-500 text-white';
       case 'schützenswert':
@@ -134,7 +156,7 @@ export function ArchiveList({ entries, onSort, currentSortBy, currentSortOrder, 
               className="hover:bg-gray-50 transition-colors cursor-pointer"
             >
               <td className="px-2 py-2 whitespace-nowrap">
-                <Link href={`/archiv/${entry.jobId}`}>
+                <Link href={`/habitat/${entry.jobId}`}>
                   {entry.metadata?.bilder && entry.metadata.bilder.length > 0 && entry.metadata.bilder[0]?.url ? (
                     <div className="relative h-14 w-16">
                       <Image
@@ -152,26 +174,25 @@ export function ArchiveList({ entries, onSort, currentSortBy, currentSortOrder, 
                 </Link>
               </td>
               <td className="px-2 py-2 whitespace-nowrap">
-                <Link href={`/archiv/${entry.jobId}`} className="block">
+                <Link href={`/habitat/${entry.jobId}`} className="block">
                   {entry.updatedAt && format(new Date(entry.updatedAt), 'dd.MM.yyyy HH:mm', { locale: de })}
                 </Link>
               </td>
               <td className="px-2 py-2 whitespace-nowrap">
-                <Link href={`/archiv/${entry.jobId}`} className="block">
-                  <div>{entry.metadata?.erfassungsperson || '-'}</div>
-                  <div className="text-xs text-gray-500">{entry.metadata?.email || '-'}</div>
+                <Link href={`/habitat/${entry.jobId}`} className="block">
+                  <div className="font-medium">{entry.metadata?.erfassungsperson || '-'}</div>
                 </Link>
               </td>
               <td className="px-2 py-2 whitespace-nowrap">
-                <Link href={`/archiv/${entry.jobId}`} className="block">
+                <Link href={`/habitat/${entry.jobId}`} className="block">
                   <div className="font-medium">{entry.metadata?.gemeinde || '-'}</div>
-                  <div className="text-xs text-gray-500 truncate max-w-[160px]" title={entry.metadata?.standort || entry.metadata?.flurname || '-'}>
-                    {entry.metadata?.standort || entry.metadata?.flurname || '-'}
+                  <div className="text-xs text-gray-500 truncate max-w-[160px]" title={entry.metadata?.standort || '-'}>
+                    {entry.metadata?.standort || '-'}
                   </div>
                 </Link>
               </td>
               <td className="px-2 py-2 whitespace-nowrap">
-                <Link href={`/archiv/${entry.jobId}`} className="block">
+                <Link href={`/habitat/${entry.jobId}`} className="block">
                   {entry.result?.habitattyp || (
                     <span className="text-red-500">
                       {entry.error ? 'Fehler' : 'Nicht analysiert'}
@@ -180,12 +201,10 @@ export function ArchiveList({ entries, onSort, currentSortBy, currentSortOrder, 
                 </Link>
               </td>
               <td className="px-2 py-2 whitespace-nowrap">
-                <Link href={`/archiv/${entry.jobId}`} className="block">
+                <Link href={`/habitat/${entry.jobId}`} className="block">
                   {entry.result?.schutzstatus ? (
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSchutzstatusColor(typeof entry.result.schutzstatus === 'string' ? entry.result.schutzstatus : 'unbekannt')}`}>
-                      {typeof entry.result.schutzstatus === 'string' 
-                        ? entry.result.schutzstatus 
-                        : 'Status prüfen'}
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSchutzstatusColor(normalizeSchutzstatus(entry.result.schutzstatus))}`}>
+                      {normalizeSchutzstatus(entry.result.schutzstatus)}
                     </span>
                   ) : (
                     <span className="text-gray-400">-</span>
@@ -193,7 +212,7 @@ export function ArchiveList({ entries, onSort, currentSortBy, currentSortOrder, 
                 </Link>
               </td>
               <td className="px-2 py-2 whitespace-nowrap text-center">
-                <Link href={`/archiv/${entry.jobId}`} className="block flex justify-center">
+                <Link href={`/habitat/${entry.jobId}`} className="block flex justify-center">
                   {getVerificationIcon(entry)}
                 </Link>
               </td>

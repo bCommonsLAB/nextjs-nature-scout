@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FolderArchive } from 'lucide-react';
+import { Folder } from 'lucide-react';
 
 export function Header() {
   const pathname = usePathname();
@@ -28,11 +28,11 @@ export function Header() {
                 Start
               </Link>
               <Link 
-                href="/archiv" 
-                className={`px-2 py-1 rounded flex items-center ${isActive('/archiv') ? 'bg-primary-dark' : 'hover:bg-primary-dark'}`}
+                href="/habitat" 
+                className={`px-2 py-1 rounded flex items-center ${isActive('/habitat') ? 'bg-primary-dark' : 'hover:bg-primary-dark'}`}
               >
-                <FolderArchive className="h-4 w-4 mr-1" />
-                <span>Archiv</span>
+                <Folder className="h-4 w-4 mr-1" />
+                <span>Habitate</span>
               </Link>
               <Link 
                 href="/tests" 
