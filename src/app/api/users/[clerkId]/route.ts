@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { clerkClient, getAuth } from '@clerk/nextjs/server';
+import { getAuth } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
 
 // GET /api/users/[clerkId] - Holt einen bestimmten Benutzer
@@ -15,15 +15,18 @@ export async function GET(
       return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
     }
     
+    // Hole die clerkId mit await
+    const clerkId = await params.clerkId;
+    
     // Benutzer dürfen nur ihre eigenen Daten abrufen, es sei denn, sie sind Admins
-    if (userId !== params.clerkId) {
+    if (userId !== clerkId) {
       const isAdmin = await UserService.isAdmin(userId);
       if (!isAdmin) {
         return NextResponse.json({ error: 'Zugriff verweigert' }, { status: 403 });
       }
     }
     
-    const user = await UserService.findByClerkId(params.clerkId);
+    const user = await UserService.findByClerkId(clerkId);
     
     if (!user) {
       return NextResponse.json({ error: 'Benutzer nicht gefunden' }, { status: 404 });
@@ -49,27 +52,28 @@ export async function PATCH(
       return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
     }
     
+    // Hole die clerkId mit await
+    const clerkId = await params.clerkId;
+    
     // Benutzer mit Admin-Rechten oder Benutzer, die ihre eigenen Daten aktualisieren
     const isAdmin = await UserService.isAdmin(userId);
-    const isSelf = userId === params.clerkId;
+    const isSelf = userId === clerkId;
     
     if (!isAdmin && !isSelf) {
       return NextResponse.json({ error: 'Zugriff verweigert' }, { status: 403 });
     }
     
     const body = await req.json();
-    let { name, email, role } = body;
+    const { name, email, role } = body;
     
     // Normale Benutzer dürfen ihre Rolle nicht ändern
-    if (!isAdmin) {
-      role = undefined;
-    }
-    
-    const updatedUser = await UserService.updateUser(params.clerkId, { 
+    const updateData = {
       name, 
       email,
-      ...(role && { role })
-    });
+      ...(isAdmin && role ? { role } : {})
+    };
+    
+    const updatedUser = await UserService.updateUser(clerkId, updateData);
     
     if (!updatedUser) {
       return NextResponse.json({ error: 'Benutzer nicht gefunden' }, { status: 404 });
@@ -95,6 +99,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
     }
     
+    // Hole die clerkId mit await
+    const clerkId = await params.clerkId;
+    
     // Nur Admins dürfen Benutzer löschen
     const isAdmin = await UserService.isAdmin(userId);
     
@@ -102,7 +109,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
     }
     
-    const success = await UserService.deleteUser(params.clerkId);
+    const success = await UserService.deleteUser(clerkId);
     
     if (!success) {
       return NextResponse.json({ error: 'Benutzer nicht gefunden' }, { status: 404 });
