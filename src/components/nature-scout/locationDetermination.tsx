@@ -38,36 +38,41 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
 
   async function getAddressFromCoordinates(lat: number, lon: number) {
     try {
-      const apiUrl = `/api/googlemaps?lat=${lat}&lon=${lon}`
+      const apiUrl = `/api/googlemaps?lat=${lat}&lon=${lon}`;
       const response = await fetch(apiUrl);
       
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
+        
         console.error('API Error:', {
           status: response.status,
           statusText: response.statusText,
           error: errorData
         });
+        
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
       
       const data: GeocodingResult = await response.json();
-
-      if (!data.standort) {
+      
+      if (!data || !data.standort) {
         throw new Error('Keine Adressdaten gefunden');
       }
       
       setMetadata(prev => ({
         ...prev,
-        standort: data.standort,
-        gemeinde: data.gemeinde,
-        flurname: data.flurname
+        standort: data.standort || 'Adresse konnte nicht ermittelt werden',
+        gemeinde: data.gemeinde || 'unbekannt',
+        flurname: data.flurname || 'unbekannt'
       }));
     } catch (error) {
-      console.error('Detaillierter Fehler:', {
-        message: error instanceof Error ? error.message : 'Unbekannter Fehler',
-        error: error
-      });
+      console.error('Fehler bei der Adressermittlung:', error);
       
       setMetadata(prev => ({
         ...prev,

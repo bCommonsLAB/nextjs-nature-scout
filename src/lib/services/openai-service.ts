@@ -4,16 +4,23 @@ import { openAiResult, AnalyseErgebnis, NatureScoutData, SimplifiedSchema } from
 import { serverConfig } from '../config';
 import { zodResponseFormat } from "openai/helpers/zod";
 import { ChatCompletionMessageParam } from 'openai/resources/index.mjs';
+import { getHabitatTypeDescription } from './habitat-service';
+import { getAnalysisSchema, getPrompt } from './analysis-config-service';
+
 const openai = new OpenAI({
     apiKey: serverConfig.OPENAI_API_KEY
 });
 
 const llmSystemInstruction = `
 Du bist ein erfahrener Vegetationsökologe und sollst bei der Habitatanalyse unterstützen. 
-Berücksichtige die bereits bekannten Standortdaten und Pflanzenarten in deiner Analyse.
-argumentiere wissenschaftlich fundiert nur auf Basis der bereitgestellten Informationen.`.trim();
-
-
+Deine Aufgabe ist es, den Habitattyp basierend auf den Bildern und den angegebenen Pflanzenarten zu bestimmen.
+WICHTIG: 
+- Berücksichtige die angegebenen Pflanzenarten als wichtige Indikatoren
+- Analysiere die Vegetationsstruktur und -zusammensetzung
+- Beachte die Standortmerkmale wie Hangneigung und Exposition
+- Gib NUR den Habitattyp zurück, der am besten zu den Beobachtungen passt
+- Wenn du dir nicht sicher bist, gib "unbekannt" zurück
+`.trim();
 
 async function urlToBase64(url: string): Promise<string> {
   try {
@@ -119,6 +126,78 @@ function getZodDescription(zodType: z.ZodTypeAny): string | undefined {
   return undefined;
 }
 
+async function createHabitatAnalyseSchema(analysisSchema: any): Promise<z.ZodObject<any, any>> {
+  const habitatTypeDesc = await getHabitatTypeDescription();
+  
+  return z.object({
+    analyses: z.array(
+      z.object({
+        standort: z.object({
+          hangneigung: z.string()
+            .describe(analysisSchema.schema.standort_hangneigung),
+          exposition: z.string()
+            .describe(analysisSchema.schema.standort_exposition),
+          bodenfeuchtigkeit: z.string()
+            .describe(analysisSchema.schema.standort_bodenfeuchtigkeit)
+        }),
+        pflanzenarten: z.array(
+          z.object({
+            name: z.string()
+              .describe(analysisSchema.schema.pflanzenarten_name),
+            häufigkeit: z.string()
+              .describe(analysisSchema.schema.pflanzenarten_häufigkeit),
+            istzeiger: z.boolean()
+              .describe(analysisSchema.schema.pflanzenarten_istzeiger)
+          })
+        ).describe(analysisSchema.schema.pflanzenarten),
+        vegetationsstruktur: z.object({
+          höhe: z.string()
+            .describe(analysisSchema.schema.vegetationsstruktur_höhe),
+          dichte: z.string()
+            .describe(analysisSchema.schema.vegetationsstruktur_dichte),
+          deckung: z.string()
+            .describe(analysisSchema.schema.vegetationsstruktur_deckung)
+        }).describe(analysisSchema.schema.vegetationsstruktur),
+        blühaspekte: z.object({
+          intensität: z.string()
+            .describe(analysisSchema.schema.blühaspekte_intensität),
+          anzahlfarben: z.number()
+            .int()
+            .describe(analysisSchema.schema.blühaspekte_anzahlfarben)
+        }).describe(analysisSchema.schema.blühaspekte),
+        nutzung: z.object({
+          beweidung: z.boolean()
+            .describe(analysisSchema.schema.nutzung_beweidung),
+          mahd: z.boolean()
+            .describe(analysisSchema.schema.nutzung_mahd),
+          düngung: z.boolean()
+            .describe(analysisSchema.schema.nutzung_düngung)
+        }).describe(analysisSchema.schema.nutzung),
+        bewertung: z.object({
+          artenreichtum: z.number()
+            .int()
+            .describe(analysisSchema.schema.bewertung_artenreichtum),
+          konfidenz: z.number()
+            .int()
+            .describe(analysisSchema.schema.bewertung_konfidenz)
+        }).describe(analysisSchema.schema.bewertung),
+        habitattyp: z.string()
+          .describe(habitatTypeDesc),
+        evidenz: z.object({
+          dafür_spricht: z.array(z.string())
+            .describe(analysisSchema.schema.evidenz_dafür_spricht),
+          dagegen_spricht: z.array(z.string())
+            .describe(analysisSchema.schema.evidenz_dagegen_spricht)
+        }).describe(analysisSchema.schema.evidenz),
+        zusammenfassung: z.string()
+          .describe(analysisSchema.schema.zusammenfassung),
+        schutzstatus: z.string()
+          .describe(analysisSchema.schema.schutzstatus)
+      })
+    )
+  });
+}
+
 export async function analyzeImageStructured(metadata: NatureScoutData): Promise<openAiResult> {
   try {
     // Schritt 1: Habitat-Analyse
@@ -188,238 +267,178 @@ async function getImageContents(metadata: NatureScoutData) {
 }
 
 async function performHabitatAnalysis(metadata: NatureScoutData) : Promise<openAiResult> {
-  const imageContents = await getImageContents(metadata);
-  const pflanzenarten = metadata.bilder
-    .filter(bild => bild.analyse && bild.analyse.trim() !== '')
-    .map(bild => bild.analyse)
-    .join(', ');
-  
-  const habitatAnalyseSchema = z.object({
-    "analyses": z.array(z.object({
-      "standort": z.object({
-        "hangneigung": z.string()
-          .describe("Beschreibe die Hangneigung des Geländes als 'eben', 'leicht geneigt', 'steil' oder 'weis nicht', wenn du dir nicht sicher bist"),
-        "exposition": z.string()
-          .describe("Beschreibe die Ausrichtung des Habitats als 'Nord', 'Nordost', 'Ost', 'Südost', 'Süd', 'Südwest', 'West', 'Nordwest' oder 'weis nicht', wenn du dir nicht sicher bist"),
-        "bodenfeuchtigkeit": z.string()
-          .describe("Beschreibe die Feuchtigkeit des Bodens als 'trocken', 'frisch', 'feucht', 'nass' oder 'wasserzügig' oder 'weis nicht', wenn du dir nicht sicher bist"),
-      }),
-      "pflanzenarten": z.array(
-        z.object({
-          "name": z.string().describe("Name der Pflanzenart in deutscher Sprache. Wenn sie nicht genannt werden, bitte 'weis nicht' angeben."),
-          "häufigkeit": z.string()
-            .describe("Beschreibe die Häufigkeit der Art im Bestand als 'einzeln', 'zerstreut', 'häufig', 'dominant' oder 'weis nicht"),
-          "istzeiger": z.boolean()
-            .describe("Ist die Art ein wichtiger Indikator?")
-        })
-      ).describe("Liste der in der fragestellung genannten Pflanzenarten mit Details. Wenn sie nicht genannt werden, bitte 'weis nicht' angeben."),
-      "vegetationsstruktur": z.object({
-        "höhe": z.string()
-          .describe("Beschreibe die Höhe des Hauptbestandes als 'kurz', 'mittel', 'hoch' oder 'weis nicht', wenn du dir nicht sicher bist"),
-        "dichte": z.string()
-          .describe("Beschreibe die Dichte der Vegetation als 'dünn', 'mittel', 'dicht' oder 'weis nicht', wenn du dir nicht sicher bist"),
-        "deckung": z.string()
-          .describe("Beschreibe die Bodendeckung der Vegetation als 'offen', 'mittel', 'geschlossen' oder 'weis nicht', wenn du dir nicht sicher bist")
-      }).describe("Beschreibe die Vegetationsstruktur."),
-      "blühaspekte": z.object({
-        "intensität": z.string()
-          .describe("Intensität der Blüte als 'keine', 'vereinzelt', 'reich' oder 'weis nicht', wenn du dir nicht sicher bist"),
-        "anzahlfarben": z.number()
-          .int()
-          .describe("Anzahl verschiedener Blütenfarben")
-      }).describe("Bitte die Blühaspekte beschreiben. Wenn nicht genau erkennbar, bitte 'weis nicht' angeben."),
-      "nutzung": z.object({
-        "beweidung": z.boolean()
-          .describe("Beweidungsspuren vorhanden oder weis nicht, wenn du dir nicht sicher bist"),
-        "mahd": z.boolean()
-          .describe("Mahdspuren vorhanden oder weis nicht, wenn du dir nicht sicher bist"),
-        "düngung": z.boolean()
-          .describe("Düngungsspuren vorhanden oder weis nicht, wenn du dir nicht sicher bist")
-      }).describe("Bitte die Nutzungsspuren beschreiben. Wenn nicht genau erkennbar, bitte 'weis nicht' angeben."),
-      "bewertung": z.object({
-        "artenreichtum": z.number()
-          .int()
-          .describe("Geschätzte Anzahl Arten pro 25m²"),
-        "konfidenz": z.number()
-          .int()
-          .describe("Konfidenz der Habitatbestimmung in Prozent")
-      }).describe("Bitte die Bewertung der ökologischen Qualität und Schutzwürdigkeit des Habitats beschreiben."),
-      "habitattyp": z.string()
-        .describe(`
-Klassifiziere den wahrscheinlichsten Habitattyps nach:
-'Verlandungsbereich': mit typischen Arten wie Typha latifolia (Breitblättriger Rohrkolben), Iris pseudacorus (Gelbe Schwertlilie), Lythrum salicaria (Blutweiderich), Myosotis palustris (Sumpf-Vergissmeinnicht)
-'Schilf': mit typischen Arten wie Phragmites australis (Gemeines Schilfrohr), Phalaris arundinacea (Rohrglanzgras), Glyceria maxima (Wasserschwaden)
-'Röhricht': mit typischen Arten wie Typha angustifolia (Schmalblättriger Rohrkolben), Schoenoplectus lacustris (Seebinse), Bolboschoenus maritimus (Gewöhnliche Strandsimse)
-'Großsegge': mit typischen Arten wie Carex elata (Steife Segge), Carex acutiformis (Sumpf-Segge), Carex riparia (Ufer-Segge), Carex paniculata (Rispen-Segge)
-'Moor': mit typischen Arten wie Sphagnum sp. (Torfmoose), Drosera rotundifolia (Rundblättriger Sonnentau), Eriophorum vaginatum (Scheidiges Wollgras), Vaccinium oxycoccos (Moosbeere)
-'Auwald': mit typischen Arten wie Alnus incana (Grauerle), Fraxinus excelsior (Gewöhnliche Esche), Salix alba (Silber-Weide), Populus nigra (Schwarz-Pappel)
-'Sumpfwald': mit typischen Arten wie Alnus glutinosa (Schwarzerle), Salix cinerea (Grau-Weide), Frangula alnus (Faulbaum), Caltha palustris (Sumpfdotterblume)
-'Bruchwald': mit typischen Arten wie Betula pubescens (Moor-Birke), Carex elongata (Walzen-Segge), Dryopteris carthusiana (Dorniger Wurmfarn)
-'Quellbereich': mit typischen Arten wie Cardamine amara (Bitteres Schaumkraut), Chrysosplenium alternifolium (Wechselblättriges Milzkraut), Veronica beccabunga (Bachbunge)
-'Naturnaher Bachlauf': mit typischen Arten wie Petasites hybridus (Gewöhnliche Pestwurz), Mentha aquatica (Wasserminze), Nasturtium officinale (Brunnenkresse)
-'Wassergraben': mit typischen Arten wie Berula erecta (Aufrechter Merk), Veronica anagallis-aquatica (Gauchheil-Ehrenpreis), Glyceria fluitans (Flutender Schwaden)
-'Trockenrasen': mit typischen Arten wie Bromus erectus (Aufrechte Trespe), Festuca valesiaca (Walliser Schwingel), Artemisia campestris (Feld-Beifuß), Dianthus carthusianorum (Karthäuser-Nelke)
-'Felsensteppe': mit typischen Arten wie Stipa pennata (Federgras), Bothriochloa ischaemum (Bartgras), Festuca rupicola (Felsen-Schwingel), Astragalus onobrychis (Esparsetten-Tragant), Achillea tomentosa (Filzige Schafgarbe)
-'Magerwiese': mit typischen Arten wie Briza media (Zittergras), Salvia pratensis (Wiesen-Salbei), Anthyllis vulneraria (Wundklee), Centaurea scabiosa (Skabiosen-Flockenblume)
-'Magerweide': mit typischen Arten wie Nardus stricta (Borstgras), Thymus praecox (Früher Thymian), Potentilla erecta (Blutwurz), Carlina acaulis (Silberdistel)
-'Fettwiese': mit typischen Arten wie Arrhenatherum elatius (Glatthafer), Trifolium pratense (Rot-Klee), Dactylis glomerata (Knaulgras), Taraxacum officinale (Löwenzahn)
-'Fettweide': mit typischen Arten wie Lolium perenne (Deutsches Weidelgras), Trifolium repens (Weiß-Klee), Cynosurus cristatus (Kammgras), Bellis perennis (Gänseblümchen)
-'Kunstrasen': mit typischen Arten wie Poa annua (Einjähriges Rispengras), Plantago major (Breit-Wegerich), Polygonum aviculare (Vogel-Knöterich)
-'Parkanlage': mit typischen Arten wie Acer pseudoplatanus (Berg-Ahorn), Tilia cordata (Winter-Linde), Poa pratensis (Wiesen-Rispengras), Hedera helix (Efeu)
-'Ruderalfläche': mit typischen Arten wie Artemisia vulgaris (Gemeiner Beifuß), Urtica dioica (Große Brennnessel), Chenopodium album (Weißer Gänsefuß), Cirsium arvense (Acker-Kratzdistel)
-oder 'sonstiges', wenn es keines dieser Habitate ist oder du dir nicht sicher bist`),
-      "evidenz": z.object({
-        "dafür_spricht": z.array(z.string())
-          .describe("Merkmale die für die Klassifizierung sprechen"),
-        "dagegen_spricht": z.array(z.string())
-          .describe("Merkmale die gegen die Klassifizierung sprechen")
-      }).describe("Bitte die Merkmale angeben, die für oder gegen diese Klassifizierung des Habitat sprechen."),
-      "zusammenfassung": z.string()
-        .describe(`Wie könnte man die Einschätzung des Habitat kurz zusammenfassen? Bitte den Satz beginnen mit 'Das Habitat ist wahrscheinlich ein...'`)
-    })
-    )
-  });
-  
+  try {
+    const analysisSchema = await getAnalysisSchema('habitat-analysis');
+    const prompt = await getPrompt('habitat-analysis');
+    
+    if (!analysisSchema || !prompt) {
+      throw new Error('Analyse-Konfigurationen nicht gefunden');
+    }
 
-  const randomId = Math.floor(Math.random() * 9000000000) + 1000000000;
+    const imageContents = await getImageContents(metadata);
+    const pflanzenarten = metadata.bilder
+      .filter(bild => bild.analyse && bild.analyse.trim() !== '')
+      .map(bild => bild.analyse)
+      .join(', ');
+    
+    // Erstelle das Zod-Schema mit Beschreibungen aus der Datenbank
+    const habitatAnalyseSchema = await createHabitatAnalyseSchema(analysisSchema);
 
-  const llmQuestion = `
-[ID:${randomId}]
-Analysiere das hochgeladenen Gesamtbild und einige Detailbilder ` +
-/*`unter Berücksichtigung der bereits bekannten:` +
-`- Geokoordinaten Latitude: (${metadata.latitude}, Longitude: ${metadata.longitude}), ` +
-`- Standort: ${metadata.standort} ` + */
-`- bereits identifizierte Pflanzenarten: ${pflanzenarten}
-` + 
-`Bitte analysiere folgende Parameter:
-0. Schätze die Konsistent der bereitgestellten Informationen 
-1. Erfasse die Standortbedingungen und deren Einfluss auf die Vegetation
-2. Wie häufig sind die erkannten Pflanzenarten im Bestand
-3. Beschreibe die Vegetationsstruktur und -dynamik
-4. Dokumentiere Nutzungsspuren und deren Auswirkungen
-5. Leite daraus den wahrscheinlichen Habitattyp ab
-${metadata.kommentar ? `Beachte bitte folgende zusätzliche Hinweise: ${metadata.kommentar}` : ''}
-`.trim();
+    const randomId = Math.floor(Math.random() * 9000000000) + 1000000000;
 
+    // Erstelle die Analyse-Frage mit den Platzhaltern aus dem Template
+    const llmQuestion = prompt.analysisPrompt
+      .replace('{randomId}', randomId.toString())
+      .replace('{pflanzenarten}', pflanzenarten)
+      .replace('{kommentar}', metadata.kommentar ? `Beachte bitte folgende zusätzliche Hinweise: ${metadata.kommentar}` : '');
 
-        //console.log("Question", llmQuestion);
+    const messages: ChatCompletionMessageParam[] = [{ 
+      role: "system", 
+      content: prompt.systemInstruction
+    },
+    {
+      role: "user",
+      content: [
+        { 
+          type: "text", 
+          text: llmQuestion
+        },
+        ...imageContents
+      ],
+    }];
 
-        const messages: ChatCompletionMessageParam[] = [{ 
-              role: "system", 
-              content: llmSystemInstruction // Allgemeine Anweisungen für das Modell
-          },
-          {
-              role: "user",
-              content: [
-                  { 
-                      type: "text", 
-                      text: llmQuestion // Die aktuelle Benutzerfrage
-                  },
-                  ...imageContents // Zusätzliche Inhalte wie Bilder                  
-              ],
-          }
-        ];
+    console.log('Sende Anfrage an OpenAI mit Schema:', JSON.stringify(habitatAnalyseSchema.shape, null, 2));
 
-        const completion = await openai.chat.completions.create({
-            model: serverConfig.OPENAI_VISION_MODEL,
-            messages: messages,
-            temperature: 0.1,
-            top_p: 0.1,
-            response_format: zodResponseFormat(habitatAnalyseSchema, "structured_analysis"),
-            max_tokens: 2000,
-        });
+    const completion = await openai.chat.completions.create({
+      model: serverConfig.OPENAI_VISION_MODEL,
+      messages: messages,
+      temperature: 0.0,
+      top_p: 0.0,
+      response_format: zodResponseFormat(habitatAnalyseSchema, "structured_analysis"),
+      max_tokens: 2000,
+    });
 
-        //const usage = completion.usage;
-        //console.log("usage", usage);
-        const analysisResult =  completion.choices[0]?.message.content;
-        if (analysisResult) {
-          //console.log("analysisResult", analysisResult);
-          const parsedResult: AnalyseErgebnis = {
-                ...JSON.parse(analysisResult).analyses[0],
-                kommentar: metadata.kommentar
-            };
-            const simplifiedSchema = convertZodSchemaToSimpleDoc(habitatAnalyseSchema);
+    const analysisResult = completion.choices[0]?.message.content;
+    if (!analysisResult) {
+      throw new Error("Keine Analyse verfügbar");
+    }
 
-            return { 
-                result: parsedResult,
-                llmInfo: {
-                    modelPflanzenErkennung: "PLANTNET",
-                    modelHabitatErkennung: serverConfig.OPENAI_VISION_MODEL,
-                    systemInstruction: llmSystemInstruction,
-                    hapitatQuestion: llmQuestion,
-                    habitatStructuredOutput: simplifiedSchema
-                }
-            };
-        } else {
-            return { result: null, error: "Keine Analyse verfügbar."};
-        };
+    console.log('Erhaltenes Analyseergebnis:', analysisResult);
+
+    const parsedAnalysis = JSON.parse(analysisResult);
+    
+    if (!parsedAnalysis.analyses || !Array.isArray(parsedAnalysis.analyses) || parsedAnalysis.analyses.length === 0) {
+      throw new Error("Das Analyseergebnis hat nicht das erwartete Format (analyses array fehlt oder leer)");
+    }
+
+    const parsedResult: AnalyseErgebnis = {
+      ...parsedAnalysis.analyses[0],
+      kommentar: metadata.kommentar
+    };
+
+    const simplifiedSchema = convertZodSchemaToSimpleDoc(habitatAnalyseSchema);
+
+    return { 
+      result: parsedResult,
+      llmInfo: {
+        modelPflanzenErkennung: "PLANTNET",
+        modelHabitatErkennung: serverConfig.OPENAI_VISION_MODEL,
+        systemInstruction: prompt.systemInstruction,
+        hapitatQuestion: llmQuestion,
+        habitatStructuredOutput: simplifiedSchema
+      }
+    };
+  } catch (error) {
+    console.error('Fehler bei der Habitat-Analyse:', error);
+    return { 
+      result: null, 
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
 }
 
 async function performSchutzStatusAnalysis(habitatAnalyse: AnalyseErgebnis) : Promise<openAiResult> {
-  const schutzstatusSchema = z.object({
-    "analyses": z.array(z.object({
-      "schutzstatus": z.string()
-      .describe(`
-Ist der Schutzstatus dieses Habitat ${habitatAnalyse.habitattyp} 'gesetzlich geschützt', 'ökologisch hochwertig' oder 'ökologisch niederwertig'?
-'gesetzlich geschützt': Wenn es sich beim Habitat handelt um ein Feuchtgebiet wie Verlandungsbereich, Schilf, Röhricht, Großsegge, Moor (alle Typen), Auwald, Sumpfwald, Bruchwald, Quellbereich, Naturnaher Bachlauf, Wassergraben mit Ufervegetation und alle Trockenstandorte wie Trockenrasen, Felsensteppe.
-'ökologisch hochwertig': Wenn es sich beim Habitat handelt um eine extensiv bewirtschaftete Grünlandfläche wie Magerwiese, Magerweide.
-'ökologisch niederwertig': Wenn es sich beim Habitat handelt um eine intensiv genutzte oder anthropogen stark veränderte Flächen wie Fettwiese, Fettweide, Kunstrasen, Parkanlage, Ruderalfläche, sonstige Lebensräume.`
-      )
-    })
-    )
-  });
-  
-  const randomId = Math.floor(Math.random() * 9000000000) + 1000000000;
-  const llmQuestion = `
-  [ID:${randomId}]
-  Bewerte bitte den Schutzstatus des Habitats ${habitatAnalyse.habitattyp}`.trim();
-  
-  //console.log("SchutzStatusQuestion", llmQuestion);
+  try {
+    // Lade Konfigurationen aus der Datenbank
+    const analysisSchema = await getAnalysisSchema('habitat-analysis');
+    const prompt = await getPrompt('schutzstatus-analysis');
+    
+    if (!analysisSchema || !prompt) {
+      throw new Error('Schutzstatus-Konfigurationen nicht gefunden');
+    }
 
-  const messages: ChatCompletionMessageParam[] = [{ 
-        role: "system", 
-        content: llmSystemInstruction // Allgemeine Anweisungen für das Modell
+    console.log('Geladenes Habitat-Schema für Schutzstatus:', analysisSchema);
+
+    const schutzstatusSchema = z.object({
+      analyses: z.array(z.object({
+        schutzstatus: z.string()
+          .describe(analysisSchema.schema.schutzstatus)
+      }))
+    });
+    
+    const randomId = Math.floor(Math.random() * 9000000000) + 1000000000;
+    const llmQuestion = prompt.analysisPrompt
+      .replace('{randomId}', randomId.toString())
+      .replace('{habitattyp}', habitatAnalyse.habitattyp);
+
+    const messages: ChatCompletionMessageParam[] = [{ 
+      role: "system", 
+      content: prompt.systemInstruction
     },
     {
-        role: "user",
-        content: [
-            { 
-                type: "text", 
-                text: llmQuestion // Die aktuelle Benutzerfrage
-            }
-        ],
-    }
-  ];
+      role: "user",
+      content: [
+        { 
+          type: "text", 
+          text: llmQuestion
+        }
+      ],
+    }];
 
-  const completion = await openai.chat.completions.create({
+    console.log('Sende Schutzstatus-Anfrage an OpenAI');
+
+    const completion = await openai.chat.completions.create({
       model: serverConfig.OPENAI_CHAT_MODEL,
       messages: messages,
       temperature: 0.1,
       top_p: 0.1,
       response_format: zodResponseFormat(schutzstatusSchema, "structured_analysis"),
       max_tokens: 500,
-  });
+    });
 
-  //const usage = completion.usage;
-  //console.log("usage", usage);
-  const analysisResult =  completion.choices[0]?.message.content;
-  if (analysisResult) {
-    //console.log("analysisResult", analysisResult);
+    const analysisResult = completion.choices[0]?.message.content;
+    if (!analysisResult) {
+      throw new Error("Keine Schutzstatus-Analyse verfügbar");
+    }
+
+    console.log('Erhaltenes Schutzstatus-Ergebnis:', analysisResult);
+
+    const parsedAnalysis = JSON.parse(analysisResult);
+    
+    if (!parsedAnalysis.analyses || !Array.isArray(parsedAnalysis.analyses) || parsedAnalysis.analyses.length === 0) {
+      throw new Error("Das Schutzstatus-Ergebnis hat nicht das erwartete Format (analyses array fehlt oder leer)");
+    }
+
     const parsedResult: AnalyseErgebnis = {
-          ...JSON.parse(analysisResult).analyses[0]
-      };
-      const simplifiedSchema = convertZodSchemaToSimpleDoc(schutzstatusSchema);
+      ...parsedAnalysis.analyses[0]
+    };
 
-      return { 
-          result: parsedResult,
-          llmInfo: {
-              modelSchutzstatusErkennung: serverConfig.OPENAI_CHAT_MODEL,
-              systemInstruction: llmSystemInstruction,
-              schutzstatusQuestion: llmQuestion,
-              schutzstatusStructuredOutput: simplifiedSchema
-          }
-      };
-  } else {
-      return { result: null, error: "Keine Analyse verfügbar."};
-  };
+    const simplifiedSchema = convertZodSchemaToSimpleDoc(schutzstatusSchema);
+
+    return { 
+      result: parsedResult,
+      llmInfo: {
+        modelSchutzstatusErkennung: serverConfig.OPENAI_CHAT_MODEL,
+        systemInstruction: prompt.systemInstruction,
+        schutzstatusQuestion: llmQuestion,
+        schutzstatusStructuredOutput: simplifiedSchema
+      }
+    };
+  } catch (error) {
+    console.error('Fehler bei der Schutzstatus-Analyse:', error);
+    return { 
+      result: null, 
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
 }
