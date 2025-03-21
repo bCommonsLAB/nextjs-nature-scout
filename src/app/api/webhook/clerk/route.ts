@@ -101,14 +101,27 @@ async function handleWebhookEvent(evt: WebhookEvent) {
     }
     
     try {
-      // Prüfen, ob Benutzer bereits existiert
-      const existingUser = await UserService.findByClerkId(id);
+      // Prüfen, ob Benutzer bereits existiert - entweder nach clerkId oder E-Mail suchen
+      let existingUser = await UserService.findByClerkId(id);
+      
+      // Falls kein Benutzer anhand der clerkId gefunden wurde, nach E-Mail suchen
+      if (!existingUser) {
+        existingUser = await UserService.findByEmail(email);
+      }
+      
       console.log('Existierender Benutzer gefunden?', !!existingUser);
       
       if (existingUser) {
-        console.log('Benutzer wird aktualisiert:', id);
-        // Benutzer aktualisieren
-        const updatedUser = await UserService.updateUser(id, { 
+        console.log('Benutzer wird aktualisiert:', existingUser.email);
+        
+        // Falls der Benutzer eine temporäre ID hat (aus dem Archiv-Import), mit der tatsächlichen Clerk-ID aktualisieren
+        if (existingUser.clerkId.startsWith('temp_')) {
+          console.log(`Temporäre Clerk-ID wird aktualisiert: ${existingUser.clerkId} -> ${id}`);
+        }
+        
+        // Benutzer aktualisieren - immer die clerkId aktualisieren, falls es ein importierter Benutzer war
+        const updatedUser = await UserService.updateUser(existingUser.clerkId, { 
+          clerkId: id, // Stelle sicher, dass die tatsächliche Clerk-ID verwendet wird
           email, 
           name,
           // Füge ein Profilbild hinzu, wenn vorhanden
@@ -119,6 +132,7 @@ async function handleWebhookEvent(evt: WebhookEvent) {
         await addWebhookEvent({
           type: 'user_updated',
           userId: id,
+          previousId: existingUser.clerkId !== id ? existingUser.clerkId : undefined,
           email,
           name,
           result: updatedUser

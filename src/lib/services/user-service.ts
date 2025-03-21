@@ -5,13 +5,15 @@ export interface CreateUserData {
   clerkId: string;
   email: string;
   name: string;
-  role?: 'user' | 'admin' | 'superadmin';
+  role?: 'user' | 'biologe' | 'admin' | 'superadmin';
 }
 
 export interface UpdateUserData {
+  clerkId?: string;
   email?: string;
   name?: string;
-  role?: 'user' | 'admin' | 'superadmin';
+  role?: 'user' | 'biologe' | 'admin' | 'superadmin';
+  image?: string;
 }
 
 export class UserService {
@@ -82,5 +84,23 @@ export class UserService {
     await connectToDatabase();
     const user = await (User.findOne({ clerkId }) as any).exec();
     return user?.role === 'admin' || user?.role === 'superadmin';
+  }
+  
+  /**
+   * Prüft, ob ein Benutzer Biologe ist
+   */
+  static async isBiologist(clerkId: string): Promise<boolean> {
+    await connectToDatabase();
+    const user = await (User.findOne({ clerkId }) as any).exec();
+    return user?.role === 'biologe';
+  }
+  
+  /**
+   * Prüft, ob ein Benutzer erweiterte Rechte hat (Biologe oder Admin)
+   */
+  static async hasAdvancedPermissions(clerkId: string): Promise<boolean> {
+    await connectToDatabase();
+    const user = await (User.findOne({ clerkId }) as any).exec();
+    return user?.role === 'biologe' || user?.role === 'admin' || user?.role === 'superadmin';
   }
 } 

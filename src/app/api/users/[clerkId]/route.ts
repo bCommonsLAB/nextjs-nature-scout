@@ -66,6 +66,23 @@ export async function PATCH(
     const body = await req.json();
     const { name, email, role } = body;
     
+    // Prüfen, ob dem aktuellen Benutzer die Admin-Rolle entzogen werden soll
+    if (isAdmin && role && isSelf && role !== 'admin' && role !== 'superadmin') {
+      // Prüfen, ob dieser Benutzer der letzte Admin ist
+      const allUsers = await UserService.getAllUsers();
+      const adminUsers = allUsers.filter(user => 
+        (user.role === 'admin' || user.role === 'superadmin') && user.clerkId !== clerkId
+      );
+      
+      // Wenn dies der letzte Admin ist, verweigere die Änderung
+      if (adminUsers.length === 0) {
+        return NextResponse.json({ 
+          error: 'Diese Änderung kann nicht durchgeführt werden. Es muss mindestens ein Administrator im System verbleiben.',
+          isLastAdmin: true 
+        }, { status: 403 });
+      }
+    }
+    
     // Normale Benutzer dürfen ihre Rolle nicht ändern
     const updateData = {
       name, 
@@ -107,6 +124,24 @@ export async function DELETE(
     
     if (!isAdmin) {
       return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
+    }
+    
+    // Prüfen, ob der zu löschende Benutzer ein Admin ist
+    const userToDelete = await UserService.findByClerkId(clerkId);
+    if (userToDelete && (userToDelete.role === 'admin' || userToDelete.role === 'superadmin')) {
+      // Prüfen, ob dies der letzte Admin ist
+      const allUsers = await UserService.getAllUsers();
+      const adminUsers = allUsers.filter(user => 
+        (user.role === 'admin' || user.role === 'superadmin') && user.clerkId !== clerkId
+      );
+      
+      // Wenn dies der letzte Admin ist, verweigere das Löschen
+      if (adminUsers.length === 0) {
+        return NextResponse.json({ 
+          error: 'Der letzte Administrator kann nicht gelöscht werden. Es muss mindestens ein Administrator im System verbleiben.',
+          isLastAdmin: true 
+        }, { status: 403 });
+      }
     }
     
     const success = await UserService.deleteUser(clerkId);

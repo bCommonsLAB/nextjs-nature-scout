@@ -20,12 +20,15 @@ import { Button } from '@/components/ui/button';
 import { IUser } from '@/lib/db/models/user';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Edit, Trash2, RefreshCw } from 'lucide-react';
+import { Trash2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { toast } from 'sonner';
 
 export function UserTable() {
   const [users, setUsers] = useState<IUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastAdminError, setLastAdminError] = useState<string | null>(null);
 
   // Benutzer laden
   const fetchUsers = async () => {
@@ -48,6 +51,7 @@ export function UserTable() {
 
   // Benutzerrolle aktualisieren
   const updateUserRole = async (clerkId: string, role: string) => {
+    setLastAdminError(null);
     try {
       const response = await fetch(`/api/users/${clerkId}`, {
         method: 'PATCH',
@@ -58,24 +62,30 @@ export function UserTable() {
       });
 
       if (!response.ok) {
-        throw new Error('Fehler beim Aktualisieren der Benutzerrolle');
+        const errorData = await response.json();
+        
+        // Prüfen, ob es sich um den letzten Admin handelt
+        if (errorData.isLastAdmin) {
+          setLastAdminError(errorData.error || 'Der letzte Administrator kann seine Rolle nicht ändern.');
+          return;
+        }
+        
+        throw new Error(errorData.error || 'Fehler beim Aktualisieren der Benutzerrolle');
       }
 
-      // Aktualisierter Benutzer
-      const updatedUser = await response.json();
+      // Nach erfolgreicher Aktualisierung: Liste neu laden
+      await fetchUsers();
       
-      // Benutzerliste aktualisieren
-      setUsers(users.map(user => 
-        user.clerkId === clerkId ? { ...user, role: updatedUser.role } : user
-      ));
+      toast.success('Benutzerrolle erfolgreich aktualisiert');
     } catch (err) {
       console.error(err);
-      alert('Fehler beim Aktualisieren der Benutzerrolle');
+      toast.error(err instanceof Error ? err.message : 'Fehler beim Aktualisieren der Benutzerrolle');
     }
   };
 
   // Benutzer löschen
   const deleteUser = async (clerkId: string) => {
+    setLastAdminError(null);
     if (!confirm('Sind Sie sicher, dass Sie diesen Benutzer löschen möchten?')) {
       return;
     }
@@ -86,20 +96,46 @@ export function UserTable() {
       });
 
       if (!response.ok) {
-        throw new Error('Fehler beim Löschen des Benutzers');
+        const errorData = await response.json();
+        
+        // Prüfen, ob es sich um den letzten Admin handelt
+        if (errorData.isLastAdmin) {
+          setLastAdminError(errorData.error || 'Der letzte Administrator kann nicht gelöscht werden.');
+          return;
+        }
+        
+        throw new Error(errorData.error || 'Fehler beim Löschen des Benutzers');
       }
 
-      // Benutzer aus der Liste entfernen
-      setUsers(users.filter(user => user.clerkId !== clerkId));
+      // Nach erfolgreicher Löschung: Liste neu laden
+      await fetchUsers();
+      
+      toast.success('Benutzer erfolgreich gelöscht');
     } catch (err) {
       console.error(err);
-      alert('Fehler beim Löschen des Benutzers');
+      toast.error(err instanceof Error ? err.message : 'Fehler beim Löschen des Benutzers');
     }
   };
 
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  // Hilfstext zu den verschiedenen Rollen anzeigen
+  const getRoleDescription = (role: string) => {
+    switch (role) {
+      case 'user':
+        return 'Standardbenutzer mit Lesezugriff';
+      case 'biologe':
+        return 'Biologe mit erweiterten Fachrechten';
+      case 'admin':
+        return 'Administrator mit vollen Rechten';
+      case 'superadmin':
+        return 'Superadministrator (höchste Stufe)';
+      default:
+        return '';
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -121,9 +157,19 @@ export function UserTable() {
       </div>
 
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          {error}
-        </div>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Fehler</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      
+      {lastAdminError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Achtung - Administrator-Schutz</AlertTitle>
+          <AlertDescription>{lastAdminError}</AlertDescription>
+        </Alert>
       )}
 
       {loading ? (
@@ -154,19 +200,25 @@ export function UserTable() {
                   <TableCell>{user.name}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
-                    <Select 
-                      defaultValue={user.role} 
-                      onValueChange={(value) => updateUserRole(user.clerkId, value)}
-                    >
-                      <SelectTrigger className="w-[130px]">
-                        <SelectValue placeholder="Rolle wählen" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="user">Benutzer</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="superadmin">Superadmin</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="flex flex-col gap-1">
+                      <Select 
+                        defaultValue={user.role} 
+                        onValueChange={(value) => updateUserRole(user.clerkId, value)}
+                      >
+                        <SelectTrigger className="w-[130px]">
+                          <SelectValue placeholder="Rolle wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="user">Benutzer</SelectItem>
+                          <SelectItem value="biologe">Biologe</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="superadmin">Superadmin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-xs text-gray-500">
+                        {getRoleDescription(user.role)}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell>
                     {formatDistanceToNow(new Date(user.createdAt), { 

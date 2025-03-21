@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
+import { getAuth } from '@clerk/nextjs/server';
+import { UserService } from '@/lib/services/user-service';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -11,6 +13,34 @@ export async function GET(request: Request) {
   const sortOrder = searchParams.get('sortOrder') || 'desc';
   
   try {
+    // Hole den aktuellen Benutzer und prüfe seine Berechtigungen
+    const auth = getAuth(request);
+    const userId = auth.userId;
+    
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Nicht autorisiert' },
+        { status: 401 }
+      );
+    }
+    
+    // Überprüfen, ob Benutzer erweiterte Rechte hat (Admin oder Biologe)
+    const isAdmin = await UserService.isAdmin(userId);
+    const isBiologist = await UserService.isBiologist(userId);
+    const hasAdvancedPermissions = isAdmin || isBiologist;
+    
+    // Holen des Benutzers, um die E-Mail für die Filterung zu bekommen
+    const currentUser = await UserService.findByClerkId(userId);
+    
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: 'Benutzer nicht gefunden' },
+        { status: 404 }
+      );
+    }
+    
+    const userEmail = currentUser.email;
+    
     const db = await connectToDatabase();
     const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
     
@@ -20,12 +50,18 @@ export async function GET(request: Request) {
       deleted: { $ne: true }
     };
     
-    // Optional: Nur abgeschlossene Jobs anzeigen
-    // filter.status = 'completed';
+    // Für normale Benutzer: Nur eigene Einträge anzeigen
+    if (!hasAdvancedPermissions) {
+      filter['metadata.email'] = userEmail;
+    }
     
-    // Füge Personenfilter hinzu, wenn ausgewählt
-    if (selectedPerson) {
+    // Füge Personenfilter hinzu, wenn ausgewählt und der Benutzer die Berechtigung hat
+    if (selectedPerson && hasAdvancedPermissions) {
       filter['metadata.erfassungsperson'] = selectedPerson;
+    } else if (selectedPerson && !hasAdvancedPermissions && selectedPerson !== userEmail) {
+      // Wenn ein normaler Benutzer versucht, nach einer anderen Person zu filtern
+      // ignorieren wir das und zeigen trotzdem nur seine eigenen Einträge
+      console.warn(`Benutzer ${userEmail} versuchte, nach Einträgen von ${selectedPerson} zu filtern`);
     }
     
     if (searchTerm) {
@@ -37,13 +73,30 @@ export async function GET(request: Request) {
       ];
     }
     
-    // Hole alle eindeutigen Personen für das Dropdown
-    const allPersonsAggregation = await collection.aggregate([
-      { $match: { deleted: { $ne: true } } },
-      { $group: { _id: '$metadata.erfassungsperson' } },
-      { $match: { _id: { $ne: null } } },
-      { $sort: { _id: 1 } }
-    ]).toArray();
+    // Hole alle eindeutigen Personen für das Dropdown - basierend auf Benutzerrechten
+    let allPersonsAggregation;
+    if (hasAdvancedPermissions) {
+      // Admins und Biologen sehen alle Personen
+      allPersonsAggregation = await collection.aggregate([
+        { $match: { deleted: { $ne: true } } },
+        { $group: { _id: '$metadata.erfassungsperson' } },
+        { $match: { _id: { $ne: null } } },
+        { $sort: { _id: 1 } }
+      ]).toArray();
+    } else {
+      // Normale Benutzer sehen nur sich selbst
+      allPersonsAggregation = await collection.aggregate([
+        { 
+          $match: { 
+            deleted: { $ne: true }, 
+            'metadata.email': userEmail 
+          } 
+        },
+        { $group: { _id: '$metadata.erfassungsperson' } },
+        { $match: { _id: { $ne: null } } },
+        { $sort: { _id: 1 } }
+      ]).toArray();
+    }
     
     const allPersons = allPersonsAggregation
       .map(item => item._id)
@@ -111,6 +164,11 @@ export async function GET(request: Request) {
     return NextResponse.json({
       entries,
       allPersons, // Füge die Liste aller Personen zur Antwort hinzu
+      userRole: {
+        isAdmin,
+        isBiologist,
+        hasAdvancedPermissions
+      },
       pagination: {
         total,
         page,

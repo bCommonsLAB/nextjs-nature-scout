@@ -1,12 +1,40 @@
-import React from 'react';
+"use client";
+
+import React, { useState, useEffect } from 'react';
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Menu, Settings, TestTube2, FolderArchive, Users } from "lucide-react";
-import { SignInButton, UserButton, SignedIn, SignedOut } from "@clerk/nextjs";
+import { SignInButton, SignedIn, SignedOut, useUser } from "@clerk/nextjs";
+import { UserProfileButton } from "@/components/user-profile";
 
 export function Navbar() {
+  const { user, isLoaded } = useUser();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Überprüfe, ob der Benutzer Admin-Rechte hat
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (isLoaded && user) {
+        try {
+          const response = await fetch(`/api/users/isAdmin`);
+          if (response.ok) {
+            const data = await response.json();
+            setIsAdmin(data.isAdmin);
+          } else {
+            setIsAdmin(false);
+          }
+        } catch (error) {
+          console.error('Fehler beim Überprüfen des Admin-Status:', error);
+          setIsAdmin(false);
+        }
+      }
+    };
+
+    checkAdminStatus();
+  }, [isLoaded, user]);
+
   return (
     <header className="flex flex-col justify-center px-16 w-full bg-stone-50 min-h-[72px] max-md:px-5">
       <nav className="flex flex-wrap gap-10 justify-between items-center w-full">
@@ -31,25 +59,31 @@ export function Navbar() {
               Über Uns
             </Button>
           </Link>
-          <Link href="/archiv">
-            <Button variant="ghost" className="text-base">
-              <FolderArchive className="h-4 w-4 mr-2" />
-              Archiv
-            </Button>
-          </Link>
           <SignedIn>
-            <Link href="/admin/config">
+            <Link href="/archiv">
               <Button variant="ghost" className="text-base">
-                <Settings className="h-4 w-4 mr-2" />
-                Admin
+                <FolderArchive className="h-4 w-4 mr-2" />
+                Archiv
               </Button>
             </Link>
-            <Link href="/admin/users">
-              <Button variant="ghost" className="text-base">
-                <Users className="h-4 w-4 mr-2" />
-                Benutzer
-              </Button>
-            </Link>
+          </SignedIn>
+          <SignedIn>
+            {isAdmin && (
+              <>
+                <Link href="/admin/config">
+                  <Button variant="ghost" className="text-base">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Admin
+                  </Button>
+                </Link>
+                <Link href="/admin/users">
+                  <Button variant="ghost" className="text-base">
+                    <Users className="h-4 w-4 mr-2" />
+                    Benutzer
+                  </Button>
+                </Link>
+              </>
+            )}
           </SignedIn>
           <Link href="/tests">
             <Button variant="ghost" className="text-base">
@@ -65,14 +99,7 @@ export function Navbar() {
             </SignInButton>
           </SignedOut>
           <SignedIn>
-            <UserButton
-              afterSignOutUrl="/"
-              appearance={{
-                elements: {
-                  userButtonAvatarBox: "h-10 w-10"
-                }
-              }}
-            />
+            <UserProfileButton />
           </SignedIn>
         </div>
 
@@ -93,25 +120,31 @@ export function Navbar() {
                   Über Uns
                 </Button>
               </Link>
-              <Link href="/archiv">
-                <Button variant="ghost" className="w-full text-base justify-start">
-                  <FolderArchive className="h-4 w-4 mr-2" />
-                  Archiv
-                </Button>
-              </Link>
               <SignedIn>
-                <Link href="/admin/config">
+                <Link href="/archiv">
                   <Button variant="ghost" className="w-full text-base justify-start">
-                    <Settings className="h-4 w-4 mr-2" />
-                    Admin
+                    <FolderArchive className="h-4 w-4 mr-2" />
+                    Archiv
                   </Button>
                 </Link>
-                <Link href="/admin/users">
-                  <Button variant="ghost" className="w-full text-base justify-start">
-                    <Users className="h-4 w-4 mr-2" />
-                    Benutzer
-                  </Button>
-                </Link>
+              </SignedIn>
+              <SignedIn>
+                {isAdmin && (
+                  <>
+                    <Link href="/admin/config">
+                      <Button variant="ghost" className="w-full text-base justify-start">
+                        <Settings className="h-4 w-4 mr-2" />
+                        Admin
+                      </Button>
+                    </Link>
+                    <Link href="/admin/users">
+                      <Button variant="ghost" className="w-full text-base justify-start">
+                        <Users className="h-4 w-4 mr-2" />
+                        Benutzer
+                      </Button>
+                    </Link>
+                  </>
+                )}
               </SignedIn>
               <Link href="/tests">
                 <Button variant="ghost" className="w-full text-base justify-start">
@@ -128,14 +161,7 @@ export function Navbar() {
               </SignedOut>
               <SignedIn>
                 <div className="pt-2 pl-2">
-                  <UserButton
-                    afterSignOutUrl="/"
-                    appearance={{
-                      elements: {
-                        userButtonAvatarBox: "h-10 w-10"
-                      }
-                    }}
-                  />
+                  <UserProfileButton />
                 </div>
               </SignedIn>
             </div>

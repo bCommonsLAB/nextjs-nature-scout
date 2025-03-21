@@ -1,15 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search } from 'lucide-react';
 
 interface SearchBarProps {
   onSearch: (term: string) => void;
-  initialValue?: string;
+  value?: string;
 }
 
-export function SearchBar({ onSearch, initialValue = '' }: SearchBarProps) {
-  const [searchTerm, setSearchTerm] = useState(initialValue);
+export function SearchBar({ onSearch, value = '' }: SearchBarProps) {
+  const [searchTerm, setSearchTerm] = useState(value);
+  
+  // Update searchTerm wenn sich value ändert (z.B. bei Zurücksetzen der Suche)
+  useEffect(() => {
+    setSearchTerm(value);
+  }, [value]);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,7 +22,7 @@ export function SearchBar({ onSearch, initialValue = '' }: SearchBarProps) {
   };
   
   return (
-    <form onSubmit={handleSubmit} className="mb-6">
+    <form onSubmit={handleSubmit} className="relative">
       <div className="relative">
         <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
           <Search className="w-5 h-5 text-gray-400" />
