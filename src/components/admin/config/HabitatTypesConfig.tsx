@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, Edit } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -12,21 +12,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 interface HabitatType {
   _id?: string;
   name: string;
   description: string;
   typicalSpecies: string[];
+  habitatFamilie: string;
+  schutzstatus: string;
 }
 
 export function HabitatTypesConfig() {
   const [types, setTypes] = useState<HabitatType[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [editingCell, setEditingCell] = useState<{
-    index: number;
-    field: keyof HabitatType;
-  } | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [currentType, setCurrentType] = useState<HabitatType | null>(null);
+  const [currentIndex, setCurrentIndex] = useState<number | null>(null);
+
+  // Gruppierte Daten für die Tabelle
+  const groupedTypes = types.reduce<Record<string, HabitatType[]>>((acc, type) => {
+    const familyName = type.habitatFamilie.trim() || "Nicht kategorisiert";
+    if (!acc[familyName]) {
+      acc[familyName] = [];
+    }
+    acc[familyName].push(type);
+    return acc;
+  }, {});
 
   const loadTypes = async () => {
     try {
@@ -57,7 +72,9 @@ export function HabitatTypesConfig() {
           id: type._id,
           name: type.name,
           description: type.description,
-          typicalSpecies: type.typicalSpecies
+          typicalSpecies: type.typicalSpecies,
+          habitatFamilie: type.habitatFamilie,
+          schutzstatus: type.schutzstatus
         })))
       });
       
@@ -72,129 +89,53 @@ export function HabitatTypesConfig() {
   };
 
   const addType = () => {
-    setTypes([...types, { 
+    const newType: HabitatType = { 
       name: "", 
       description: "",
-      typicalSpecies: []
-    }]);
+      typicalSpecies: [],
+      habitatFamilie: "",
+      schutzstatus: ""
+    };
+    setCurrentType(newType);
+    setCurrentIndex(null);
+    setIsDetailOpen(true);
+  };
+
+  const editType = (type: HabitatType, index: number) => {
+    setCurrentType({...type});
+    setCurrentIndex(index);
+    setIsDetailOpen(true);
   };
 
   const removeType = (index: number) => {
     setTypes(types.filter((_, i) => i !== index));
   };
 
-  const updateType = (index: number, field: keyof HabitatType, value: any) => {
-    setTypes(types.map((type, i) => 
-      i === index ? { ...type, [field]: value } : type
-    ));
-  };
+  const saveCurrentType = () => {
+    if (!currentType) return;
 
-  const startEditing = (index: number, field: keyof HabitatType) => {
-    setEditingCell({ index, field });
-  };
-
-  const stopEditing = () => {
-    setEditingCell(null);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent, index: number, field: keyof HabitatType) => {
-    console.log('KeyDown Event:', {
-      key: e.key,
-      shiftKey: e.shiftKey,
-      field: field,
-      index: index
-    });
-
-    if (e.key === 'Enter') {
-      if (e.shiftKey) {
-        // Verhindern des Standard-Verhaltens
-        e.preventDefault();
-        
-        // Manuell neue Zeile einfügen
-        const textarea = e.target as HTMLTextAreaElement;
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const value = textarea.value;
-        
-        const newValue = value.substring(0, start) + '\n' + value.substring(end);
-        console.log('Füge neue Zeile ein:', {
-          vorher: value,
-          nachher: newValue,
-          cursorPosition: start
-        });
-        
-        // Update durchführen - KEINE Filterung von leeren Zeilen während der Bearbeitung
-        if (field === 'typicalSpecies') {
-          updateType(index, field, newValue.split('\n'));
-        } else {
-          updateType(index, field, newValue);
-        }
-        
-        // Cursor-Position aktualisieren
-        setTimeout(() => {
-          textarea.selectionStart = start + 1;
-          textarea.selectionEnd = start + 1;
-        }, 0);
-      } else {
-        console.log('Beende Bearbeitung');
-        e.preventDefault();
-        
-        // Beim Beenden der Bearbeitung leere Zeilen filtern
-        if (field === 'typicalSpecies') {
-          const textarea = e.target as HTMLTextAreaElement;
-          const filteredValue = textarea.value.split('\n').filter(s => s.trim());
-          updateType(index, field, filteredValue);
-        }
-        
-        stopEditing();
-      }
+    if (currentIndex !== null) {
+      // Bearbeiten eines vorhandenen Eintrags
+      setTypes(types.map((type, i) => 
+        i === currentIndex ? currentType : type
+      ));
+    } else {
+      // Hinzufügen eines neuen Eintrags
+      setTypes([...types, currentType]);
     }
+    
+    closeDetail();
   };
 
-  const renderCell = (type: HabitatType, index: number, field: keyof HabitatType) => {
-    const isEditing = editingCell?.index === index && editingCell?.field === field;
-    const value = field === 'typicalSpecies' ? type[field].join('\n') : type[field];
+  const closeDetail = () => {
+    setIsDetailOpen(false);
+    setCurrentType(null);
+    setCurrentIndex(null);
+  };
 
-    if (isEditing) {
-      return (
-        <div className="min-w-[200px]">
-          <textarea
-            autoFocus
-            className="w-full p-2 border rounded-md min-h-[100px] focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-green-500"
-            value={value}
-            onChange={(e) => {
-              const newValue = field === 'typicalSpecies' 
-                ? e.target.value.split('\n')
-                : e.target.value;
-              updateType(index, field, newValue);
-            }}
-            onBlur={() => {
-              // Beim Verlassen des Textfelds leere Zeilen filtern
-              if (field === 'typicalSpecies') {
-                const filteredValue = type[field].filter(s => s.trim());
-                updateType(index, field, filteredValue);
-              }
-              stopEditing();
-            }}
-            onKeyDown={(e) => handleKeyDown(e, index, field)}
-            placeholder={field === 'typicalSpecies' ? "Shift+Enter für neue Zeile\nEine Art pro Zeile..." : "Shift+Enter für neue Zeile..."}
-          />
-        </div>
-      );
-    }
-
-    return (
-      <div 
-        className="min-h-[2.5rem] p-2 cursor-pointer hover:bg-gray-50 rounded whitespace-pre-line"
-        onClick={() => startEditing(index, field)}
-      >
-        {field === 'typicalSpecies' 
-          ? type[field].map((species, i) => (
-              <div key={i} className="py-0.5">{species}</div>
-            ))
-          : type[field] || <span className="text-gray-400">Klicken zum Bearbeiten...</span>}
-      </div>
-    );
+  const updateCurrentType = (field: keyof HabitatType, value: string | string[]) => {
+    if (!currentType) return;
+    setCurrentType({...currentType, [field]: value});
   };
 
   return (
@@ -230,32 +171,129 @@ export function HabitatTypesConfig() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[200px]">Name</TableHead>
-              <TableHead className="w-[300px]">Beschreibung</TableHead>
-              <TableHead>Typische Pflanzenarten</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
+              <TableHead className="w-[250px]">Name</TableHead>
+              <TableHead className="w-[150px]">Schutzstatus</TableHead>
+              <TableHead>Beschreibung</TableHead>
+              <TableHead className="w-[100px] text-right">Aktionen</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {types.map((type, index) => (
-              <TableRow key={index}>
-                <TableCell className="align-top py-4">{renderCell(type, index, 'name')}</TableCell>
-                <TableCell className="align-top py-4">{renderCell(type, index, 'description')}</TableCell>
-                <TableCell className="align-top py-4">{renderCell(type, index, 'typicalSpecies')}</TableCell>
-                <TableCell className="align-top py-4">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeType(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
+            {Object.entries(groupedTypes).map(([family, familyTypes]) => (
+              <>
+                <TableRow key={`family-${family}`} className="bg-muted/50">
+                  <TableCell colSpan={4} className="font-medium py-2">
+                    {family}
+                  </TableCell>
+                </TableRow>
+                {familyTypes.map((type) => {
+                  const globalIndex = types.findIndex(t => t === type);
+                  return (
+                    <TableRow key={`type-${globalIndex}`}>
+                      <TableCell>{type.name || <span className="text-gray-400">Kein Name</span>}</TableCell>
+                      <TableCell>{type.schutzstatus || <span className="text-gray-400">-</span>}</TableCell>
+                      <TableCell className="truncate max-w-md">
+                        {type.description || <span className="text-gray-400">Keine Beschreibung</span>}
+                      </TableCell>
+                      <TableCell className="text-right space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => editType(type, globalIndex)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeType(globalIndex)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </>
             ))}
           </TableBody>
         </Table>
       </div>
+
+      {/* Detail-Dialog zum Bearbeiten/Hinzufügen */}
+      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {currentIndex !== null ? "Habitat-Typ bearbeiten" : "Neuen Habitat-Typ erstellen"}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {currentType && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="habitatFamilie">Habitat-Familie</Label>
+                  <Input 
+                    id="habitatFamilie"
+                    value={currentType.habitatFamilie}
+                    onChange={(e) => updateCurrentType('habitatFamilie', e.target.value)}
+                    placeholder="z.B. Wald, Gewässer, Wiese..."
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="name">Name</Label>
+                  <Input 
+                    id="name"
+                    value={currentType.name}
+                    onChange={(e) => updateCurrentType('name', e.target.value)}
+                    placeholder="Name des Habitat-Typs"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="schutzstatus">Schutzstatus</Label>
+                  <Input 
+                    id="schutzstatus"
+                    value={currentType.schutzstatus}
+                    onChange={(e) => updateCurrentType('schutzstatus', e.target.value)}
+                    placeholder="z.B. FFH, geschützt nach §30..."
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="description">Beschreibung</Label>
+                  <Textarea 
+                    id="description"
+                    value={currentType.description}
+                    onChange={(e) => updateCurrentType('description', e.target.value)}
+                    placeholder="Beschreibung des Habitat-Typs"
+                    className="min-h-[100px]"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="typicalSpecies">Typische Pflanzenarten</Label>
+                  <Textarea 
+                    id="typicalSpecies"
+                    value={currentType.typicalSpecies.join("\n")}
+                    onChange={(e) => updateCurrentType('typicalSpecies', e.target.value.split("\n").filter(s => s.trim()))}
+                    placeholder="Eine Art pro Zeile"
+                    className="min-h-[150px]"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={closeDetail}>Abbrechen</Button>
+            <Button onClick={saveCurrentType}>Speichern</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

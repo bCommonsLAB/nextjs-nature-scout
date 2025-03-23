@@ -69,9 +69,10 @@ export function EffektiverHabitatEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Wir initialisieren mit dem verifizierten Habitat (wenn vorhanden) oder dem KI-detektierten Habitat
   const [selectedHabitat, setSelectedHabitat] = useState(effectiveHabitat || detectedHabitat || '');
   const [selectedHabitatInfo, setSelectedHabitatInfo] = useState<HabitatType | null>(null);
-  const [habitatKommentar, setHabitatKommentar] = useState('');
+  const [habitatKommentar, setHabitatKommentar] = useState(kommentar || '');
   
   // Neue States für die Habitatfamilien
   const [habitatFamilies, setHabitatFamilies] = useState<string[]>([]);
@@ -182,9 +183,6 @@ export function EffektiverHabitatEditor({
     
     setSaving(true);
     try {
-      // Generiere automatisch eine Zusammenfassung
-      const zusammenfassung = `Das Habitat ist ein ${selectedHabitat}.`;
-      
       const response = await fetch(`/api/habitat/${jobId}/effective-habitat`, {
         method: 'PATCH',
         headers: {
@@ -192,8 +190,7 @@ export function EffektiverHabitatEditor({
         },
         body: JSON.stringify({
           effectiveHabitat: selectedHabitat,
-          kommentar: habitatKommentar,
-          zusammenfassung: zusammenfassung
+          kommentar: habitatKommentar
         }),
       });
       

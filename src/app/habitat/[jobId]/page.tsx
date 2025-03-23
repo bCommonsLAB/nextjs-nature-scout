@@ -9,7 +9,8 @@ import {
   ArrowLeft, 
   Trash2,
   RefreshCw,
-  Edit
+  Edit,
+  CheckCircle
 } from 'lucide-react';
 import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
 import { EffektiverHabitatEditor } from '@/components/habitat/EffektiverHabitatEditor';
@@ -39,7 +40,6 @@ interface HabitatData {
     userName?: string;
     role?: string;
   };
-  effectiveHabitat?: string;
   metadata?: {
     erfassungsperson?: string;
     email?: string;
@@ -67,6 +67,12 @@ interface HabitatData {
     };
     habitatFamilie?: string;
     typicalSpecies?: string[];
+    kommentar?: string;
+  };
+  verifiedResult?: {
+    habitattyp?: string;
+    schutzstatus?: string;
+    habitatFamilie?: string;
     kommentar?: string;
   };
   error?: string;
@@ -313,7 +319,7 @@ export default function HabitateDetailPage() {
           <div className="flex flex-1 md:flex-row justify-between items-start gap-4 mb-6">
             <div>
               <h1 className="text-2xl font-bold">
-                Habitaterfassung: {data.result?.habitattyp || 'Nicht klassifiziert'}
+                Habitaterfassung: 
               </h1>
               <p className="text-gray-500">
                 Erfasst am {data.updatedAt && format(new Date(data.updatedAt), 'dd. MMMM yyyy, HH:mm', { locale: de })} von {data.metadata?.erfassungsperson || 'Unbekannt'}
@@ -350,8 +356,17 @@ export default function HabitateDetailPage() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+
             {/* Linke Spalte: Bilder und Metadaten */}
             <div>
+              <h2 className="text-xl font-semibold mb-4">Standort</h2>
+              <div className="bg-gray-50 p-3 rounded mb-4">
+                <p>Gemeinde: {data.metadata?.gemeinde || '-'}</p>
+                <p>Flurname: {data.metadata?.flurname || '-'}</p>
+                <p>Koordinaten: {data.metadata?.latitude}, {data.metadata?.longitude}</p>
+              </div>
+
               <h2 className="text-xl font-semibold mb-4">Bilder</h2>
               <div className="space-y-4">
                 {data.metadata?.bilder?.map((bild: HabitatBild, index: number) => (
@@ -379,26 +394,13 @@ export default function HabitateDetailPage() {
                 ))}
               </div>
               
-              <div className="mt-6">
-                <h3 className="font-semibold mb-2">Standort</h3>
-                <div className="bg-gray-50 p-4 rounded">
-                  <p>Gemeinde: {data.metadata?.gemeinde || '-'}</p>
-                  <p>Flurname: {data.metadata?.flurname || '-'}</p>
-                  <p>Koordinaten: {data.metadata?.latitude}, {data.metadata?.longitude}</p>
-                </div>
-              </div>
             </div>
             
             {/* Rechte Spalte: Analyseergebnisse */}
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold">Analyseergebnis</h2>
-                {/* Schutzstatus-Badge anzeigen - rechtsbündig neben der Überschrift */}
-                {data.result?.schutzstatus && (
-                  <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getSchutzstatusColor(data.result.schutzstatus)}`}>
-                    {normalizeSchutzstatus(data.result.schutzstatus)}
-                  </div>
-                )}
+                
               </div>
               
               {/* Unterschiedliche Ansichten basierend auf Benutzerrolle und Verifizierungsstatus */}
@@ -410,8 +412,8 @@ export default function HabitateDetailPage() {
                       jobId={jobId as string}
                       detectedHabitat={data.result.habitattyp}
                       detectedFamilie={data.result.habitatFamilie}
-                      effectiveHabitat={data.result.habitattyp}
-                      kommentar={data.result.kommentar}
+                      effectiveHabitat={data.verifiedResult?.habitattyp || data.result.habitattyp}
+                      kommentar={data.verifiedResult?.kommentar || data.result.kommentar}
                       onSaved={handleEditorSaved}
                       isExpert={isExpert}
                       isVerified={data.verified || false}
@@ -421,7 +423,7 @@ export default function HabitateDetailPage() {
                     />
                   )}
                   
-                  {/* Für normale Benutzer und nicht verifizierte Habitate */}
+                  {/* Für normale Benutzer und nicht verifizierte Habitate - nur KI-Ergebnisse mit Hinweis */}
                   {!isExpert && !data.verified && (
                     <div className="space-y-4">
                       <div className="bg-yellow-50 p-4 rounded border border-yellow-200 mb-4">
@@ -435,32 +437,68 @@ export default function HabitateDetailPage() {
                         </div>
                         <p className="text-sm text-yellow-700">
                           Dieses Habitat wurde noch nicht von einem Experten verifiziert. 
-                          Die angezeigte Klassifizierung und der Schutzstatus sind vorläufig.
+                          Die angezeigte Klassifizierung und der Schutzstatus sind vorläufig und wurden automatisch durch KI erstellt.
                         </p>
                       </div>
 
-                      {/* Habitat-Informationen anzeigen */}
-                      <div className="bg-gray-50 p-4 rounded">
-                        <h3 className="font-semibold">Vorläufige Klassifizierung</h3>
-                        <p className="text-lg">
-                          {data.result.habitattyp}
-                        </p>
-                        
+                      <div className="p-4 border rounded-lg bg-white">
+                        <h3 className="font-medium text-lg mb-2">Habitat: {data.result.habitattyp}</h3>
                         {data.result.habitatFamilie && (
-                          <p className="text-sm text-gray-500">
-                            Familie: {data.result.habitatFamilie}
+                          <p className="text-gray-500 mb-4">Habitatfamilie: {data.result.habitatFamilie}</p>
+                        )}
+                        {data.result.zusammenfassung && (
+                          <p className="mb-4">{data.result.zusammenfassung}</p>
+                        )}
+                        {data.result.schutzstatus && (
+                          <div className="mt-2">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSchutzstatusColor(data.result.schutzstatus)}`}>
+                              {normalizeSchutzstatus(data.result.schutzstatus)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Für normale Benutzer und verifizierte Habitate - nur verifizierte Daten anzeigen */}
+                  {!isExpert && data.verified && data.verifiedResult && (
+                    <div className="space-y-4">
+                      <div className="bg-green-50 p-4 rounded border border-green-200 mb-4">
+                        <div className="flex items-center text-green-700 mb-3">
+                          <CheckCircle className="h-5 w-5 mr-2" />
+                          <span className="font-medium">Dieser Habitat wurde verifiziert</span>
+                        </div>
+                        {data.verifiedAt && (
+                          <p className="text-green-700 text-sm">
+                            Verifiziert am {format(new Date(data.verifiedAt), 'dd.MM.yyyy HH:mm', { locale: de })}
+                            {data.verifiedBy?.userName && ` von ${data.verifiedBy.userName}`}
+                            {data.verifiedBy?.role && ` (${data.verifiedBy.role})`}
                           </p>
                         )}
-                        
-                        {/* Zusammenfassung anzeigen */}
-                        <div className="mt-4 border-t border-gray-200 pt-3">
-                          <h4 className="text-sm font-medium">Zusammenfassung</h4>
-                          <p className="mt-1">{data.result.zusammenfassung}</p>
+                      </div>
+                      
+                      {/* Verifizierter Habitat */}
+                      <div className="p-4 border rounded-lg bg-white">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-medium text-lg mb-2">Habitat: {data.verifiedResult.habitattyp}</h3>
+                            {data.verifiedResult.habitatFamilie && (
+                              <p className="text-gray-500 mb-4">Habitatfamilie: {data.verifiedResult.habitatFamilie}</p>
+                            )}
+                          </div>
+                          {data.verifiedResult.schutzstatus && (
+                            <div>
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSchutzstatusColor(data.verifiedResult.schutzstatus)}`}>
+                                {normalizeSchutzstatus(data.verifiedResult.schutzstatus)}
+                              </span>
+                            </div>
+                          )}
                         </div>
                         
-                        {data.result.kommentar && (
-                          <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
-                            <span className="font-medium">Anmerkung:</span> {data.result.kommentar}
+                        {data.verifiedResult.kommentar && (
+                          <div className="mt-4 p-3 bg-gray-50 rounded border text-sm">
+                            <p className="text-gray-700 font-medium mb-1">Expertenkommentar:</p>
+                            <p className="text-gray-800">{data.verifiedResult.kommentar}</p>
                           </div>
                         )}
                       </div>
@@ -479,61 +517,9 @@ export default function HabitateDetailPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Habitat-Anzeige für normale Benutzer und verifizierte Habitate */}
-                  {!isExpert && data.verified && (
-                    <div className="bg-gray-50 p-4 rounded">
-                      <h3 className="font-semibold">Habitat</h3>
-                      
-                      {/* Verifizierungsinformationen - für alle Benutzer anzeigen */}
-                      <div className="bg-green-50 p-3 rounded border border-green-100 mb-4 mt-2">
-                        <p className="text-green-700 text-sm flex items-center">
-                          <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            <path d="M22 4L12 14.01l-3-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                          Dieser Habitat wurde verifiziert.
-                        </p>
-                        {data.verifiedAt && (
-                          <p className="text-green-700 text-sm mt-1 ml-6">
-                            Verifiziert am {format(new Date(data.verifiedAt), 'dd.MM.yyyy HH:mm', { locale: de })}
-                            {data.verifiedBy?.userName && ` von ${data.verifiedBy.userName}`}
-                            {data.verifiedBy?.role && ` (${data.verifiedBy.role})`}
-                          </p>
-                        )}
-                      </div>
-                      
-                      <p className="text-lg">
-                        {data.result.habitattyp}
-                      </p>
-                      
-                      {data.result.habitatFamilie && (
-                        <p className="text-sm text-gray-500">
-                          Familie: {data.result.habitatFamilie}
-                        </p>
-                      )}
-
-                      {data.result.kommentar && (
-                        <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
-                          <span className="font-medium">Anmerkung:</span> {data.result.kommentar}
-                        </div>
-                      )}
-                      
-                      {data.result.typicalSpecies && data.result.typicalSpecies.length > 0 && (
-                        <div className="mt-3">
-                          <h4 className="text-sm font-medium">Typische Pflanzenarten:</h4>
-                          <ul className="mt-1 pl-5 text-sm list-disc">
-                            {data.result.typicalSpecies.map((species, index) => (
-                              <li key={index}>{species}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
                   {/* Zuklappbarer Bereich für KI-generierte Hinweise - nur für Experten sichtbar */}
                   {isExpert && (
-                    <div className="border border-gray-200 rounded-md overflow-hidden">
+                    <div className="border border-gray-200 rounded-md overflow-hidden mt-6">
                       <details className="group">
                         <summary className="flex justify-between items-center p-4 cursor-pointer bg-gray-50 hover:bg-gray-100">
                           <span className="font-semibold text-gray-700">Analyse Hinweise (KI generiert)</span>
@@ -644,7 +630,7 @@ export default function HabitateDetailPage() {
       </div>
 
       {/* Nach dem Abschnitt mit den Analyseergebnissen, vor dem Seitenende */}
-      {data.history && data.history.length > 0 && (
+      {isExpert && data.history && data.history.length > 0 && (
         <div className="mt-8 bg-gray-50 p-6 rounded-lg shadow-sm">
           <h2 className="text-xl font-semibold mb-4">Änderungsverlauf</h2>
           <div className="space-y-6">
@@ -715,6 +701,11 @@ export default function HabitateDetailPage() {
           </div>
         </div>
       )}
+      <div>
+        <p className="text-gray-500 text-xs">
+            jobId: {data.jobId}
+        </p>
+      </div>
     </div>
   );
 } 

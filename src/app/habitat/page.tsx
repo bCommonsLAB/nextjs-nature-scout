@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
-import { Folder, Plus, ShieldAlert, X } from 'lucide-react';
+import { Folder, Plus, ShieldAlert, X, Download, Trash2 } from 'lucide-react';
 import { HabitateList } from './components/habitate-list';
 import { SearchBar } from './components/search-bar';
 import { 
@@ -71,6 +71,7 @@ export default function HabitatPage() {
   const [hasAdvancedPermissions, setHasAdvancedPermissions] = useState(false);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
   
   const page = Number(searchParams.get('page') || '1');
   const search = searchParams.get('search') || '';
@@ -90,6 +91,10 @@ export default function HabitatPage() {
         const responseExpert = await fetch('/api/users/isExpert');
         const dataExpert = await responseExpert.json();
         setisExpert(dataExpert.isExpert);
+        
+        const responseAdmin = await fetch('/api/users/isAdmin');
+        const dataAdmin = await responseAdmin.json();
+        setIsAdmin(dataAdmin.isAdmin);
         
         const responseAdvanced = await fetch('/api/users/hasAdvancedPermissions');
         const dataAdvanced = await responseAdvanced.json();
@@ -314,6 +319,37 @@ export default function HabitatPage() {
     }
   };
   
+  // Funktion zum Herunterladen aller Habitat-Daten
+  const handleDownloadHabitatData = () => {
+    window.location.href = '/api/habitat/download';
+  };
+  
+  // Funktion zum Löschen aller Einträge ohne result-Objekt
+  const handleCleanupData = async () => {
+    if (!confirm("Möchten Sie wirklich alle Einträge ohne result-Objekt löschen? Diese Aktion kann nicht rückgängig gemacht werden.")) {
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/habitat/cleanup', {
+        method: 'DELETE'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Fehler ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      alert(`${data.deletedCount} Einträge ohne result-Objekt wurden erfolgreich gelöscht.`);
+      
+      // Seite neu laden, um die Änderungen anzuzeigen
+      window.location.reload();
+    } catch (error) {
+      console.error('Fehler beim Löschen der Einträge:', error);
+      alert('Fehler beim Löschen der Einträge ohne result-Objekt');
+    }
+  };
+  
   if (isLoadingPermissions) {
     return (
       <div className="container mx-auto py-8 px-2 sm:px-4">
@@ -333,6 +369,29 @@ export default function HabitatPage() {
         </div>
         
         <div className="flex flex-wrap gap-2">
+          {isAdmin && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+                onClick={handleDownloadHabitatData}
+              >
+                <Download className="h-4 w-4" />
+                Daten herunterladen
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                onClick={handleCleanupData}
+              >
+                <Trash2 className="h-4 w-4" />
+                Leere Einträge löschen
+              </Button>
+            </>
+          )}
           {hasAdvancedPermissions && isExpert && (
             <Button variant="default" size="sm" onClick={() => router.push('/naturescout')}>
               <Plus className="mr-2 h-4 w-4" />

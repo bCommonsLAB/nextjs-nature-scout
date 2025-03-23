@@ -31,6 +31,14 @@ interface HabitateEntry {
   result?: {
     habitattyp?: string;
     schutzstatus?: string;
+    habitatFamilie?: string;
+  };
+  verifiedResult?: {
+    habitattyp?: string;
+    schutzstatus?: string;
+    habitatFamilie?: string;
+    kommentar?: string;
+    zusammenfassung?: string;
   };
   error?: string;
 }
@@ -87,6 +95,15 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
       default:
         return 'bg-gray-400 text-white';
     }
+  };
+  
+  // Hilfsfunktion, um vorrangig verifizierte Daten anzuzeigen
+  const getHabitatData = (entry: HabitateEntry) => {
+    return {
+      habitattyp: entry.verifiedResult?.habitattyp || entry.result?.habitattyp || '',
+      schutzstatus: entry.verifiedResult?.schutzstatus || entry.result?.schutzstatus || '',
+      habitatFamilie: entry.verifiedResult?.habitatFamilie || entry.result?.habitatFamilie || ''
+    };
   };
   
   return (
@@ -150,91 +167,102 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
-          {entries.map((entry) => (
-            <tr 
-              key={entry.jobId} 
-              id={`habitat-row-${entry.jobId}`}
-              className="hover:bg-gray-50 transition-colors cursor-pointer"
-            >
-              <td className="px-2 py-2 whitespace-nowrap">
-                <Link href={`/habitat/${entry.jobId}`}>
-                  {entry.metadata?.bilder && entry.metadata.bilder.length > 0 && entry.metadata.bilder[0]?.url ? (
-                    <div className="relative h-14 w-16">
-                      <Image
-                        src={entry.metadata.bilder[0].url}
-                        alt="Vorschaubild"
-                        fill
-                        className="object-cover rounded"
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-14 w-16 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">
-                      Kein Bild
-                    </div>
-                  )}
-                </Link>
-              </td>
-              <td className="px-2 py-2 whitespace-nowrap">
-                <Link href={`/habitat/${entry.jobId}`} className="block">
-                  {entry.updatedAt && format(new Date(entry.updatedAt), 'dd.MM.yyyy HH:mm', { locale: de })}
-                </Link>
-              </td>
-              <td className="px-2 py-2 whitespace-nowrap">
-                <Link href={`/habitat/${entry.jobId}`} className="block">
-                  <div className="font-medium">{entry.metadata?.erfassungsperson || '-'}</div>
-                </Link>
-              </td>
-              <td className="px-2 py-2 whitespace-nowrap">
-                <Link href={`/habitat/${entry.jobId}`} className="block">
-                  <div className="font-medium">{entry.metadata?.gemeinde || '-'}</div>
-                  <div className="text-xs text-gray-500 truncate max-w-[160px]" title={entry.metadata?.standort || '-'}>
-                    {entry.metadata?.standort || '-'}
-                  </div>
-                </Link>
-              </td>
-              <td className="px-2 py-2 whitespace-nowrap">
-                <Link href={`/habitat/${entry.jobId}`} className="block">
-                  {entry.result?.habitattyp || (
-                    <span className="text-red-500">
-                      {entry.error ? 'Fehler' : 'Nicht analysiert'}
-                    </span>
-                  )}
-                </Link>
-              </td>
-              <td className="px-2 py-2 whitespace-nowrap">
-                <Link href={`/habitat/${entry.jobId}`} className="block">
-                  {entry.result?.schutzstatus ? (
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSchutzstatusColor(normalizeSchutzstatus(entry.result.schutzstatus))}`}>
-                      {normalizeSchutzstatus(entry.result.schutzstatus)}
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">-</span>
-                  )}
-                </Link>
-              </td>
-              <td className="px-2 py-2 whitespace-nowrap text-center">
-                <Link href={`/habitat/${entry.jobId}`} className="block flex justify-center">
-                  {getVerificationIcon(entry)}
-                </Link>
-              </td>
-              {onDelete && (
-                <td className="px-2 py-2 whitespace-nowrap text-center">
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (confirm('Sind Sie sicher, dass Sie diesen Eintrag löschen möchten?')) {
-                        onDelete(entry.jobId);
-                      }
-                    }}
-                    className="text-gray-500 hover:text-red-500 transition-colors inline-flex items-center justify-center"
-                    title="Eintrag löschen"
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </button>
+          {entries.map((entry) => {
+            const habitatData = getHabitatData(entry);
+            
+            return (
+              <tr 
+                key={entry.jobId} 
+                id={`habitat-row-${entry.jobId}`}
+                className="hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                <td className="px-2 py-2 whitespace-nowrap">
+                  <Link href={`/habitat/${entry.jobId}`}>
+                    {entry.metadata?.bilder && entry.metadata.bilder.length > 0 && entry.metadata.bilder[0]?.url ? (
+                      <div className="relative h-14 w-16">
+                        <Image
+                          src={entry.metadata.bilder[0].url}
+                          alt="Vorschaubild"
+                          fill
+                          className="object-cover rounded"
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-14 w-16 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">
+                        Kein Bild
+                      </div>
+                    )}
+                  </Link>
                 </td>
-              )}
-            </tr>
-          ))}
+                <td className="px-2 py-2 whitespace-nowrap">
+                  <Link href={`/habitat/${entry.jobId}`} className="block">
+                    {entry.updatedAt && format(new Date(entry.updatedAt), 'dd.MM.yyyy HH:mm', { locale: de })}
+                  </Link>
+                </td>
+                <td className="px-2 py-2 whitespace-nowrap">
+                  <Link href={`/habitat/${entry.jobId}`} className="block">
+                    <div className="font-medium">{entry.metadata?.erfassungsperson || '-'}</div>
+                  </Link>
+                </td>
+                <td className="px-2 py-2 whitespace-nowrap">
+                  <Link href={`/habitat/${entry.jobId}`} className="block">
+                    <div className="font-medium">{entry.metadata?.gemeinde || '-'}</div>
+                    <div className="text-xs text-gray-500 truncate max-w-[160px]" title={entry.metadata?.standort || '-'}>
+                      {entry.metadata?.standort || '-'}
+                    </div>
+                  </Link>
+                </td>
+                <td className="px-2 py-2 whitespace-nowrap">
+                  <Link href={`/habitat/${entry.jobId}`} className="block">
+                    {habitatData.habitattyp ? (
+                      <>
+                        <div>{habitatData.habitattyp}</div>
+                        {entry.verified && entry.verifiedResult?.habitattyp && (
+                          <span className="text-xs text-green-600 mt-1 block">Verifiziert</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-red-500">
+                        {entry.error ? 'Fehler' : 'Nicht analysiert'}
+                      </span>
+                    )}
+                  </Link>
+                </td>
+                <td className="px-2 py-2 whitespace-nowrap">
+                  <Link href={`/habitat/${entry.jobId}`} className="block">
+                    {habitatData.schutzstatus ? (
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSchutzstatusColor(normalizeSchutzstatus(habitatData.schutzstatus))}`}>
+                        {normalizeSchutzstatus(habitatData.schutzstatus)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </Link>
+                </td>
+                <td className="px-2 py-2 whitespace-nowrap text-center">
+                  <Link href={`/habitat/${entry.jobId}`} className="block flex justify-center">
+                    {getVerificationIcon(entry)}
+                  </Link>
+                </td>
+                {onDelete && (
+                  <td className="px-2 py-2 whitespace-nowrap text-center">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (confirm('Sind Sie sicher, dass Sie diesen Eintrag löschen möchten?')) {
+                          onDelete(entry.jobId);
+                        }
+                      }}
+                      className="text-gray-500 hover:text-red-500 transition-colors inline-flex items-center justify-center"
+                      title="Eintrag löschen"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                  </td>
+                )}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

@@ -34,7 +34,7 @@ export async function PATCH(
     }
     
     const body = await request.json();
-    const { effectiveHabitat, kommentar, zusammenfassung } = body;
+    const { effectiveHabitat, kommentar } = body;
     
     if (!effectiveHabitat) {
       return NextResponse.json(
@@ -82,18 +82,16 @@ export async function PATCH(
       },
       module: 'Habitat-Verifizierung',
       previousResult: {
-        habitattyp: entry.result?.habitattyp,
-        habitatFamilie: entry.result?.habitatFamilie,
-        schutzstatus: entry.result?.schutzstatus,
-        kommentar: entry.kommentar,
-        zusammenfassung: entry.result?.zusammenfassung
+        habitattyp: entry.verifiedResult?.habitattyp || entry.result?.habitattyp,
+        habitatFamilie: entry.verifiedResult?.habitatFamilie || entry.result?.habitatFamilie,
+        schutzstatus: entry.verifiedResult?.schutzstatus || entry.result?.schutzstatus,
+        kommentar: entry.verifiedResult?.kommentar || entry.result?.kommentar
       },
       changes: {
         habitattyp: effectiveHabitat,
         habitatFamilie: habitatFamilie,
         schutzstatus: schutzstatus,
-        kommentar: kommentar,
-        zusammenfassung: zusammenfassung
+        kommentar: kommentar
       }
     };
     
@@ -106,12 +104,13 @@ export async function PATCH(
       [
         {
           $set: {
-            // Aktualisiere die result-Attribute
-            "result.habitattyp": effectiveHabitat,
-            "result.habitatFamilie": habitatFamilie,
-            "result.schutzstatus": schutzstatus,
-            "result.kommentar": kommentar,
-            "result.zusammenfassung": zusammenfassung,
+            // Aktualisiere die verifiedResult-Attribute statt result
+            "verifiedResult": {
+              habitattyp: effectiveHabitat,
+              habitatFamilie: habitatFamilie,
+              schutzstatus: schutzstatus,
+              kommentar: kommentar
+            },
             updatedAt: now,
             // Setze Verifizierungsstatus
             verified: true,
@@ -148,7 +147,6 @@ export async function PATCH(
       habitatFamilie: habitatFamilie,
       schutzstatus: schutzstatus,
       kommentar: kommentar,
-      zusammenfassung: zusammenfassung,
       verified: true,
       verifiedAt: now.toISOString(),
       // Hole den aktualisierten Eintrag mit der History
