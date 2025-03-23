@@ -55,7 +55,7 @@ interface HabitateData {
   allPersons?: string[];
   userRole?: {
     isAdmin: boolean;
-    isBiologist: boolean;
+    isExpert: boolean;
     hasAdvancedPermissions: boolean;
   };
 }
@@ -67,7 +67,7 @@ export default function HabitatPage() {
   const [data, setData] = useState<HabitateData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isBiologist, setIsBiologist] = useState(false);
+  const [isExpert, setisExpert] = useState(false);
   const [hasAdvancedPermissions, setHasAdvancedPermissions] = useState(false);
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
@@ -87,9 +87,9 @@ export default function HabitatPage() {
     const checkPermissions = async () => {
       setIsLoadingPermissions(true);
       try {
-        const responseBiologist = await fetch('/api/users/isBiologist');
-        const dataBiologist = await responseBiologist.json();
-        setIsBiologist(dataBiologist.isBiologist);
+        const responseExpert = await fetch('/api/users/isExpert');
+        const dataExpert = await responseExpert.json();
+        setisExpert(dataExpert.isExpert);
         
         const responseAdvanced = await fetch('/api/users/hasAdvancedPermissions');
         const dataAdvanced = await responseAdvanced.json();
@@ -213,8 +213,33 @@ export default function HabitatPage() {
         });
         
         if (result.userRole) {
-          setIsBiologist(result.userRole.isBiologist);
+          setisExpert(result.userRole.isExpert);
           setHasAdvancedPermissions(result.userRole.hasAdvancedPermissions);
+        }
+
+        // Prüfe, ob wir von einer Verifizierung zurückkommen und scrolle zur Position
+        if (typeof window !== 'undefined') {
+          const justVerified = sessionStorage.getItem('habitat_just_verified');
+          const verifiedId = sessionStorage.getItem('habitat_verified_id');
+          
+          if (justVerified === 'true' && verifiedId) {
+            // Entferne die Flags
+            sessionStorage.removeItem('habitat_just_verified');
+            sessionStorage.removeItem('habitat_verified_id');
+            
+            // Warte einen Moment, bis die Komponente gerendert ist
+            setTimeout(() => {
+              const verifiedElement = document.getElementById(`habitat-row-${verifiedId}`);
+              if (verifiedElement) {
+                verifiedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                verifiedElement.classList.add('bg-green-50');
+                setTimeout(() => {
+                  verifiedElement.classList.remove('bg-green-50');
+                  verifiedElement.classList.add('bg-white');
+                }, 2000);
+              }
+            }, 500);
+          }
         }
       } catch (err) {
         if (err instanceof Error) {
@@ -308,7 +333,7 @@ export default function HabitatPage() {
         </div>
         
         <div className="flex flex-wrap gap-2">
-          {hasAdvancedPermissions && isBiologist && (
+          {hasAdvancedPermissions && isExpert && (
             <Button variant="default" size="sm" onClick={() => router.push('/naturescout')}>
               <Plus className="mr-2 h-4 w-4" />
               Neues Habitat
@@ -331,7 +356,7 @@ export default function HabitatPage() {
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle>Hinweis</AlertTitle>
           <AlertDescription>
-            Als registrierter Benutzer sehen Sie hier Ihre eigenen Habitaterfassungen. Nur verifizierte Biologen und Administratoren können alle Einträge sehen.
+            Als registrierter Benutzer sehen Sie hier Ihre eigenen Habitaterfassungen. Nur verifizierte Experten und Administratoren können alle Einträge sehen.
           </AlertDescription>
         </Alert>
       )}
@@ -412,7 +437,6 @@ export default function HabitatPage() {
               <SelectItem value="alle">Alle Prüfstatus</SelectItem>
               <SelectItem value="unverified">Ungeprüft</SelectItem>
               <SelectItem value="verified">Verifiziert</SelectItem>
-              <SelectItem value="rejected">Abgelehnt</SelectItem>
             </SelectContent>
           </Select>
 

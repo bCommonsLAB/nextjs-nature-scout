@@ -153,6 +153,7 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
           {entries.map((entry) => (
             <tr 
               key={entry.jobId} 
+              id={`habitat-row-${entry.jobId}`}
               className="hover:bg-gray-50 transition-colors cursor-pointer"
             >
               <td className="px-2 py-2 whitespace-nowrap">

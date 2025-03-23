@@ -4,7 +4,7 @@ export interface IUser extends Document {
   clerkId: string;
   email: string;
   name: string;
-  role: 'user' | 'biologe' | 'admin' | 'superadmin';
+  role: 'user' | 'experte' | 'admin' | 'superadmin';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,7 +26,7 @@ const UserSchema = new Schema<IUser>({
   },
   role: { 
     type: String, 
-    enum: ['user', 'biologe', 'admin', 'superadmin'], 
+    enum: ['user', 'experte', 'admin', 'superadmin'], 
     default: 'user' 
   },
 }, {

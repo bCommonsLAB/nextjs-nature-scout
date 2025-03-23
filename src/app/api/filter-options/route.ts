@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
 import { auth } from '@clerk/nextjs/server';
 import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
+import { UserService } from '@/lib/services/user-service';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -17,17 +18,41 @@ export async function GET(request: Request) {
       );
     }
     
+    // Benutzerberechtigungen prüfen
+    const isAdmin = await UserService.isAdmin(userId);
+    const isExpert = await UserService.isExpert(userId);
+    const hasAdvancedPermissions = isAdmin || isExpert;
+    
+    // Benutzer für Email-Filterung holen
+    const userRecord = await UserService.findByClerkId(userId);
+    if (!userRecord) {
+      return NextResponse.json(
+        { error: 'Benutzer nicht gefunden' },
+        { status: 404 }
+      );
+    }
+    
+    const userEmail = userRecord.email;
+    
     const db = await connectToDatabase();
     const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
     
-    // Standardmäßig nur nicht gelöschte Dokumente anzeigen
-    const baseMatch = { deleted: { $ne: true } };
+    // Basisfilter: nicht gelöschte Dokumente
+    const baseMatch: { 
+      deleted?: { $ne: boolean },
+      'metadata.email'?: string 
+    } = { deleted: { $ne: true } };
+    
+    // Für normale Benutzer: Nur eigene Einträge
+    if (!hasAdvancedPermissions) {
+      baseMatch['metadata.email'] = userEmail;
+    }
     
     let results: string[] = [];
     
     switch (filterType) {
       case 'gemeinden':
-        // Aggregation für alle eindeutigen Gemeinden
+        // Aggregation für eindeutige Gemeinden
         const gemeindenAgg = await collection.aggregate([
           { $match: baseMatch },
           { $group: { _id: '$metadata.gemeinde' } },
@@ -41,7 +66,7 @@ export async function GET(request: Request) {
         break;
         
       case 'habitate':
-        // Aggregation für alle eindeutigen Habitat-Typen
+        // Aggregation für eindeutige Habitat-Typen
         const habitateAgg = await collection.aggregate([
           { $match: baseMatch },
           { $group: { _id: '$result.habitattyp' } },
@@ -55,27 +80,21 @@ export async function GET(request: Request) {
         break;
         
       case 'familien':
-        // Aggregation für alle eindeutigen Habitat-Familien (erster Teil des Habitat-Typs)
+        // Aggregation für eindeutige Habitat-Familien
         const habitateForFamilies = await collection.aggregate([
           { $match: baseMatch },
-          { $group: { _id: '$result.habitattyp' } },
+          { $group: { _id: '$result.habitatFamilie' } }, // Direkt nach Habitat-Familie suchen
           { $match: { _id: { $ne: null } } },
+          { $sort: { _id: 1 } }
         ]).toArray();
         
-        // Extrahiere die Familie aus dem Habitat-Typ (erster Teil des Namens)
-        const familienSet = new Set<string>();
-        habitateForFamilies.forEach(item => {
-          if (item._id && typeof item._id === 'string') {
-            const familie = item._id.split(' ')[0];
-            if (familie) familienSet.add(familie);
-          }
-        });
-        
-        results = Array.from(familienSet).sort();
+        results = habitateForFamilies
+          .map(item => item._id)
+          .filter(Boolean) as string[];
         break;
         
       case 'schutzstati':
-        // Aggregation für alle eindeutigen Schutzstatus-Werte
+        // Aggregation für eindeutige Schutzstatus-Werte
         const schutzstatiAgg = await collection.aggregate([
           { $match: baseMatch },
           { $group: { _id: '$result.schutzstatus' } },
@@ -95,40 +114,30 @@ export async function GET(request: Request) {
         break;
         
       case 'personen':
-        // Einfachere Implementierung ohne komplizierte Datenbankabfragen für Benutzerprüfung
-        const personenMatch: { 
-          deleted?: { $ne: boolean },
-          'metadata.email'?: string 
-        } = { ...baseMatch };
-        
-        // Logging hinzufügen, um zu sehen, was passiert
-        console.log('Suche nach Personen mit userId:', userId);
-        
-        // Hier prüfen wir direkt mit auth(), ob es erweiterte Rechte gibt 
-        // ohne Datenbank-Lookup, um Timeout-Probleme zu vermeiden
-        // In echter Produktion würdest du das anders implementieren
-        // mit korrekter Rollen-Prüfung, aber für jetzt vereinfachen wir es
-        
-        // Für diesen Test zeigen wir alle Personen an
-        // In Produktion würde man hier die Berechtigungsprüfung implementieren
-        // Keine Filterung nach Email durchführen
-        
-        console.log('Anfrage für personenMatch:', personenMatch);
-        
-        // Aggregation durchführen
-        const personenAgg = await collection.aggregate([
-          { $match: personenMatch },
-          { $group: { _id: '$metadata.erfassungsperson' } },
-          { $match: { _id: { $ne: null } } },
-          { $sort: { _id: 1 } }
-        ]).toArray();
-        
-        console.log('Gefundene Personen:', personenAgg.length);
-        console.log('Erste 5 Personen-IDs:', personenAgg.slice(0, 5).map(p => p._id));
-        
-        results = personenAgg
-          .map(item => item._id)
-          .filter(Boolean) as string[];
+        // Für normale Benutzer: Nur eigene Person anzeigen
+        if (!hasAdvancedPermissions) {
+          // Benutze den Erfasser-Namen des Benutzers
+          const personName = await collection.findOne(
+            { 'metadata.email': userEmail },
+            { projection: { 'metadata.erfassungsperson': 1 } }
+          );
+          
+          if (personName && personName.metadata && personName.metadata.erfassungsperson) {
+            results = [personName.metadata.erfassungsperson];
+          }
+        } else {
+          // Für Experten/Admins: Alle Personen anzeigen
+          const personenAgg = await collection.aggregate([
+            { $match: { deleted: { $ne: true } } },
+            { $group: { _id: '$metadata.erfassungsperson' } },
+            { $match: { _id: { $ne: null } } },
+            { $sort: { _id: 1 } }
+          ]).toArray();
+          
+          results = personenAgg
+            .map(item => item._id)
+            .filter(Boolean) as string[];
+        }
         break;
         
       default:
@@ -138,8 +147,6 @@ export async function GET(request: Request) {
           { status: 400 }
         );
     }
-    
-    console.log(`Filter-Optionen abgerufen für ${filterType}:`, results);
     
     return NextResponse.json({
       [filterType]: results

@@ -13,7 +13,7 @@ interface MongoFilter {
   'metadata.gemeinde'?: string;
   'result.habitattyp'?: string | { $regex: string, $options: string };
   'result.schutzstatus'?: string;
-  verified?: boolean | { $exists: boolean };
+  verified?: boolean | { $exists: boolean } | { $ne: boolean };
   $or?: Array<{ [key: string]: { $regex: string, $options: string } }>;
 }
 
@@ -68,10 +68,10 @@ export async function GET(request: Request) {
       );
     }
     
-    // Überprüfen, ob Benutzer erweiterte Rechte hat (Admin oder Biologe)
+    // Überprüfen, ob Benutzer erweiterte Rechte hat (Admin oder Experte)
     const isAdmin = await UserService.isAdmin(userId);
-    const isBiologist = await UserService.isBiologist(userId);
-    const hasAdvancedPermissions = isAdmin || isBiologist;
+    const isExpert = await UserService.isExpert(userId);
+    const hasAdvancedPermissions = isAdmin || isExpert;
     
     // Holen des Benutzers, um die E-Mail für die Filterung zu bekommen
     const userRecord = await UserService.findByClerkId(userId);
@@ -135,10 +135,9 @@ export async function GET(request: Request) {
     if (pruefstatus) {
       if (pruefstatus === 'verified') {
         filter['verified'] = true;
-      } else if (pruefstatus === 'rejected') {
-        filter['verified'] = false;
-      } else if (pruefstatus === 'unchecked') {
-        filter['verified'] = { $exists: false };
+      } else if (pruefstatus === 'unverified') {
+        // Ungeprüft bedeutet, dass das verified-Feld nicht existiert oder falsch ist
+        filter['verified'] = { $ne: true };
       }
     }
     
@@ -154,7 +153,7 @@ export async function GET(request: Request) {
     // Hole alle eindeutigen Personen für das Dropdown - basierend auf Benutzerrechten
     let allPersonsAggregation;
     if (hasAdvancedPermissions) {
-      // Admins und Biologen sehen alle Personen
+      // Admins und Experten sehen alle Personen
       allPersonsAggregation = await collection.aggregate([
         { $match: { deleted: { $ne: true } } },
         { $group: { _id: '$metadata.erfassungsperson' } },
@@ -254,7 +253,7 @@ export async function GET(request: Request) {
       allPersons, // Füge die Liste aller Personen zur Antwort hinzu
       userRole: {
         isAdmin,
-        isBiologist,
+        isExpert,
         hasAdvancedPermissions
       },
       pagination: {

@@ -5,14 +5,14 @@ export interface CreateUserData {
   clerkId: string;
   email: string;
   name: string;
-  role?: 'user' | 'biologe' | 'admin' | 'superadmin';
+  role?: 'user' | 'experte' | 'admin' | 'superadmin';
 }
 
 export interface UpdateUserData {
   clerkId?: string;
   email?: string;
   name?: string;
-  role?: 'user' | 'biologe' | 'admin' | 'superadmin';
+  role?: 'user' | 'experte' | 'admin' | 'superadmin';
   image?: string;
 }
 
@@ -87,20 +87,20 @@ export class UserService {
   }
   
   /**
-   * Prüft, ob ein Benutzer Biologe ist
+   * Prüft, ob ein Benutzer Experte ist
    */
-  static async isBiologist(clerkId: string): Promise<boolean> {
+  static async isExpert(clerkId: string): Promise<boolean> {
     await connectToDatabase();
     const user = await (User.findOne({ clerkId }) as any).exec();
-    return user?.role === 'biologe';
+    return user?.role === 'experte';
   }
   
   /**
-   * Prüft, ob ein Benutzer erweiterte Rechte hat (Biologe oder Admin)
+   * Prüft, ob ein Benutzer erweiterte Rechte hat (Experte oder Admin)
    */
   static async hasAdvancedPermissions(clerkId: string): Promise<boolean> {
     await connectToDatabase();
     const user = await (User.findOne({ clerkId }) as any).exec();
-    return user?.role === 'biologe' || user?.role === 'admin' || user?.role === 'superadmin';
+    return user?.role === 'experte' || user?.role === 'admin' || user?.role === 'superadmin';
   }
 } 
