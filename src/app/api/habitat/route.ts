@@ -1,7 +1,52 @@
 import { NextResponse } from 'next/server';
+import { Sort as MongoSort, Document } from 'mongodb';
 import { connectToDatabase } from '@/lib/services/db';
-import { getAuth } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
+import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
 import { UserService } from '@/lib/services/user-service';
+
+// Vor der GET-Funktion, definiere die Typen
+interface MongoFilter {
+  deleted?: { $ne: boolean };
+  'metadata.email'?: string;
+  'metadata.erfassungsperson'?: string;
+  'metadata.gemeinde'?: string;
+  'result.habitattyp'?: string | { $regex: string, $options: string };
+  'result.schutzstatus'?: string;
+  verified?: boolean | { $exists: boolean } | { $ne: boolean };
+  $or?: Array<{ [key: string]: { $regex: string, $options: string } }>;
+}
+
+interface MongoDocument extends Document {
+  _id: string;
+  jobId: string;
+  status: string;
+  updatedAt: string;
+  verified?: boolean;
+  metadata?: {
+    erfassungsperson?: string;
+    email?: string;
+    gemeinde?: string;
+    flurname?: string;
+    standort?: string;
+    latitude?: number;
+    longitude?: number;
+    bilder?: Array<{url: string}>;
+    kommentar?: string;
+    [key: string]: unknown;
+  };
+  result?: {
+    habitattyp?: string;
+    schutzstatus?: unknown;
+    zusammenfassung?: string;
+    [key: string]: unknown;
+  };
+  error?: string;
+}
+
+interface PersonAggregationResult {
+  _id: string;
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -14,8 +59,7 @@ export async function GET(request: Request) {
   
   try {
     // Hole den aktuellen Benutzer und prüfe seine Berechtigungen
-    const auth = getAuth(request);
-    const userId = auth.userId;
+    const { userId } = await auth();
     
     if (!userId) {
       return NextResponse.json(
@@ -24,28 +68,28 @@ export async function GET(request: Request) {
       );
     }
     
-    // Überprüfen, ob Benutzer erweiterte Rechte hat (Admin oder Biologe)
+    // Überprüfen, ob Benutzer erweiterte Rechte hat (Admin oder Experte)
     const isAdmin = await UserService.isAdmin(userId);
-    const isBiologist = await UserService.isBiologist(userId);
-    const hasAdvancedPermissions = isAdmin || isBiologist;
+    const isExpert = await UserService.isExpert(userId);
+    const hasAdvancedPermissions = isAdmin || isExpert;
     
     // Holen des Benutzers, um die E-Mail für die Filterung zu bekommen
-    const currentUser = await UserService.findByClerkId(userId);
+    const userRecord = await UserService.findByClerkId(userId);
     
-    if (!currentUser) {
+    if (!userRecord) {
       return NextResponse.json(
         { error: 'Benutzer nicht gefunden' },
         { status: 404 }
       );
     }
     
-    const userEmail = currentUser.email;
+    const userEmail = userRecord.email;
     
     const db = await connectToDatabase();
     const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
     
     // Suchfilter erstellen
-    const filter: any = {
+    const filter: MongoFilter = {
       // Zeige nur Einträge an, die nicht als gelöscht markiert sind
       deleted: { $ne: true }
     };
@@ -64,6 +108,39 @@ export async function GET(request: Request) {
       console.warn(`Benutzer ${userEmail} versuchte, nach Einträgen von ${selectedPerson} zu filtern`);
     }
     
+    // Füge weitere Filter hinzu
+    const gemeinde = searchParams.get('gemeinde');
+    if (gemeinde) {
+      filter['metadata.gemeinde'] = gemeinde;
+    }
+    
+    const habitat = searchParams.get('habitat');
+    if (habitat) {
+      filter['result.habitattyp'] = habitat;
+    }
+    
+    const habitatFamilie = searchParams.get('habitatFamilie');
+    if (habitatFamilie) {
+      // Für Habitat-Familie können wir einen Regex-Filter verwenden, um nach Habitaten 
+      // zu suchen, die mit der angegebenen Familie beginnen
+      filter['result.habitattyp'] = { $regex: `^${habitatFamilie}`, $options: 'i' };
+    }
+    
+    const schutzstatus = searchParams.get('schutzstatus');
+    if (schutzstatus) {
+      filter['result.schutzstatus'] = schutzstatus;
+    }
+    
+    const pruefstatus = searchParams.get('pruefstatus');
+    if (pruefstatus) {
+      if (pruefstatus === 'verified') {
+        filter['verified'] = true;
+      } else if (pruefstatus === 'unverified') {
+        // Ungeprüft bedeutet, dass das verified-Feld nicht existiert oder falsch ist
+        filter['verified'] = { $ne: true };
+      }
+    }
+    
     if (searchTerm) {
       filter['$or'] = [
         { 'metadata.erfassungsperson': { $regex: searchTerm, $options: 'i' } },
@@ -76,7 +153,7 @@ export async function GET(request: Request) {
     // Hole alle eindeutigen Personen für das Dropdown - basierend auf Benutzerrechten
     let allPersonsAggregation;
     if (hasAdvancedPermissions) {
-      // Admins und Biologen sehen alle Personen
+      // Admins und Experten sehen alle Personen
       allPersonsAggregation = await collection.aggregate([
         { $match: { deleted: { $ne: true } } },
         { $group: { _id: '$metadata.erfassungsperson' } },
@@ -99,7 +176,7 @@ export async function GET(request: Request) {
     }
     
     const allPersons = allPersonsAggregation
-      .map(item => item._id)
+      .map((item) => (item as PersonAggregationResult)._id)
       .filter(Boolean)
       .sort();
     
@@ -108,7 +185,7 @@ export async function GET(request: Request) {
     const skip = (page - 1) * limit;
     
     // Erstelle Sortierung
-    const sort: any = {};
+    const sort: MongoSort = {};
     sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
     
     // Daten abrufen und für Frontend projizieren
@@ -138,14 +215,24 @@ export async function GET(request: Request) {
       })
       .toArray();
     
+    // Validiere die Einträge, insbesondere den schutzstatus
+    const validatedEntries = entries.map((entry) => {
+      // Validiere den schutzstatus, falls er existiert
+      const typedEntry = entry as MongoDocument;
+      if (typedEntry.result?.schutzstatus) {
+        typedEntry.result.schutzstatus = normalizeSchutzstatus(typedEntry.result.schutzstatus);
+      }
+      return typedEntry;
+    });
+    
     // Debug-Logging für den ersten Eintrag
-    if (entries.length > 0) {
-      const entry = entries[0];
+    if (validatedEntries.length > 0) {
+      const entry = validatedEntries[0];
       if (entry) {
         const metadata = entry.metadata || {};
         const bilder = metadata.bilder || [];
         
-        console.log('Erster Archiveintrag:', {
+        console.log('Erster Habitateintrag:', {
           jobId: entry.jobId,
           bildInfo: bilder.length > 0 ? {
             anzahl: bilder.length,
@@ -162,11 +249,11 @@ export async function GET(request: Request) {
     }
     
     return NextResponse.json({
-      entries,
+      entries: validatedEntries,
       allPersons, // Füge die Liste aller Personen zur Antwort hinzu
       userRole: {
         isAdmin,
-        isBiologist,
+        isExpert,
         hasAdvancedPermissions
       },
       pagination: {
@@ -177,9 +264,9 @@ export async function GET(request: Request) {
       }
     });
   } catch (error) {
-    console.error('Fehler beim Abrufen der Archivdaten:', error);
+    console.error('Fehler beim Abrufen der Habitatdaten:', error);
     return NextResponse.json(
-      { error: 'Fehler beim Abrufen der Archivdaten' },
+      { error: 'Fehler beim Abrufen der Habitatdaten' },
       { status: 500 }
     );
   }

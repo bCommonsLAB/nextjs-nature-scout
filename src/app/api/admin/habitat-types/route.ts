@@ -27,7 +27,9 @@ export async function POST(request: NextRequest) {
         const result = await updateHabitatType(type.id, {
           name: type.name,
           description: type.description,
-          typicalSpecies: type.typicalSpecies
+          typicalSpecies: type.typicalSpecies,
+          habitatFamilie: type.habitatFamilie,
+          schutzstatus: type.schutzstatus
         });
         if (result) results.push(result);
       } else {
@@ -35,7 +37,9 @@ export async function POST(request: NextRequest) {
         const result = await createHabitatType({
           name: type.name,
           description: type.description,
-          typicalSpecies: type.typicalSpecies
+          typicalSpecies: type.typicalSpecies,
+          habitatFamilie: type.habitatFamilie,
+          schutzstatus: type.schutzstatus
         });
         results.push(result);
       }

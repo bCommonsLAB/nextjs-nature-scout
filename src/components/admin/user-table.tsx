@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { IUser } from '@/lib/db/models/user';
+import { IUser } from '@/lib/services/user-service';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { Trash2, RefreshCw, AlertCircle, Edit } from 'lucide-react';
@@ -48,7 +48,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 const userFormSchema = z.object({
   name: z.string().min(2, { message: 'Name muss mindestens 2 Zeichen lang sein' }),
   email: z.string().email({ message: 'Ungültige E-Mail-Adresse' }).optional(),
-  role: z.enum(['user', 'biologe', 'admin', 'superadmin']),
+  role: z.enum(['user', 'experte', 'admin', 'superadmin']),
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -96,7 +96,7 @@ export function UserTable() {
     form.reset({
       name: user.name,
       email: user.email,
-      role: user.role as 'user' | 'biologe' | 'admin' | 'superadmin',
+      role: user.role as 'user' | 'experte' | 'admin' | 'superadmin',
     });
     setIsEditDialogOpen(true);
   };
@@ -215,8 +215,8 @@ export function UserTable() {
     switch (role) {
       case 'user':
         return 'Standardbenutzer mit Lesezugriff';
-      case 'biologe':
-        return 'Biologe mit erweiterten Fachrechten';
+      case 'experte':
+        return 'Experte mit erweiterten Fachrechten';
       case 'admin':
         return 'Administrator mit vollen Rechten';
       case 'superadmin':
@@ -299,7 +299,7 @@ export function UserTable() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="user">Benutzer</SelectItem>
-                          <SelectItem value="biologe">Biologe</SelectItem>
+                          <SelectItem value="experte">Experte</SelectItem>
                           <SelectItem value="admin">Admin</SelectItem>
                           <SelectItem value="superadmin">Superadmin</SelectItem>
                         </SelectContent>
@@ -397,7 +397,7 @@ export function UserTable() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="user">Benutzer</SelectItem>
-                        <SelectItem value="biologe">Biologe</SelectItem>
+                        <SelectItem value="experte">Experte</SelectItem>
                         <SelectItem value="admin">Admin</SelectItem>
                         <SelectItem value="superadmin">Superadmin</SelectItem>
                       </SelectContent>

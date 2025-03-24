@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ChevronDown, ChevronUp, Flower2, Sparkles, CheckCircle2, Camera, MessagesSquare, MessageSquare, Terminal, AlertTriangle, Loader2 } from 'lucide-react';
 import { NatureScoutData, AnalyseErgebnis, llmInfo, SimplifiedSchema } from "@/types/nature-scout";
 import { ParameterHeading } from './parameter-heading';
+import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
 
 interface ImageAnalysisProps {
   metadata: NatureScoutData;
@@ -143,6 +144,23 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
     [metadata.llmInfo?.schutzstatusStructuredOutput]
   );
 
+  const getStatusStyle = (type: string) => {
+    const baseStyle = "text-sm font-medium px-3.5 py-2.5 rounded-full flex items-center gap-1";
+    
+    const normalizedType = normalizeSchutzstatus(type);
+    
+    switch(normalizedType) {
+      case 'gesetzlich geschützt':
+        return `${baseStyle} bg-red-100 text-red-800`;
+      case 'ökologisch hochwertig':
+        return `${baseStyle} bg-orange-100 text-orange-800`;
+      case 'ökologisch niedrigwertig':
+        return `${baseStyle} bg-green-100 text-green-800`;
+      default:
+        return `${baseStyle} bg-gray-100 text-gray-600`;
+    }
+  };
+
   return (
     <div className="space-y-4">
       {analysisError && (
@@ -179,32 +197,12 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                 <div className="flex flex-col gap-2">
                   <div className="text-sm text-gray-500">Schutzstatus für Biodiversität</div>
                   <div className="space-y-2">
-                    {(() => {
-                      const status = metadata.analyseErgebnis?.schutzstatus;
-                      if (!status) return null;
-
-                      const getStatusStyle = (type: string) => {
-                        const baseStyle = "text-sm font-medium px-3.5 py-2.5 rounded-full flex items-center gap-1";
-                        
-                        switch(type) {
-                          case 'gesetzlich geschützt':
-                            return `${baseStyle} bg-red-100 text-red-800`;
-                          case 'ökologisch hochwertig':
-                            return `${baseStyle} bg-orange-100 text-orange-800`;
-                          case 'ökologisch niedrigwertig':
-                            return `${baseStyle} bg-green-100 text-green-800`;
-                          default:
-                            return `${baseStyle} bg-gray-100 text-gray-600`;
-                        }
-                      };
-
-                      return (
-                        <div className={getStatusStyle(status)}>
-                          <CheckCircle2 className="w-4 h-4" />
-                          {status}
-                        </div>
-                      );
-                    })()}
+                    {metadata.analyseErgebnis?.schutzstatus && (
+                      <div className={getStatusStyle(normalizeSchutzstatus(metadata.analyseErgebnis.schutzstatus))}>
+                        <CheckCircle2 className="w-4 h-4" />
+                        {normalizeSchutzstatus(metadata.analyseErgebnis.schutzstatus)}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -414,7 +412,7 @@ ${metadata.analyseErgebnis.evidenz?.dagegen_spricht?.length ? '\nDagegen spricht
                         description={schutzstatusTooltips.schutzstatus?.description || ''}
                         details={{}}
                       />
-{`- ${metadata.analyseErgebnis.schutzstatus || ''}`}
+{`- ${normalizeSchutzstatus(metadata.analyseErgebnis.schutzstatus)}`}
 
 {/*
                       <ParameterHeading 

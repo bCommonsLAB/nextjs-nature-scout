@@ -4,7 +4,7 @@ import { UserService } from '@/lib/services/user-service';
 
 /**
  * GET /api/users/hasAdvancedPermissions - Überprüft, ob der aktuelle Benutzer erweiterte Rechte hat
- * (Benutzer ist entweder Biologe, Admin oder Superadmin)
+ * (Benutzer ist entweder Experte, Admin oder Superadmin)
  */
 export async function GET(req: NextRequest) {
   try {

@@ -5,14 +5,16 @@ import { Card } from "@/components/ui/card";
 import { HabitatSchemaConfig } from "@/components/admin/config/HabitatSchemaConfig";
 import { PromptConfig } from "@/components/admin/config/PromptConfig";
 import { HabitatTypesConfig } from "@/components/admin/config/HabitatTypesConfig";
+import { HabitatGroupsConfig } from "@/components/admin/config/HabitatGroupsConfig";
 
 export function ConfigurationDashboard() {
   return (
     <Tabs defaultValue="schema" className="w-full">
-      <TabsList className="grid w-full grid-cols-3">
+      <TabsList className="grid w-full grid-cols-4">
+        <TabsTrigger value="types">Habitat-Typen</TabsTrigger>
+        <TabsTrigger value="groups">Habitat-Familien</TabsTrigger>
         <TabsTrigger value="schema">Analyse-Schema</TabsTrigger>
         <TabsTrigger value="prompts">Prompts</TabsTrigger>
-        <TabsTrigger value="types">Habitat-Typen</TabsTrigger>
       </TabsList>
       
       <TabsContent value="schema">
@@ -30,6 +32,12 @@ export function ConfigurationDashboard() {
       <TabsContent value="types">
         <Card className="p-6">
           <HabitatTypesConfig />
+        </Card>
+      </TabsContent>
+      
+      <TabsContent value="groups">
+        <Card className="p-6">
+          <HabitatGroupsConfig />
         </Card>
       </TabsContent>
     </Tabs>

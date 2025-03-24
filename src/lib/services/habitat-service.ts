@@ -6,6 +6,8 @@ export interface HabitatType {
   name: string;
   description: string;
   typicalSpecies: string[];
+  habitatFamilie?: string;
+  schutzstatus?: string;
 }
 
 export async function initializeHabitatTypes(): Promise<void> {

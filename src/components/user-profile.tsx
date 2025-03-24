@@ -15,15 +15,15 @@ export function UserProfileButton() {
         const adminResponse = await fetch('/api/users/isAdmin');
         const adminData = await adminResponse.json();
         
-        // Prüfen des Biologen-Status
-        const biologistResponse = await fetch('/api/users/isBiologist');
-        const biologistData = await biologistResponse.json();
+        // Prüfen des Experten-Status
+        const ExpertResponse = await fetch('/api/users/isExpert');
+        const ExpertData = await ExpertResponse.json();
 
         // Rolle basierend auf Berechtigungen setzen
         if (adminData.isAdmin) {
           setUserRole('Admin');
-        } else if (biologistData.isBiologist) {
-          setUserRole('Biologe');
+        } else if (ExpertData.isExpert) {
+          setUserRole('Experte');
         } else {
           setUserRole('Benutzer');
         }
@@ -42,7 +42,7 @@ export function UserProfileButton() {
     switch (role) {
       case 'Admin':
         return 'bg-blue-500 hover:bg-blue-600';
-      case 'Biologe':
+      case 'Experte':
         return 'bg-green-500 hover:bg-green-600';
       default:
         return 'bg-gray-500 hover:bg-gray-600';
