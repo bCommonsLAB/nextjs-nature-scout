@@ -11,10 +11,10 @@ export function ConfigurationDashboard() {
   return (
     <Tabs defaultValue="schema" className="w-full">
       <TabsList className="grid w-full grid-cols-4">
-        <TabsTrigger value="schema">Analyse-Schema</TabsTrigger>
-        <TabsTrigger value="prompts">Prompts</TabsTrigger>
         <TabsTrigger value="types">Habitat-Typen</TabsTrigger>
         <TabsTrigger value="groups">Habitat-Familien</TabsTrigger>
+        <TabsTrigger value="schema">Analyse-Schema</TabsTrigger>
+        <TabsTrigger value="prompts">Prompts</TabsTrigger>
       </TabsList>
       
       <TabsContent value="schema">

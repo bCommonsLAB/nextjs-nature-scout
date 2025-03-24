@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { IUser } from '@/lib/db/models/user';
+import { IUser } from '@/lib/services/user-service';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { Trash2, RefreshCw, AlertCircle, Edit } from 'lucide-react';

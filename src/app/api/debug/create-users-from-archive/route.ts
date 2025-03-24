@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/db/mongodb';
-import { User } from '@/lib/db/models/user';
-import mongoose from 'mongoose';
+import { connectToDatabase } from '@/lib/services/db';
+import { UserService } from '@/lib/services/user-service';
 
 interface UserResult {
   name: string;
@@ -32,10 +31,10 @@ export async function GET() {
   
   try {
     // Verbinde zur Datenbank
-    await connectToDatabase();
+    const db = await connectToDatabase();
     
     // Hole die Analyse-Jobs Sammlung (anstatt habitat)
-    const analyseJobsCollection = mongoose.connection.collection('analyseJobs');
+    const analyseJobsCollection = db.collection('analyseJobs');
     
     // Debug: Prüfe, ob die Collection existiert und Dokumente enthält
     const countDocs = await analyseJobsCollection.countDocuments();
@@ -93,9 +92,8 @@ export async function GET() {
       }
       
       // Prüfe, ob ein Benutzer mit dieser E-Mail bereits existiert
-      // Verwende den UserService statt direktem Mongoose-Aufruf
-      const userCollection = mongoose.connection.collection('users');
-      const existingUser = await userCollection.findOne({ email });
+      // Verwende UserService statt direkter Mongoose-Abfrage
+      const existingUser = await UserService.findByEmail(email);
       
       if (existingUser) {
         console.log(`Benutzer mit E-Mail ${email} existiert bereits`);
@@ -121,15 +119,14 @@ export async function GET() {
       // Generiere eine temporäre Clerk-ID, die später aktualisiert wird
       const tempClerkId = `temp_${Math.random().toString(36).substring(2, 10)}`;
       
-      // Erstelle einen neuen Benutzer
-      const newUser = new User({
+      // Erstelle einen neuen Benutzer mit UserService
+      await UserService.createUser({
         clerkId: tempClerkId,
         email,
         name,
         role: 'user'
       });
       
-      await newUser.save();
       console.log(`Benutzer erstellt: ${name} (${email})`);
       ergebnisse.erstellt++;
       ergebnisse.benutzer.push({
