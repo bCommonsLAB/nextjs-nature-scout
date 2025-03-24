@@ -5,6 +5,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { Footer } from '@/components/layout/footer';  
 import '../styles/leaflet-custom.css';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet-draw/dist/leaflet.draw.css'; // CSS für Leaflet Draw
 import './leaflet-custom.css';  // Ihre custom Styles
 import { ClerkProvider } from "@clerk/nextjs";
 

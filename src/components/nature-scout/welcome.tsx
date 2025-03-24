@@ -1,87 +1,62 @@
 "use client";
 
 import { useEffect } from "react";
+import Image from "next/image";
+import { useUser } from "@clerk/nextjs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { NatureScoutData } from "@/types/nature-scout";
 
-interface UserData {
-  erfassungsperson: string;
-  email: string;
-}
-
 export function Welcome({ metadata, setMetadata }: { metadata: NatureScoutData; setMetadata: React.Dispatch<React.SetStateAction<NatureScoutData>> }) {
-  // Lade gespeicherte Benutzerdaten beim ersten Render
+  const { user, isLoaded } = useUser();
+  
+  // Lade Benutzerdaten vom aktuellen angemeldeten Benutzer
   useEffect(() => {
-    const savedUserData = localStorage.getItem('NatureScoutUserData');
-    if (savedUserData) {
-      try {
-        const userData: UserData = JSON.parse(savedUserData);
-        setMetadata(prev => ({
-          ...prev,
-          erfassungsperson: userData.erfassungsperson,
-          email: userData.email
-        }));
-      } catch (e) {
-        console.error('Fehler beim Laden der Benutzerdaten:', e);
-      }
+    if (isLoaded && user) {
+      // Automatisch Daten vom angemeldeten Benutzer übernehmen
+      setMetadata(prev => ({
+        ...prev,
+        erfassungsperson: user.fullName || "",
+        email: user.primaryEmailAddress?.emailAddress || ""
+      }));
     }
-  }, [setMetadata]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setMetadata(prev => {
-      const newMetadata = { ...prev, [name]: value };
-      
-      // Speichere nur Benutzerdaten im localStorage
-      const userDataToSave: UserData = {
-        erfassungsperson: name === 'erfassungsperson' ? value : newMetadata.erfassungsperson,
-        email: name === 'email' ? value : newMetadata.email
-      };
-      localStorage.setItem('NatureScoutUserData', JSON.stringify(userDataToSave));
-      
-      return newMetadata;
-    });
-  };
+  }, [setMetadata, isLoaded, user]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Alert>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <Alert className="h-fit order-2 md:order-1">
         <AlertDescription>
           <div className="space-y-4">
-            <p className="mt-4">
-              In diesem Frageassistent werden Sie gebeten, einige Merkmale eines Naturhabitats zu erfassen und mehrere Bilder hochzuladen. 
-              Wir werden diese Bilder analysieren, um einzuschätzen, ob das Habitat schützenswert ist.
-            </p>
-            <div className="space-y-4">
-              <div className="grid w-full items-center gap-1.5">
-                <Label htmlFor="erfassungsperson">Name der Erfassungsperson</Label>
-                <Input
-                  type="text"
-                  id="erfassungsperson"
-                  name="erfassungsperson"
-                  value={metadata.erfassungsperson}
-                  onChange={handleChange}
-                  autoComplete="name"
-                />
-              </div>
-              <div className="grid w-full items-center gap-1.5">
-                <Label htmlFor="email">Email Adresse</Label>
-                <Input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={metadata.email}
-                  onChange={handleChange}
-                  placeholder="name@beispiel.de"
-                  autoComplete="email"
-                />
-              </div>
+            <div>
+              <p className="mb-3">
+                {isLoaded && user?.fullName ? `Hallo ${user.fullName},` : 'Hallo,'}
+              </p>
+              <p className="mb-3">
+                in diesem Frageassistenten werden Sie gebeten, einige Standort-Merkmale eines Naturhabitats zu erfassen 
+                und mehrere Bilder hochzuladen. Wir werden diese Bilder analysieren, um einzuschätzen, ob das 
+                Habitat schützenswert ist.
+              </p>
+              <p className="mb-3">
+                Wenn Sie Ihre Eingaben im letzten Schritt bestätigen, dann wird dieses Habitat Arbeitvon Experten verifiziert 
+                und Sie bekommen eine Bestätigungs-E-Mail an: <span className="font-semibold">{metadata.email || (isLoaded && user?.primaryEmailAddress?.emailAddress)}</span>.
+              </p>
+              <p className="mb-3">
+                Vielen Dank für diese wertvolle und gewissenhafte Erfassung.<br/>
+                Ihr NatureScout Team
+              </p>
             </div>
           </div>
         </AlertDescription>
       </Alert>
+
+      <div className="relative aspect-video overflow-hidden rounded-lg shadow-md order-1 md:order-2">
+        <Image 
+          src="/images/welcome-nature.JPG" 
+          alt="Willkommensbild" 
+          fill
+          className="object-cover"
+          priority
+        />
+      </div>
     </div>
   );
-} 
+}

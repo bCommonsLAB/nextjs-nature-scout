@@ -8,6 +8,10 @@ export interface NatureScoutData {
   latitude: number;
   longitude: number;
   standort: string;
+  elevation?: string;
+  exposition?: string;
+  slope?: string;
+  polygonPoints?: Array<[number, number]>;
   bilder: Bild[];
   analyseErgebnis?: AnalyseErgebnis;
   llmInfo?: llmInfo;
@@ -18,6 +22,9 @@ export interface GeocodingResult {
   standort: string;
   gemeinde: string;
   flurname: string;
+  elevation?: string;
+  exposition?: string;
+  slope?: string;
 }
 
 
