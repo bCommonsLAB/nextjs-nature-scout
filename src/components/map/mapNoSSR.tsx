@@ -77,11 +77,20 @@ function MapNoSSR({
   useEffect(() => {
     if (mapRef.current === null && mapContainerRef.current !== null) {
       // Leaflet-Map initialisieren
-      mapRef.current = L.map(mapContainerRef.current).setView(position, zoom);
+      mapRef.current = L.map(mapContainerRef.current, {
+        maxZoom: 19, // Erlaubt einen sehr hohen Zoom-Level
+        minZoom: 3
+      }).setView(position, zoom);
       
       // Basis OpenStreetMap Layer
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(mapRef.current);
+
+      // Mapbox Satellite Layer für höhere Zoom-Level
+      L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4M29iazA2Z2gycXA4N2pmbDZmangifQ.-g_vE53SD2WrJ6tFX7QHmA', {
+        attribution: '&copy; Mapbox',
+        maxZoom: 22
       }).addTo(mapRef.current);
 
       // Südtiroler WMS-Layer hinzufügen für aktuelle Orthofotos
@@ -91,7 +100,7 @@ function MapNoSSR({
           format: 'image/png',
           transparent: true,
           version: '1.3.0',
-          opacity: 0.6, // 60% Deckkraft für Transparenz
+          opacity: 0.7, // 60% Deckkraft für Transparenz
           attribution: '&copy; Autonome Provinz Bozen - Südtirol'
         }).addTo(mapRef.current);
       } catch (error) {

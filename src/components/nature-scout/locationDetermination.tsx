@@ -18,11 +18,17 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [editMode, setEditMode] = useState<boolean>(false);
   const [polygonPoints, setPolygonPoints] = useState<Array<[number, number]>>(metadata.polygonPoints || []);
+  // Neuer Status für die UI-Steuerung
+  const [uiState, setUiState] = useState<'welcome' | 'drawing' | 'complete'>(
+    metadata.polygonPoints && metadata.polygonPoints.length > 0 ? 'complete' : 'welcome'
+  );
+  const [showInstructions, setShowInstructions] = useState<boolean>(true);
   
   const debounceTimer = useRef<NodeJS.Timeout>();
 
   // Vereinfachter useEffect, der nur einmal beim Mount ausgeführt wird
   useEffect(() => {
+    // GPS-Position nur abrufen, wenn keine Koordinaten gesetzt sind
     if (metadata.latitude === 0 && metadata.longitude === 0) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -34,17 +40,67 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
             latitude,
             longitude
           }));
-          getGeoDataFromCoordinates(latitude, longitude);
+          
+          // Keine automatische Geodatenermittlung beim ersten Laden
+          // getGeoDataFromCoordinates(latitude, longitude);
         },
         () => {
           // Bei Fehler werden die Default-Werte verwendet (bereits im State gesetzt)
-          getGeoDataFromCoordinates(initialPosition[0], initialPosition[1]);
+          // Keine automatische Geodatenermittlung beim ersten Laden
+          // getGeoDataFromCoordinates(initialPosition[0], initialPosition[1]);
         }
       );
     } else {
-      getGeoDataFromCoordinates(metadata.latitude, metadata.longitude);
+      // Vorhandene Koordinaten verwenden, aber keine Geodaten abrufen
+      // getGeoDataFromCoordinates(metadata.latitude, metadata.longitude);
+      
+      // Geodaten nur abrufen, wenn bereits ein Polygon existiert (vorherige Bearbeitung)
+      if (metadata.polygonPoints && metadata.polygonPoints.length > 0) {
+        getGeoDataFromCoordinates(metadata.latitude, metadata.longitude);
+      }
     }
   }, []); // Leere Dependency Array - wird nur beim Mount ausgeführt
+
+  // Neue Funktion zum Starten des Zeichenmodus
+  const startDrawingMode = (e: React.MouseEvent) => {
+    // Verhindere Standard-Formularverhalten
+    e.preventDefault();
+    
+    setEditMode(true);
+    setUiState('drawing');
+  };
+
+  // Neue Funktion zum Abschließen des Polygons
+  const handlePolygonComplete = (e: React.MouseEvent) => {
+    // Verhindere Standard-Formularverhalten
+    e.preventDefault();
+    
+    // Berechne Mittelpunkt des Polygons
+    if (polygonPoints.length > 0) {
+      const centerPoint = calculatePolygonCenter(polygonPoints);
+      setCurrentPosition(centerPoint);
+      setInitialPosition(centerPoint);
+      
+      // Metadaten aktualisieren
+      setMetadata(prevMetadata => ({
+        ...prevMetadata,
+        latitude: centerPoint[0],
+        longitude: centerPoint[1],
+      }));
+      
+      // Geodaten für den Mittelpunkt erst jetzt abrufen
+      getGeoDataFromCoordinates(centerPoint[0], centerPoint[1]);
+    }
+    setUiState('complete');
+    setEditMode(false); // Zeichenmodus beenden
+  };
+
+  // Hilfsfunktion zur Berechnung des Mittelpunkts
+  const calculatePolygonCenter = (points: Array<[number, number]>): [number, number] => {
+    const latSum = points.reduce((sum, point) => sum + point[0], 0);
+    const lngSum = points.reduce((sum, point) => sum + point[1], 0);
+    return [latSum / points.length, lngSum / points.length];
+  };
 
   // Polygonpunkte-Handler
   const handlePolygonChange = useCallback((newPoints: Array<[number, number]>) => {
@@ -168,9 +224,9 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
       longitude: newCenter[1],
     }));
     
-    // Verwende die gedebouncte Version
-    debouncedGetGeoData(newCenter[0], newCenter[1]);
-  }, [debouncedGetGeoData]);
+    // Entferne die automatische Geo-Datenermittlung während der Kartenbewegung
+    // debouncedGetGeoData(newCenter[0], newCenter[1]);
+  }, [debouncedGetGeoData, setMetadata]);
 
   // Cleanup beim Unmount
   useEffect(() => {
@@ -183,6 +239,14 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
 
   return (
     <div className="space-y-4">
+      {/* Willkommensnachricht */}
+      {showInstructions && uiState === 'welcome' && (
+        <div className="rounded-lg bg-blue-50 p-4 mb-4 text-sm">
+          <h3 className="font-medium mb-2">Willkommen bei der Standortbestimmung</h3>
+          <p>Falls notwendig, verschieben Sie den Kartenausschnitt zu Ihrem aktuellen Standort und zoomen Sie so weit wie möglich hinein. Wenn Sie bereit sind, klicken Sie auf "Habitatumriss erfassen", um fortzufahren.</p>
+        </div>
+      )}
+
       <div className="h-[50vh] min-h-[400px] rounded-lg overflow-hidden relative">
         <div className="absolute inset-0">
           <MapNoSSR 
@@ -198,12 +262,31 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
       <div className="bg-gray-50 p-4 rounded-lg space-y-2">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
-            <Switch 
-              id="edit-mode" 
-              checked={editMode}
-              onCheckedChange={setEditMode}
-            />
-            <Label htmlFor="edit-mode">Fläche zeichnen</Label>
+            {uiState === 'welcome' ? (
+              <>
+                <Button 
+                  onClick={startDrawingMode}
+                  variant="default"
+                  type="button"
+                >
+                  Habitatumriss erfassen
+                </Button>
+              </>
+            ) : (
+              <>
+                <Switch 
+                  id="edit-mode" 
+                  checked={editMode}
+                  onCheckedChange={(checked) => {
+                    setEditMode(checked);
+                    if (checked) {
+                      setUiState('drawing');
+                    }
+                  }}
+                />
+                <Label htmlFor="edit-mode">Habitatumriss bearbeiten</Label>
+              </>
+            )}
           </div>
           {polygonPoints.length > 0 && (
             <div className="text-sm text-gray-600">
@@ -211,15 +294,40 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
             </div>
           )}
         </div>
+
+        {/* Anleitung im Zeichenmodus */}
+        {uiState === 'drawing' && showInstructions && (
+          <div className="bg-yellow-50 p-3 rounded-md mt-2 mb-4">
+            <p className="text-sm">Zeichnen Sie jetzt eine Umrisslinie um das Habitat, einfach durch Auswahl von Eckpunkten im Uhrzeigersinn. Wenn Sie fertig sind, klicken Sie unten auf "Umriss fertig".</p>
+          </div>
+        )}
         
+        {/* Button zum Abschließen des Umrisses */}
+        {editMode && polygonPoints.length > 0 && (
+          <Button 
+            className="w-full mt-4 mb-4" 
+            onClick={handlePolygonComplete}
+            type="button"
+          >
+            Umriss fertig
+          </Button>
+        )}
+        
+        {/* Basisinformationen - immer anzeigen */}
         <p className="text-sm font-medium">Aktuelle Position:</p>
         <p className="text-sm">Lat: {currentPosition[0]?.toFixed(6)}</p>
         <p className="text-sm">Lng: {currentPosition[1]?.toFixed(6)}</p>
-        <p className="text-sm">Gemeinde: {metadata.gemeinde}</p>
-        <p className="text-sm">Standort: {metadata.standort}</p>
-        <p className="text-sm">Höhe über Meer: {metadata.elevation || elevation}</p>
-        <p className="text-sm">Hangneigung: {metadata.slope || slope}</p>
-        <p className="text-sm">Exposition: {metadata.exposition || exposition}</p>
+        
+        {/* Detaillierte Geoinformationen - nur anzeigen, wenn sie verfügbar sind oder nach Polygon-Erstellung */}
+        {uiState === 'complete' && (
+          <>
+            <p className="text-sm">Gemeinde: {metadata.gemeinde !== 'unbekannt' ? metadata.gemeinde : ''}</p>
+            <p className="text-sm">Standort: {metadata.standort !== 'Standort konnte nicht ermittelt werden' ? metadata.standort : ''}</p>
+            <p className="text-sm">Höhe über Meer: {metadata.elevation !== 'unbekannt' ? metadata.elevation : 'unbekannt'}</p>
+            <p className="text-sm">Hangneigung: {metadata.slope !== 'unbekannt' ? metadata.slope : 'unbekannt'}</p>
+            <p className="text-sm">Exposition: {metadata.exposition !== 'unbekannt' ? metadata.exposition : 'unbekannt'}</p>
+          </>
+        )}
         
         <div className="pt-4">
           <Button 
