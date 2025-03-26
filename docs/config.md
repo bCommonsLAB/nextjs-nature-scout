@@ -1,3 +1,8 @@
+next.config.ts:
+
+
+
+
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -25,10 +30,6 @@ const nextConfig: NextConfig = {
     eslint: {
         // Warnung: Aktiviere das nur für die Produktion, für die Entwicklung sollte ESLint aktiv bleiben
         ignoreDuringBuilds: true,
-    },
-    typescript: {
-        // Warnung: Aktiviere das nur für die Produktion, für die Entwicklung sollte TypeScript aktiv bleiben
-        ignoreBuildErrors: true,
     }
 };
 

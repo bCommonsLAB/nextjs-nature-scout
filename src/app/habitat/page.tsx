@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
@@ -60,7 +60,7 @@ interface HabitateData {
   };
 }
 
-export default function HabitatPage() {
+function HabitatPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -654,5 +654,13 @@ export default function HabitatPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function HabitatPage() {
+  return (
+    <Suspense fallback={<div className="w-full h-screen flex items-center justify-center">Laden...</div>}>
+      <HabitatPageContent />
+    </Suspense>
   );
 } 

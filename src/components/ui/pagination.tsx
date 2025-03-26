@@ -9,14 +9,13 @@ interface PaginationProps {
 export function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) {
   // Erzeuge Seitenzahlen-Array
   const pages: number[] = [];
-  const maxVisiblePages = 5;
   
-  let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-  let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+  const pageSpread = 2; // Number of pages to show before and after current page
+  let startPage = Math.max(1, currentPage - pageSpread);
+  const endPage = Math.min(totalPages, startPage + pageSpread * 2);
   
-  if (endPage - startPage + 1 < maxVisiblePages) {
-    startPage = Math.max(1, endPage - maxVisiblePages + 1);
-  }
+  // Adjust startPage to maintain consistent number of pagination buttons
+  startPage = Math.max(1, endPage - pageSpread * 2);
   
   for (let i = startPage; i <= endPage; i++) {
     pages.push(i);
