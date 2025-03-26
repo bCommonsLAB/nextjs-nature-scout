@@ -1,6 +1,5 @@
 import { connectToDatabase } from './db';
 import { ObjectId } from 'mongodb';
-import { z } from 'zod';
 import { getHabitatTypeDescription } from './habitat-service';
 
 export interface AnalysisSchema {
@@ -8,7 +7,7 @@ export interface AnalysisSchema {
   name: string;
   version: string;
   description: string;
-  schema: Record<string, any>;  // Das Zod-Schema als JSON
+  schema: Record<string, unknown>;  // Das Schema als JSON
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,21 +33,26 @@ export async function initializeAnalysisConfigs(): Promise<void> {
   const promptCount = await promptCollection.countDocuments();
   
   if (habitatSchemaCount > 0 && promptCount > 0) {
-    console.log('Konfigurationen existieren bereits:', { 
-      habitatSchemaCount, 
-      promptCount 
-    });
+    // Logging nur im Development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Konfigurationen existieren bereits:', { 
+        habitatSchemaCount, 
+        promptCount 
+      });
+    }
     return;
   }
 
-  console.log('Initialisiere Konfigurationen...');
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Initialisiere Konfigurationen...');
+  }
 
   try {
     // Hole die Habitattypen-Beschreibung aus der Datenbank
     const habitatTypeDesc = await getHabitatTypeDescription();
 
     // Initial-Schema für die Habitat-Analyse
-    const habitatAnalysisSchema = {
+    const habitatAnalysisSchema: Omit<AnalysisSchema, '_id'> = {
       name: 'habitat-analysis',
       version: '1.0.0',
       description: 'Schema für die Analyse von Habitattypen',

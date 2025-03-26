@@ -4,48 +4,68 @@ import L from 'leaflet';
 import 'leaflet-draw';
 
 // Typendefinitionen für Leaflet Draw
+type DrawOptions = {
+  position?: string;
+  draw?: {
+    polyline?: boolean | Record<string, unknown>;
+    polygon?: boolean | {
+      allowIntersection?: boolean;
+      showArea?: boolean;
+      drawError?: {
+        color?: string;
+        message?: string;
+      };
+      shapeOptions?: {
+        color?: string;
+        weight?: number;
+        dashArray?: string;
+      };
+    };
+    rectangle?: boolean | Record<string, unknown>;
+    circle?: boolean | Record<string, unknown>;
+    marker?: boolean | Record<string, unknown>;
+    circlemarker?: boolean | Record<string, unknown>;
+  };
+  edit?: {
+    featureGroup: L.FeatureGroup;
+    remove?: boolean;
+  };
+};
+
+// Erweitere die Leaflet-Typen
 declare module 'leaflet' {
   namespace Control {
-    interface DrawConstructorOptions {
-      position?: string;
-      draw?: {
-        polyline?: boolean | any;
-        polygon?: boolean | {
-          allowIntersection?: boolean;
-          showArea?: boolean;
-          drawError?: {
-            color?: string;
-            message?: string;
-          };
-          shapeOptions?: {
-            color?: string;
-            weight?: number;
-            dashArray?: string;
-          };
-        };
-        rectangle?: boolean | any;
-        circle?: boolean | any;
-        marker?: boolean | any;
-        circlemarker?: boolean | any;
-      };
-      edit?: {
-        featureGroup: L.FeatureGroup;
-        remove?: boolean;
-      };
+    interface DrawConstructorOptions extends DrawOptions {}
+    
+    class DrawControl extends L.Control {
+      constructor(options?: DrawConstructorOptions);
     }
 
-    class Draw extends L.Control {
-      constructor(options?: DrawConstructorOptions);
+    class LocationSteps extends L.Control {
+      constructor(options?: LocationStepsOptions);
     }
   }
 
   namespace Draw {
     namespace Event {
-      const CREATED: string;
-      const EDITED: string;
-      const DELETED: string;
+      const CREATED_EVENT: string;
+      const EDITED_EVENT: string;
+      const DELETED_EVENT: string;
     }
   }
+}
+
+interface LocationStepsOptions {
+  position?: string;
+  drawnItems?: L.FeatureGroup;
+  onStartDrawing?: () => void;
+  onSavePolygon?: () => void;
+  onCancelDrawing?: () => void;
+  onPolygonChange?: (points: Array<[number, number]>) => void;
+  isDrawing?: boolean;
+  hasPolygon?: boolean;
+  onSavePolygonWithPoints?: (points: Array<[number, number]>) => void;
+  onRestartDrawing?: () => void;
 }
 
 interface MapNoSSRProps {
@@ -65,50 +85,32 @@ interface MapNoSSRProps {
 }
 
 // Custom Control für die Standortbestimmungs-Buttons
-L.Control.LocationSteps = L.Control.extend({
+const LocationStepsControl = L.Control.extend({
   options: {
     position: 'bottomleft',
-    drawnItems: null
-  },
+    drawnItems: undefined
+  } as LocationStepsOptions,
 
-  initialize: function(options: {
-    onStartDrawing?: () => void;
-    onSavePolygon?: () => void;
-    onCancelDrawing?: () => void;
-    onPolygonChange?: (points: Array<[number, number]>) => void;
-    isDrawing?: boolean;
-    hasPolygon?: boolean;
-    drawnItems?: L.FeatureGroup;
-    onSavePolygonWithPoints?: (points: Array<[number, number]>) => void;
-  }) {
+  initialize: function(options: LocationStepsOptions) {
     L.setOptions(this, options);
   },
 
   onAdd: function() {
-    console.log('LocationSteps Control: onAdd wird aufgerufen', {
-      options: this.options
-    });
-
     const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control location-steps-control');
     container.style.padding = '3px 8px';
     container.style.backgroundColor = 'white';
     container.style.boxShadow = '0 1px 5px rgba(0,0,0,0.4)';
     container.style.borderRadius = '4px';
     
-    // Wichtig: Wir überschreiben nicht die Klassen, sondern fügen neue hinzu
     container.classList.add('leaflet-control-layers');
     container.classList.add('location-steps-control');
+    container.id = `location-steps-control-${new Date().getTime()}`;
     
-    // Eindeutige ID für bessere Identifikation
-    container.id = 'location-steps-control-' + new Date().getTime();
-    
-    // Verhindern, dass Container-Events auf die Map durchschlagen
     L.DomEvent.disableClickPropagation(container);
     L.DomEvent.disableScrollPropagation(container);
     
-    // Wichtig: Stellen wir sicher, dass der Zoom nicht beeinträchtigt wird
-    const map = this._map as any;
-    if (map && map.scrollWheelZoom) {
+    const map = (this as any)._map as L.Map;
+    if (map?.scrollWheelZoom) {
       container.addEventListener('mouseenter', () => {
         if (map.scrollWheelZoom) {
           map.scrollWheelZoom.enable();
@@ -116,51 +118,39 @@ L.Control.LocationSteps = L.Control.extend({
       });
     }
 
-    // Buttons Container
     const buttonContainer = L.DomUtil.create('div', '', container);
     buttonContainer.style.display = 'flex';
     buttonContainer.style.flexDirection = 'column';
     buttonContainer.style.gap = '4px';
 
-    console.log('LocationSteps Control: Button Container erstellt, isDrawing:', this.options.isDrawing);
-
-    if (!this.options.isDrawing) {
-      console.log('LocationSteps Control: Erstelle Start-Button');
-      // Start Button - nur anzeigen wenn nicht im Zeichenmodus
+    const options = this.options as LocationStepsOptions;
+    if (!options.isDrawing) {
       const startButton = this.createButton(
         'Habitatumriss erfassen',
         true,
         () => {
-          console.log('Start-Button geklickt');
-          this.options.onStartDrawing?.();
+          options.onStartDrawing?.();
         }
       );
       buttonContainer.appendChild(startButton);
     } else {
-      console.log('LocationSteps Control: Erstelle Zeichenmodus-Buttons');
-      // Buttons für den Zeichenmodus
       const saveButton = this.createButton(
         'Umrisslinie speichern',
         true,
         () => {
-          console.log('Speichern-Button geklickt');
-          // Aktives Polygon aus der FeatureGroup holen
-          if (this.options.drawnItems) {
-            this.options.drawnItems.eachLayer((layer: any) => {
+          if (options.drawnItems) {
+            options.drawnItems.eachLayer((layer: L.Layer) => {
               if (layer instanceof L.Polygon) {
                 const latlngs = layer.getLatLngs()[0];
                 if (Array.isArray(latlngs)) {
                   const points = latlngs.map((p: L.LatLng): [number, number] => [p.lat, p.lng]);
-                  console.log('Extrahierte Punkte beim Speichern:', points);
                   
-                  // Erst die Punkte übergeben
-                  if (this.options.onPolygonChange) {
-                    this.options.onPolygonChange(points);
+                  if (options.onPolygonChange) {
+                    options.onPolygonChange(points);
                   }
                   
-                  // Speichern aufrufen und direkt die Punkte übergeben (ohne auf State-Update zu warten)
-                  if (this.options.onSavePolygon) {
-                    this.options.onSavePolygonWithPoints?.(points);
+                  if (options.onSavePolygon) {
+                    options.onSavePolygonWithPoints?.(points);
                   }
                 }
               }
@@ -174,8 +164,7 @@ L.Control.LocationSteps = L.Control.extend({
         'Neu beginnen',
         true,
         () => {
-          console.log('Neu-beginnen-Button geklickt');
-          this.options.onRestartDrawing?.();
+          options.onRestartDrawing?.();
         }
       );
       buttonContainer.appendChild(restartButton);
@@ -184,14 +173,12 @@ L.Control.LocationSteps = L.Control.extend({
         'Abbrechen',
         true,
         () => {
-          console.log('Abbrechen-Button geklickt');
-          this.options.onCancelDrawing?.();
+          options.onCancelDrawing?.();
         }
       );
       buttonContainer.appendChild(cancelButton);
     }
 
-    console.log('LocationSteps Control: Container erstellt und konfiguriert');
     return container;
   },
 
@@ -212,7 +199,6 @@ L.Control.LocationSteps = L.Control.extend({
     button.style.marginBottom = '4px';
     button.style.minWidth = '180px';
 
-    // Eindeutige Daten-Attribute für spätere Identifikation
     button.dataset.controlType = 'location-steps';
     button.dataset.buttonType = text;
 
@@ -224,15 +210,21 @@ L.Control.LocationSteps = L.Control.extend({
       button.addEventListener('mouseout', () => {
         button.style.backgroundColor = text === 'Habitatumriss erfassen' || text === 'Umrisslinie speichern' ? '#22c55e' : '#9ca3af';
       });
+    } else {
+      button.style.opacity = '0.5';
+      button.style.cursor = 'not-allowed';
     }
 
     return button;
+  },
+
+  onRemove: function() {
+    // Cleanup
   }
 });
 
-L.control.locationSteps = function(options: any) {
-  return new (L.Control.LocationSteps as any)(options);
-};
+// Registriere den Control
+L.Control.LocationSteps = LocationStepsControl;
 
 // Komponente als benannte Funktion deklarieren
 function MapNoSSR({ 

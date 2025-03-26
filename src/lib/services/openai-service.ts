@@ -24,17 +24,11 @@ WICHTIG:
 
 async function urlToBase64(url: string): Promise<string> {
   try {
-    //console.log('🔄 Lade Bild:', url);
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     
     const arrayBuffer = await response.arrayBuffer();
     const base64String = Buffer.from(arrayBuffer).toString('base64');
-    
-    //console.log('✅ Base64 Konvertierung erfolgreich', {
-    //  originalUrl: url,
-    //  base64Length: base64String.length
-    //});
     
     return base64String;
   } catch (error) {
@@ -127,9 +121,9 @@ function getZodDescription(zodType: z.ZodTypeAny): string | undefined {
 }
 
 async function createHabitatAnalyseSchema(
-  analysisSchema: any, 
+  analysisSchema: { schema: Record<string, string | unknown> }, 
   habitatTypes: HabitatType[]
-): Promise<z.ZodObject<any, any>> {
+): Promise<z.ZodObject<z.ZodRawShape>> {
   // Erstelle eine formatierte Beschreibung der Habitat-Typen
   const habitatTypeDesc = habitatTypes
     .map(ht => `${ht.name}${ht.typicalSpecies.length > 0 ? `\n typischen Arten: ${ht.typicalSpecies.join(', ')}` : ''}`)
@@ -145,65 +139,64 @@ async function createHabitatAnalyseSchema(
       z.object({
         standort: z.object({
           hangneigung: z.string()
-            .describe(analysisSchema.schema.standort_hangneigung),
+            .describe(String(analysisSchema.schema.standort_hangneigung)),
           exposition: z.string()
-            .describe(analysisSchema.schema.standort_exposition),
+            .describe(String(analysisSchema.schema.standort_exposition)),
           bodenfeuchtigkeit: z.string()
-            .describe(analysisSchema.schema.standort_bodenfeuchtigkeit)
+            .describe(String(analysisSchema.schema.standort_bodenfeuchtigkeit)),
         }),
         pflanzenarten: z.array(
           z.object({
             name: z.string()
-              .describe(analysisSchema.schema.pflanzenarten_name),
+              .describe(String(analysisSchema.schema.pflanzenarten_name)),
             häufigkeit: z.string()
-              .describe(analysisSchema.schema.pflanzenarten_häufigkeit),
+              .describe(String(analysisSchema.schema.pflanzenarten_häufigkeit)),
             istzeiger: z.boolean()
-              .describe(analysisSchema.schema.pflanzenarten_istzeiger)
+              .describe(String(analysisSchema.schema.pflanzenarten_istzeiger)),
           })
-        ).describe(analysisSchema.schema.pflanzenarten),
+        ).describe(String(analysisSchema.schema.pflanzenarten)),
         vegetationsstruktur: z.object({
           höhe: z.string()
-            .describe(analysisSchema.schema.vegetationsstruktur_höhe),
+            .describe(String(analysisSchema.schema.vegetationsstruktur_höhe)),
           dichte: z.string()
-            .describe(analysisSchema.schema.vegetationsstruktur_dichte),
+            .describe(String(analysisSchema.schema.vegetationsstruktur_dichte)),
           deckung: z.string()
-            .describe(analysisSchema.schema.vegetationsstruktur_deckung)
-        }).describe(analysisSchema.schema.vegetationsstruktur),
+            .describe(String(analysisSchema.schema.vegetationsstruktur_deckung)),
+        }).describe(String(analysisSchema.schema.vegetationsstruktur)),
         blühaspekte: z.object({
           intensität: z.string()
-            .describe(analysisSchema.schema.blühaspekte_intensität),
+            .describe(String(analysisSchema.schema.blühaspekte_intensität)),
           anzahlfarben: z.number()
-            .int()
-            .describe(analysisSchema.schema.blühaspekte_anzahlfarben)
-        }).describe(analysisSchema.schema.blühaspekte),
+            .describe(String(analysisSchema.schema.blühaspekte_anzahlfarben)),
+        }).describe(String(analysisSchema.schema.blühaspekte)),
         nutzung: z.object({
-          beweidung: z.boolean()
-            .describe(analysisSchema.schema.nutzung_beweidung),
-          mahd: z.boolean()
-            .describe(analysisSchema.schema.nutzung_mahd),
-          düngung: z.boolean()
-            .describe(analysisSchema.schema.nutzung_düngung)
-        }).describe(analysisSchema.schema.nutzung),
+          beweidung: z.string()
+            .describe(String(analysisSchema.schema.nutzung_beweidung)),
+          mahd: z.string()
+            .describe(String(analysisSchema.schema.nutzung_mahd)),
+          düngung: z.string()
+            .describe(String(analysisSchema.schema.nutzung_düngung)),
+        }).describe(String(analysisSchema.schema.nutzung)),
         bewertung: z.object({
           artenreichtum: z.number()
-            .int()
-            .describe(analysisSchema.schema.bewertung_artenreichtum),
+            .describe(String(analysisSchema.schema.bewertung_artenreichtum)),
           konfidenz: z.number()
-            .int()
-            .describe(analysisSchema.schema.bewertung_konfidenz)
-        }).describe(analysisSchema.schema.bewertung),
+            .describe(String(analysisSchema.schema.bewertung_konfidenz)),
+        }).describe(String(analysisSchema.schema.bewertung)),
+        habitattyp: z.string()
+          .describe(String(analysisSchema.schema.habitattyp)),
         evidenz: z.object({
-          dafür_spricht: z.array(z.string())
-            .describe(analysisSchema.schema.evidenz_dafür_spricht),
-          dagegen_spricht: z.array(z.string())
-            .describe(analysisSchema.schema.evidenz_dagegen_spricht)
-        }).describe(analysisSchema.schema.evidenz),
+          dafür_spricht: z.string()
+            .describe(String(analysisSchema.schema.evidenz_dafür_spricht)),
+          dagegen_spricht: z.string()
+            .describe(String(analysisSchema.schema.evidenz_dagegen_spricht)),
+        }).describe(String(analysisSchema.schema.evidenz)),
         zusammenfassung: z.string()
-          .describe(analysisSchema.schema.zusammenfassung),
-          habitattyp: z.string()
-            .describe(`Wähle den passendsten Habitattyp aus, zu dem die bekannte Pflanzearten, die anderen Merkmale und das Bild am besten passen. Hier folgende Liste der Habitattypen:\n\n${habitatTypeDesc}`)
+          .describe(String(analysisSchema.schema.zusammenfassung)),
+        schutzstatus: z.string()
+          .describe(String(analysisSchema.schema.schutzstatus)),
       })
-    )
+    ),
   });
 }
 
@@ -291,7 +284,10 @@ async function performHabitatAnalysis(metadata: NatureScoutData, habitatTypes: H
       .join(', ');
     
     // Erstelle das Zod-Schema mit Beschreibungen aus der Datenbank und den Habitat-Typen
-    const habitatAnalyseSchema = await createHabitatAnalyseSchema(analysisSchema, habitatTypes);
+    const habitatAnalyseSchema = await createHabitatAnalyseSchema(
+      { schema: analysisSchema.schema as Record<string, string | unknown> }, 
+      habitatTypes
+    );
 
     const randomId = Math.floor(Math.random() * 9000000000) + 1000000000;
 

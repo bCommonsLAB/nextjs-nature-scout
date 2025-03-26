@@ -49,13 +49,13 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
           </>
         )}
         
-        {pages.map(page => (
+        {pages.map((page) => (
           <button
             key={page}
             onClick={() => onPageChange(page)}
             className={`px-3 py-1 border-t border-b border-l border-gray-300 ${
-              currentPage === page
-                ? 'bg-primary text-white'
+              page === currentPage
+                ? 'bg-blue-500 text-white hover:bg-blue-600'
                 : 'bg-white text-gray-500 hover:bg-gray-50'
             }`}
           >

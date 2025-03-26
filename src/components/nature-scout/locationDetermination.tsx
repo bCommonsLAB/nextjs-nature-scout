@@ -49,19 +49,19 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
         getGeoDataFromCoordinates(metadata.latitude, metadata.longitude);
       }
     }
-  }, []); // Leere Dependency Array - wird nur beim Mount ausgeführt
+  }, [metadata.latitude, metadata.longitude, metadata.polygonPoints, setMetadata]);
 
   // Neue Funktion zum Abbrechen des Zeichnens
-  const cancelDrawing = () => {
+  const cancelDrawing = useCallback(() => {
     console.log('cancelDrawing aufgerufen');
     setPolygonPoints([]);
     setIsDrawing(false);
     setUiState('welcome');
     console.log('Zeichnen abgebrochen', { isDrawing: false, uiState: 'welcome', polygonPoints: [] });
-  };
+  }, []);
 
   // Neue Funktion zum Neustarten des Zeichnens
-  const restartDrawing = () => {
+  const restartDrawing = useCallback(() => {
     console.log('restartDrawing aufgerufen');
     setPolygonPoints([]);
     setIsDrawing(true);
@@ -70,7 +70,7 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
       polygonPoints: []
     }));
     console.log('Zeichnen neu gestartet', { isDrawing: true, polygonPoints: [] });
-  };
+  }, [setMetadata]);
 
   // Neue Funktion zum direkten Speichern des Umrisses mit übergebenen Punkten
   const savePolygonWithPoints = useCallback((points: Array<[number, number]>) => {
@@ -121,7 +121,7 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
     
     // Standortinformationen automatisch abrufen
     getGeoDataFromCoordinates(centerLat, centerLng);
-  }, []);
+  }, [setMetadata]);
 
   // Polygonpunkte-Handler
   const handlePolygonChange = useCallback((newPoints: Array<[number, number]>) => {
@@ -174,7 +174,7 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
       centerLng,
       finalPoints 
     });
-  }, [polygonPoints]);
+  }, [polygonPoints, setMetadata]);
 
   async function getGeoDataFromCoordinates(lat: number, lon: number) {
     try {

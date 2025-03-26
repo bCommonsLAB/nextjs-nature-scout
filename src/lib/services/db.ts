@@ -1,8 +1,8 @@
-import { MongoClient } from 'mongodb';
+import { MongoClient, Db } from 'mongodb';
 
 let client: MongoClient | null = null;
 
-export async function connectToDatabase() {
+export async function connectToDatabase(): Promise<Db> {
   try {
     // Check if client exists and is connected
     if (client?.connect && client.db(process.env.MONGODB_DATABASE_NAME)) {
@@ -10,7 +10,12 @@ export async function connectToDatabase() {
     }
 
     // Wenn keine Verbindung besteht, neue aufbauen
-    client = new MongoClient(process.env.MONGODB_URI as string, {
+    const uri = process.env.MONGODB_URI;
+    if (!uri) {
+      throw new Error('MONGODB_URI ist nicht definiert');
+    }
+
+    client = new MongoClient(uri, {
       maxPoolSize: 10,
       minPoolSize: 5,
       serverSelectionTimeoutMS: 30000,
@@ -22,7 +27,12 @@ export async function connectToDatabase() {
 
     await client.connect();
     
-    return client.db(process.env.MONGODB_DATABASE_NAME);
+    const dbName = process.env.MONGODB_DATABASE_NAME;
+    if (!dbName) {
+      throw new Error('MONGODB_DATABASE_NAME ist nicht definiert');
+    }
+    
+    return client.db(dbName);
   } catch (error) {
     console.error('MongoDB Verbindungsfehler:', error);
     
@@ -39,7 +49,7 @@ export async function connectToDatabase() {
 }
 
 // Optional: Cleanup-Funktion für die Verbindung
-export async function closeDatabaseConnection() {
+export async function closeDatabaseConnection(): Promise<void> {
   if (client) {
     await client.close();
     client = null;

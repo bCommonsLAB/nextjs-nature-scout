@@ -19,7 +19,7 @@ export async function initializeHabitatTypes(): Promise<void> {
   if (count > 0) return;
 
   // Initial-Daten für Habitattypen
-  const habitatTypes: HabitatType[] = [
+  const habitatTypes: Omit<HabitatType, '_id'>[] = [
     {
       name: 'Verlandungsbereich',
       description: 'Übergangsbereich zwischen Gewässer und Land',
@@ -132,10 +132,13 @@ export async function getAllHabitatTypes(): Promise<HabitatType[]> {
     
     const habitatTypes = await collection.find({}).toArray();
     
-    console.log('Geladene Habitat-Typen:', {
-      count: habitatTypes.length,
-      types: habitatTypes.map(h => h.name)
-    });
+    // Logging nur im Development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Geladene Habitat-Typen:', {
+        count: habitatTypes.length,
+        types: habitatTypes.map(h => h.name)
+      });
+    }
     
     return habitatTypes;
   } catch (error) {
@@ -201,14 +204,14 @@ export async function deleteHabitatType(id: string): Promise<boolean> {
 
 export async function validateHabitatType(habitatName: string): Promise<boolean> {
   const db = await connectToDatabase();
-  const collection = db.collection('habitatTypes');
-  const count = await collection.countDocuments({ name: habitatName });
-  return count > 0;
+  const collection = db.collection<HabitatType>('habitatTypes');
+  const habitat = await collection.findOne({ name: habitatName });
+  return habitat !== null;
 }
 
 export async function getHabitatTypeDescription(): Promise<string> {
   const habitatTypes = await getAllHabitatTypes();
-  return habitatTypes.map(ht => 
-    `'${ht.name}': mit typischen Arten wie ${ht.typicalSpecies.join(', ')}`
-  ).join('\n');
+  return habitatTypes
+    .map(ht => `${ht.name}${ht.typicalSpecies.length > 0 ? `\n typischen Arten: ${ht.typicalSpecies.join(', ')}` : ''}`)
+    .join('\n\n');
 } 

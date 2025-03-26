@@ -102,7 +102,7 @@ export default function NatureScout() {
               latitude: habitatData.metadata.latitude || 0,
               longitude: habitatData.metadata.longitude || 0,
               standort: habitatData.metadata.standort || "",
-              bilder: habitatData.metadata.bilder?.map((bild: any) => ({
+              bilder: habitatData.metadata.bilder?.map((bild: Bild) => ({
                 imageKey: bild.imageKey || (bild.plantnetResult ? "Detailbild_1" : "Panoramabild"),
                 filename: bild.filename || "Bild.jpg",
                 url: bild.url,
@@ -113,7 +113,6 @@ export default function NatureScout() {
               llmInfo: habitatData.llmInfo || undefined,
               kommentar: habitatData.metadata.kommentar || ""
             });
-            console.log("Habitat-Daten geladen:", habitatData);
             
             // Direkt zum zweiten Schritt springen, wenn wir ein bestehendes Habitat bearbeiten
             setAktiverSchritt(1);
@@ -150,13 +149,7 @@ export default function NatureScout() {
       
     setMetadata(prev => ({
       ...prev,
-      bilder: [
-        ...prev.bilder.filter(bild => bild.imageKey !== imageKey),
-        neuesBild
-      ],
-      analyseErgebnis: undefined,
-      llmInfo: undefined,
-      kommentar: undefined
+      bilder: [...prev.bilder.filter(b => b.imageKey !== imageKey), neuesBild]
     }));
   };
 
@@ -167,7 +160,7 @@ export default function NatureScout() {
     setMetadata(prev => ({
       ...prev,
       analyseErgebnis: ergebnis,
-      llmInfo: llmInfo
+      llmInfo
     }));
   };
 
@@ -181,10 +174,7 @@ export default function NatureScout() {
   const handleDeleteImage = (imageKey: string) => {
     setMetadata(prev => ({
       ...prev,
-      bilder: prev.bilder.filter(bild => bild.imageKey !== imageKey),
-      analyseErgebnis: undefined,
-      llmInfo: undefined,
-      kommentar: undefined
+      bilder: prev.bilder.filter(b => b.imageKey !== imageKey)
     }));
   };
 
