@@ -100,14 +100,10 @@ export interface llmInfo {
   habitatStructuredOutput?: SimplifiedSchema;
   schutzstatusQuestion?: string;
   schutzstatusStructuredOutput?: SimplifiedSchema;
+  fullSchemaStructure?: any;
 }
 
 export interface AnalyseErgebnis {
-  standort: {
-    hangneigung: string;
-    exposition: string;
-    bodenfeuchtigkeit: string;
-  };
   pflanzenarten: Array<{
     name: string;
     häufigkeit: string;

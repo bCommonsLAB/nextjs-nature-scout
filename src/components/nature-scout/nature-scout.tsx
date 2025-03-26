@@ -94,6 +94,13 @@ export default function NatureScout() {
           
           // Setze die geladenen Daten in den State
           if (habitatData && habitatData.metadata) {
+            console.log("Geladene Habitat-Daten:", habitatData);
+            
+            // Extrahiere polygonPoints aus points oder polygonPoints
+            const polygonPoints = habitatData.metadata.polygonPoints || 
+                                  habitatData.metadata.points || 
+                                  [];
+            
             setMetadata({
               erfassungsperson: habitatData.metadata.erfassungsperson || "",
               email: habitatData.metadata.email || "",
@@ -111,7 +118,16 @@ export default function NatureScout() {
               })) || [],
               analyseErgebnis: habitatData.result || undefined,
               llmInfo: habitatData.llmInfo || undefined,
-              kommentar: habitatData.metadata.kommentar || ""
+              kommentar: habitatData.metadata.kommentar || "",
+              
+              // Wichtig: Polygonpunkte setzen
+              polygonPoints: polygonPoints,
+              
+              // Weitere Felder, die möglicherweise in den Metadaten vorhanden sind
+              exposition: habitatData.metadata.exposition || "",
+              elevation: habitatData.metadata.elevation || "",
+              slope: habitatData.metadata.slope || "",
+              plotsize: habitatData.metadata.plotsize || 0
             });
             
             // Direkt zum zweiten Schritt springen, wenn wir ein bestehendes Habitat bearbeiten
@@ -183,6 +199,12 @@ export default function NatureScout() {
       case 0:
         return <Welcome metadata={metadata} setMetadata={setMetadata} />;
       case 1:
+        console.log("LocationDetermination wird gerendert mit:", { 
+          latitude: metadata.latitude, 
+          longitude: metadata.longitude,
+          polygonPoints: metadata.polygonPoints,
+          hasPolygonPoints: metadata.polygonPoints && metadata.polygonPoints.length > 0
+        });
         return <LocationDetermination metadata={metadata} setMetadata={setMetadata} />;
       case 2:
         return (

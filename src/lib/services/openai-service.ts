@@ -102,7 +102,7 @@ function convertZodSchemaToSimpleDoc(schema: z.ZodObject<z.ZodRawShape>): Simpli
   return simplifiedDoc;
 }
 
-function getZodDescription(zodType: z.ZodTypeAny): string | undefined {
+function getZodDescription(zodType: z.ZodType): string | undefined {
   if (zodType instanceof z.ZodOptional) {
     return getZodDescription(zodType.unwrap());
   }
@@ -126,8 +126,8 @@ async function createHabitatAnalyseSchema(
 ): Promise<z.ZodObject<z.ZodRawShape>> {
   // Erstelle eine formatierte Beschreibung der Habitat-Typen
   const habitatTypeDesc = habitatTypes
-    .map(ht => `${ht.name}${ht.typicalSpecies.length > 0 ? `\n typischen Arten: ${ht.typicalSpecies.join(', ')}` : ''}`)
-    .join('\n\n');
+    .map(ht => `\n'${ht.name}'${ht.typicalSpecies.length > 0 ? ` bei typischen Arten wie ${ht.typicalSpecies.join(', ')}` : ''}`)
+    .join('\n');
 
   console.log('Verwende Habitat-Typen für Schema:', {
     count: habitatTypes.length,
@@ -137,14 +137,6 @@ async function createHabitatAnalyseSchema(
   return z.object({
     analyses: z.array(
       z.object({
-        standort: z.object({
-          hangneigung: z.string()
-            .describe(String(analysisSchema.schema.standort_hangneigung)),
-          exposition: z.string()
-            .describe(String(analysisSchema.schema.standort_exposition)),
-          bodenfeuchtigkeit: z.string()
-            .describe(String(analysisSchema.schema.standort_bodenfeuchtigkeit)),
-        }),
         pflanzenarten: z.array(
           z.object({
             name: z.string()
@@ -184,7 +176,7 @@ async function createHabitatAnalyseSchema(
             .describe(String(analysisSchema.schema.bewertung_konfidenz)),
         }).describe(String(analysisSchema.schema.bewertung)),
         habitattyp: z.string()
-          .describe(String(analysisSchema.schema.habitattyp)),
+          .describe(String(analysisSchema.schema.habitattyp).replace('{habitattypen}', habitatTypeDesc)),
         evidenz: z.object({
           dafür_spricht: z.string()
             .describe(String(analysisSchema.schema.evidenz_dafür_spricht)),
@@ -192,9 +184,7 @@ async function createHabitatAnalyseSchema(
             .describe(String(analysisSchema.schema.evidenz_dagegen_spricht)),
         }).describe(String(analysisSchema.schema.evidenz)),
         zusammenfassung: z.string()
-          .describe(String(analysisSchema.schema.zusammenfassung)),
-        schutzstatus: z.string()
-          .describe(String(analysisSchema.schema.schutzstatus)),
+          .describe(String(analysisSchema.schema.zusammenfassung))
       })
     ),
   });
@@ -208,17 +198,9 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
     const habitatAnalyse = await performHabitatAnalysis(metadata, habitatTypes);
     if (!habitatAnalyse.result) return habitatAnalyse;
 
-    // Hole den Habitat-Typ aus der Datenbank
-    const habitatType = habitatTypes.find(ht => ht.name === habitatAnalyse.result?.habitattyp);
-    
-    // Füge den Schutzstatus aus dem Habitat-Typ hinzu
-    const result = {
-      ...habitatAnalyse.result,
-      schutzstatus: habitatType?.schutzstatus || 'unbekannt'
-    };
 
     return {
-      result,
+      result: habitatAnalyse.result,
       llmInfo: habitatAnalyse.llmInfo
     };
   } catch (error: Error | unknown) {
@@ -262,6 +244,121 @@ async function getImageContents(metadata: NatureScoutData) {
     //});
 
   return imageContents;
+}
+
+// Neue Funktion zum Extrahieren der relevanten Schema-Informationen
+function extractSchemaQuestions(zodSchema: z.ZodObject<z.ZodRawShape>): Record<string, any> {
+  try {
+    const schema = zodSchema.shape;
+    if (!schema.analyses || !(schema.analyses instanceof z.ZodArray)) {
+      return { error: 'Ungültiges Schema-Format' };
+    }
+
+    // Nur die Felder aus dem analyses-Array extrahieren
+    const analysesElement = schema.analyses.element;
+    if (!(analysesElement instanceof z.ZodObject)) {
+      return { error: 'Ungültiges analyses-Element' };
+    }
+
+    const result: Record<string, any> = {};
+    const analysesShape = analysesElement.shape;
+
+    // Durch die Felder des analyses-Elements iterieren
+    for (const [key, field] of Object.entries(analysesShape)) {
+      if (field instanceof z.ZodObject) {
+        // Für verschachtelte Objekte rekursiv verarbeiten
+        const nestedFields: Record<string, any> = {};
+        
+        // Beschreibung des Objekts selbst
+        const objectDescription = getZodDescription(field);
+        if (objectDescription) {
+          nestedFields.description = objectDescription;
+        }
+        
+        // Durch die Unterfelder iterieren
+        for (const [nestedKey, nestedField] of Object.entries(field.shape)) {
+          if (nestedField instanceof z.ZodType) {
+            const fieldInfo: Record<string, any> = {
+              type: getZodTypeName(nestedField)
+            };
+            
+            const description = getZodDescription(nestedField);
+            if (description) {
+              fieldInfo.description = description;
+            }
+            
+            nestedFields[nestedKey] = fieldInfo;
+          }
+        }
+        
+        result[key] = nestedFields;
+      } else if (field instanceof z.ZodArray) {
+        // Arrays verarbeiten
+        const arrayInfo: Record<string, any> = {
+          type: 'array',
+        };
+        
+        const description = getZodDescription(field);
+        if (description) {
+          arrayInfo.description = description;
+        }
+        
+        // Element-Typ des Arrays
+        if (field.element instanceof z.ZodObject) {
+          const elementShape: Record<string, any> = {};
+          
+          for (const [elementKey, elementField] of Object.entries(field.element.shape)) {
+            if (elementField instanceof z.ZodType) {
+              const fieldInfo: Record<string, any> = {
+                type: getZodTypeName(elementField)
+              };
+              
+              const elementDesc = getZodDescription(elementField);
+              if (elementDesc) {
+                fieldInfo.description = elementDesc;
+              }
+              
+              elementShape[elementKey] = fieldInfo;
+            }
+          }
+          
+          arrayInfo.items = elementShape;
+        }
+        
+        result[key] = arrayInfo;
+      } else if (field instanceof z.ZodType) {
+        // Einfache Typen verarbeiten
+        const fieldInfo: Record<string, any> = {
+          type: getZodTypeName(field)
+        };
+        
+        const description = getZodDescription(field);
+        if (description) {
+          fieldInfo.description = description;
+        }
+        
+        result[key] = fieldInfo;
+      }
+    }
+    
+    return { analyses: result };
+  } catch (error) {
+    console.error('Fehler beim Extrahieren der Schema-Informationen:', error);
+    return { error: 'Fehler beim Extrahieren der Schema-Informationen' };
+  }
+}
+
+// Hilfsfunktion für die Ermittlung des lesbaren Typnamens
+function getZodTypeName(zodType: z.ZodType): string {
+  if (zodType instanceof z.ZodString) return 'string';
+  if (zodType instanceof z.ZodNumber) return 'number';
+  if (zodType instanceof z.ZodBoolean) return 'boolean';
+  if (zodType instanceof z.ZodArray) return 'array';
+  if (zodType instanceof z.ZodObject) return 'object';
+  if (zodType instanceof z.ZodOptional) {
+    return `${getZodTypeName(zodType.unwrap())} (optional)`;
+  }
+  return 'unknown';
 }
 
 async function performHabitatAnalysis(metadata: NatureScoutData, habitatTypes: HabitatType[]): Promise<openAiResult> {
@@ -347,12 +444,24 @@ async function performHabitatAnalysis(metadata: NatureScoutData, habitatTypes: H
       throw new Error("Das Analyseergebnis hat nicht das erwartete Format (analyses array fehlt oder leer)");
     }
 
-    const parsedResult: AnalyseErgebnis = {
+
+    let parsedResult: AnalyseErgebnis = {
       ...parsedAnalysis.analyses[0],
       kommentar: metadata.kommentar
     };
 
+    // Hole den Habitat-Typ aus der Datenbank
+    const habitatType = habitatTypes.find(ht => ht.name === parsedResult?.habitattyp);
+    
+    // Füge den Schutzstatus aus dem Habitat-Typ hinzu
+    parsedResult = {
+      ...parsedResult,
+      schutzstatus: habitatType?.schutzstatus || 'unbekannt'
+    };
+
+
     const simplifiedSchema = convertZodSchemaToSimpleDoc(habitatAnalyseSchema);
+    const readableSchema = extractSchemaQuestions(habitatAnalyseSchema);
 
     return { 
       result: parsedResult,
@@ -361,7 +470,8 @@ async function performHabitatAnalysis(metadata: NatureScoutData, habitatTypes: H
         modelHabitatErkennung: serverConfig.OPENAI_VISION_MODEL,
         systemInstruction: prompt.systemInstruction,
         hapitatQuestion: llmQuestion,
-        habitatStructuredOutput: simplifiedSchema
+        habitatStructuredOutput: simplifiedSchema,
+        fullSchemaStructure: readableSchema
       }
     };
   } catch (error) {
