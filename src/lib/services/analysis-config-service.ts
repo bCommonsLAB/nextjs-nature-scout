@@ -91,72 +91,10 @@ export async function initializeAnalysisConfigs(): Promise<void> {
       updatedAt: new Date()
     };
 
-    // System-Instruktionen und Prompts
-    const defaultSystemInstruction = {
-      name: 'default-system-instruction',
-      version: '1.0.0',
-      description: 'Standard System-Instruktion für alle Analysen',
-      systemInstruction: `
-Du bist ein erfahrener Vegetationsökologe und sollst bei der Habitatanalyse unterstützen. 
-Deine Aufgabe ist es, den Habitattyp basierend auf den Bildern und den angegebenen Pflanzenarten zu bestimmen.
-WICHTIG: 
-- Berücksichtige die angegebenen Pflanzenarten als wichtige Indikatoren
-- Analysiere die Vegetationsstruktur und -zusammensetzung
-- Beachte die Standortmerkmale wie Hangneigung und Exposition
-- Gib NUR den Habitattyp zurück, der am besten zu den Beobachtungen passt
-- Wenn du dir nicht sicher bist, gib "unbekannt" zurück
-      `.trim(),
-      analysisPrompt: '',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    const habitatAnalysisPrompt = {
-      name: 'habitat-analysis',
-      version: '1.0.0',
-      description: 'Prompts für die Analyse von Habitattypen',
-      systemInstruction: defaultSystemInstruction.systemInstruction,
-      analysisPrompt: `
-[ID:{randomId}]
-Analysiere das hochgeladenen Gesamtbild und einige Detailbilder unter Berücksichtigung der bereits identifizierten Pflanzenarten: {pflanzenarten}
-
-Bitte analysiere folgende Parameter:
-0. Schätze die Konsistent der bereitgestellten Informationen 
-1. Erfasse die Standortbedingungen und deren Einfluss auf die Vegetation
-2. Wie häufig sind die erkannten Pflanzenarten im Bestand
-3. Beschreibe die Vegetationsstruktur und -dynamik
-4. Dokumentiere Nutzungsspuren und deren Auswirkungen
-5. Leite daraus den wahrscheinlichen Habitattyp ab
-{kommentar}
-      `.trim(),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    const schutzstatusPrompt = {
-      name: 'schutzstatus-analysis',
-      version: '1.0.0',
-      description: 'Prompts für die Analyse des Schutzstatus',
-      systemInstruction: defaultSystemInstruction.systemInstruction,
-      analysisPrompt: `
-[ID:{randomId}]
-Bewerte bitte den Schutzstatus des Habitats basierend auf dem Habitattyp und den vorhandenen Merkmalen.
-Berücksichtige dabei:
-1. Den Habitattyp und seine typischen Arten
-2. Die Vegetationsstruktur und den Artenreichtum
-3. Die Nutzungsintensität und anthropogene Einflüsse
-      `.trim(),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    // Speichere die Schemas in separate Collections
+    // Speichere nur das Schema
     await habitatSchemaCollection.insertOne(habitatAnalysisSchema);
     console.log('Habitat-Analysis Schema gespeichert');
 
-    // Speichere die Prompts
-    await promptCollection.insertMany([defaultSystemInstruction, habitatAnalysisPrompt, schutzstatusPrompt]);
-    console.log('Prompts gespeichert');
   } catch (error) {
     console.error('Fehler beim Speichern der Konfigurationen:', error);
     throw error;
@@ -242,19 +180,30 @@ export async function createPrompt(prompt: Omit<Prompt, '_id'>): Promise<Prompt>
   };
 }
 
-export async function updatePrompt(id: string, updates: Partial<Omit<Prompt, '_id'>>): Promise<Prompt | null> {
+export async function updatePrompt(id: string | undefined, updates: Partial<Prompt>): Promise<Prompt | null> {
   const db = await connectToDatabase();
   const collection = db.collection<Prompt>('prompts');
   
+  // Entferne _id aus den Updates
+  const { _id, ...updateData } = updates;
+  
+  // Wenn keine ID vorhanden ist, suche nach dem Namen
+  const query = id 
+    ? { _id: new ObjectId(id) }
+    : { name: updates.name };
+
   const result = await collection.findOneAndUpdate(
-    { _id: new ObjectId(id) },
+    query,
     { 
       $set: {
-        ...updates,
+        ...updateData,
         updatedAt: new Date()
       }
     },
-    { returnDocument: 'after' }
+    { 
+      returnDocument: 'after',
+      upsert: true // Erstelle ein neues Dokument, wenn keines gefunden wurde
+    }
   );
 
   return result;

@@ -126,9 +126,22 @@ export async function initializeHabitatTypes(): Promise<void> {
 }
 
 export async function getAllHabitatTypes(): Promise<HabitatType[]> {
-  const db = await connectToDatabase();
-  const collection = db.collection<HabitatType>('habitatTypes');
-  return collection.find().toArray();
+  try {
+    const db = await connectToDatabase();
+    const collection = db.collection<HabitatType>('habitatTypes');
+    
+    const habitatTypes = await collection.find({}).toArray();
+    
+    console.log('Geladene Habitat-Typen:', {
+      count: habitatTypes.length,
+      types: habitatTypes.map(h => h.name)
+    });
+    
+    return habitatTypes;
+  } catch (error) {
+    console.error('Fehler beim Laden der Habitat-Typen:', error);
+    throw error;
+  }
 }
 
 export async function getHabitatTypeById(id: string): Promise<HabitatType | null> {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { GeocodingResult, NatureScoutData } from "@/types/nature-scout";
+import { GeocodingResult, NatureScoutData, DebugInfo } from "@/types/nature-scout";
 import MapNoSSR from '../map/mapNoSSR';
 import { Button } from "@/components/ui/button";
 
@@ -12,7 +12,7 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
   });
 
   const [currentPosition, setCurrentPosition] = useState<[number, number]>([metadata.latitude || 46.724212, metadata.longitude || 11.65555]);
-  const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(null);
+  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [polygonPoints, setPolygonPoints] = useState<Array<[number, number]>>(metadata.polygonPoints || []);
@@ -318,6 +318,11 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
           onAreaChange={(area) => {
             console.log('Neue Fläche berechnet:', area);
             setAreaInSqMeters(area);
+            // Speichere die Fläche in den Metadaten
+            setMetadata(prev => ({
+              ...prev,
+              plotsize: area
+            }));
           }}
           initialPolygon={polygonPoints}
           editMode={isDrawing}
@@ -355,9 +360,7 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
             <div className="bg-white p-3 rounded-md shadow-sm">
               <p className="text-sm">Breitengrad: {currentPosition[0]?.toFixed(6)}°</p>
               <p className="text-sm">Längengrad: {currentPosition[1]?.toFixed(6)}°</p>
-              {areaInSqMeters > 0 && (
-                <p className="text-sm mt-2">Fläche: {areaInSqMeters.toLocaleString('de-DE')} m²</p>
-              )}
+              
             </div>
           </div>
 
@@ -390,6 +393,10 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
                   <div>
                     <p className="text-xs text-gray-500">Exposition</p>
                     <p className="text-sm font-medium">{metadata.exposition !== 'unbekannt' ? metadata.exposition : '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Fläche</p>
+                    <p className="text-sm font-medium">{metadata.plotsize ? `${metadata.plotsize.toLocaleString('de-DE')} m²` : '-'}</p>
                   </div>
                 </div>
               </div>

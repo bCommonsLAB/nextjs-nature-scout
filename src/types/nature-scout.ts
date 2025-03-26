@@ -11,6 +11,7 @@ export interface NatureScoutData {
   elevation?: string;
   exposition?: string;
   slope?: string;
+  plotsize?: number;
   polygonPoints?: Array<[number, number]>;
   bilder: Bild[];
   analyseErgebnis?: AnalyseErgebnis;
@@ -160,5 +161,33 @@ export interface LocationMetadata {
     lat: number;
     lng: number;
   };
-  // Weitere Metadaten falls benötigt
+}
+
+export interface DebugInfo {
+  debug?: {
+    expositionUrl?: string;
+    expositionResponse?: {
+      status: number;
+      statusText: string;
+      contentType: string;
+    };
+    slopeUrl?: string;
+    slopeResponse?: {
+      status: number;
+      statusText: string;
+      contentType: string;
+    };
+    municipalityUrl?: string;
+    municipalityResponse?: {
+      status: number;
+      statusText: string;
+      contentType: string;
+    };
+    parsedData?: {
+      exposition?: any;
+      slope?: any;
+      municipality?: any;
+    };
+  };
+  error?: string;
 }

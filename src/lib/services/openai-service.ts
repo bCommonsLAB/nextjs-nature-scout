@@ -4,7 +4,7 @@ import { openAiResult, AnalyseErgebnis, NatureScoutData, SimplifiedSchema } from
 import { serverConfig } from '../config';
 import { zodResponseFormat } from "openai/helpers/zod";
 import { ChatCompletionMessageParam } from 'openai/resources/index.mjs';
-import { getHabitatTypeDescription } from './habitat-service';
+import { getAllHabitatTypes, HabitatType } from './habitat-service';
 import { getAnalysisSchema, getPrompt } from './analysis-config-service';
 
 const openai = new OpenAI({
@@ -126,8 +126,19 @@ function getZodDescription(zodType: z.ZodTypeAny): string | undefined {
   return undefined;
 }
 
-async function createHabitatAnalyseSchema(analysisSchema: any): Promise<z.ZodObject<any, any>> {
-  const habitatTypeDesc = await getHabitatTypeDescription();
+async function createHabitatAnalyseSchema(
+  analysisSchema: any, 
+  habitatTypes: HabitatType[]
+): Promise<z.ZodObject<any, any>> {
+  // Erstelle eine formatierte Beschreibung der Habitat-Typen
+  const habitatTypeDesc = habitatTypes
+    .map(ht => `${ht.name}${ht.typicalSpecies.length > 0 ? `\n typischen Arten: ${ht.typicalSpecies.join(', ')}` : ''}`)
+    .join('\n\n');
+
+  console.log('Verwende Habitat-Typen für Schema:', {
+    count: habitatTypes.length,
+    description: habitatTypeDesc.substring(0, 100) + '...'
+  });
   
   return z.object({
     analyses: z.array(
@@ -181,8 +192,6 @@ async function createHabitatAnalyseSchema(analysisSchema: any): Promise<z.ZodObj
             .int()
             .describe(analysisSchema.schema.bewertung_konfidenz)
         }).describe(analysisSchema.schema.bewertung),
-        habitattyp: z.string()
-          .describe(habitatTypeDesc),
         evidenz: z.object({
           dafür_spricht: z.array(z.string())
             .describe(analysisSchema.schema.evidenz_dafür_spricht),
@@ -191,8 +200,8 @@ async function createHabitatAnalyseSchema(analysisSchema: any): Promise<z.ZodObj
         }).describe(analysisSchema.schema.evidenz),
         zusammenfassung: z.string()
           .describe(analysisSchema.schema.zusammenfassung),
-        schutzstatus: z.string()
-          .describe(analysisSchema.schema.schutzstatus)
+          habitattyp: z.string()
+            .describe(`Wähle den passendsten Habitattyp aus, zu dem die bekannte Pflanzearten, die anderen Merkmale und das Bild am besten passen. Hier folgende Liste der Habitattypen:\n\n${habitatTypeDesc}`)
       })
     )
   });
@@ -200,28 +209,24 @@ async function createHabitatAnalyseSchema(analysisSchema: any): Promise<z.ZodObj
 
 export async function analyzeImageStructured(metadata: NatureScoutData): Promise<openAiResult> {
   try {
+    const habitatTypes = await getAllHabitatTypes();
+
     // Schritt 1: Habitat-Analyse
-    const habitatAnalyse = await performHabitatAnalysis(metadata);
+    const habitatAnalyse = await performHabitatAnalysis(metadata, habitatTypes);
     if (!habitatAnalyse.result) return habitatAnalyse;
 
-    //console.log("habitatAnalyse", habitatAnalyse);
+    // Hole den Habitat-Typ aus der Datenbank
+    const habitatType = habitatTypes.find(ht => ht.name === habitatAnalyse.result?.habitattyp);
+    
+    // Füge den Schutzstatus aus dem Habitat-Typ hinzu
+    const result = {
+      ...habitatAnalyse.result,
+      schutzstatus: habitatType?.schutzstatus || 'unbekannt'
+    };
 
-    // Schritt 2: Schutzstatus-Analyse
-    const schutzStatusAnalyse = await performSchutzStatusAnalysis(habitatAnalyse.result);
-    if (!schutzStatusAnalyse.result) return schutzStatusAnalyse;
-
-    //console.log("schutzStatusAnalyse", schutzStatusAnalyse);
-
-    // Kombiniere die Ergebnisse
     return {
-      result: {
-        ...habitatAnalyse.result,
-        ...schutzStatusAnalyse.result,
-      },
-      llmInfo: {
-        ...habitatAnalyse.llmInfo,
-        ...schutzStatusAnalyse.llmInfo,
-      }
+      result,
+      llmInfo: habitatAnalyse.llmInfo
     };
   } catch (error: Error | unknown) {
     console.error('Fehler bei der Analyse:', error);
@@ -266,7 +271,7 @@ async function getImageContents(metadata: NatureScoutData) {
   return imageContents;
 }
 
-async function performHabitatAnalysis(metadata: NatureScoutData) : Promise<openAiResult> {
+async function performHabitatAnalysis(metadata: NatureScoutData, habitatTypes: HabitatType[]): Promise<openAiResult> {
   try {
     const analysisSchema = await getAnalysisSchema('habitat-analysis');
     const prompt = await getPrompt('habitat-analysis');
@@ -275,21 +280,36 @@ async function performHabitatAnalysis(metadata: NatureScoutData) : Promise<openA
       throw new Error('Analyse-Konfigurationen nicht gefunden');
     }
 
+    if (!habitatTypes || habitatTypes.length === 0) {
+      throw new Error('Keine Habitat-Typen in der Datenbank gefunden');
+    }
+
     const imageContents = await getImageContents(metadata);
     const pflanzenarten = metadata.bilder
       .filter(bild => bild.analyse && bild.analyse.trim() !== '')
       .map(bild => bild.analyse)
       .join(', ');
     
-    // Erstelle das Zod-Schema mit Beschreibungen aus der Datenbank
-    const habitatAnalyseSchema = await createHabitatAnalyseSchema(analysisSchema);
+    // Erstelle das Zod-Schema mit Beschreibungen aus der Datenbank und den Habitat-Typen
+    const habitatAnalyseSchema = await createHabitatAnalyseSchema(analysisSchema, habitatTypes);
 
     const randomId = Math.floor(Math.random() * 9000000000) + 1000000000;
+
+    // Erstelle die Standortparameter aus den Metadaten
+    const standortParameter = [
+      metadata.gemeinde && `Gemeinde: ${metadata.gemeinde}`,
+      metadata.elevation && `Höhe über dem Meer: ${metadata.elevation}`,
+      metadata.exposition && `Exposition: ${metadata.exposition}`,
+      metadata.slope && `Hangneigung: ${metadata.slope}`,
+      metadata.plotsize && `Fläche: ${metadata.plotsize} m²`,
+      metadata.latitude && metadata.longitude && `Koordinaten: ${metadata.latitude}°N, ${metadata.longitude}°E`
+    ].filter(Boolean).join('\n');
 
     // Erstelle die Analyse-Frage mit den Platzhaltern aus dem Template
     const llmQuestion = prompt.analysisPrompt
       .replace('{randomId}', randomId.toString())
       .replace('{pflanzenarten}', pflanzenarten)
+      .replace('{standortparameter}', standortParameter)
       .replace('{kommentar}', metadata.kommentar ? `Beachte bitte folgende zusätzliche Hinweise: ${metadata.kommentar}` : '');
 
     const messages: ChatCompletionMessageParam[] = [{ 
@@ -350,92 +370,6 @@ async function performHabitatAnalysis(metadata: NatureScoutData) : Promise<openA
     };
   } catch (error) {
     console.error('Fehler bei der Habitat-Analyse:', error);
-    return { 
-      result: null, 
-      error: error instanceof Error ? error.message : String(error)
-    };
-  }
-}
-
-async function performSchutzStatusAnalysis(habitatAnalyse: AnalyseErgebnis) : Promise<openAiResult> {
-  try {
-    // Lade Konfigurationen aus der Datenbank
-    const analysisSchema = await getAnalysisSchema('habitat-analysis');
-    const prompt = await getPrompt('schutzstatus-analysis');
-    
-    if (!analysisSchema || !prompt) {
-      throw new Error('Schutzstatus-Konfigurationen nicht gefunden');
-    }
-
-    console.log('Geladenes Habitat-Schema für Schutzstatus:', analysisSchema);
-
-    const schutzstatusSchema = z.object({
-      analyses: z.array(z.object({
-        schutzstatus: z.string()
-          .describe(analysisSchema.schema.schutzstatus)
-      }))
-    });
-    
-    const randomId = Math.floor(Math.random() * 9000000000) + 1000000000;
-    const llmQuestion = prompt.analysisPrompt
-      .replace('{randomId}', randomId.toString())
-      .replace('{habitattyp}', habitatAnalyse.habitattyp);
-
-    const messages: ChatCompletionMessageParam[] = [{ 
-      role: "system", 
-      content: prompt.systemInstruction
-    },
-    {
-      role: "user",
-      content: [
-        { 
-          type: "text", 
-          text: llmQuestion
-        }
-      ],
-    }];
-
-    console.log('Sende Schutzstatus-Anfrage an OpenAI');
-
-    const completion = await openai.chat.completions.create({
-      model: serverConfig.OPENAI_CHAT_MODEL,
-      messages: messages,
-      temperature: 0.1,
-      top_p: 0.1,
-      response_format: zodResponseFormat(schutzstatusSchema, "structured_analysis"),
-      max_tokens: 500,
-    });
-
-    const analysisResult = completion.choices[0]?.message.content;
-    if (!analysisResult) {
-      throw new Error("Keine Schutzstatus-Analyse verfügbar");
-    }
-
-    console.log('Erhaltenes Schutzstatus-Ergebnis:', analysisResult);
-
-    const parsedAnalysis = JSON.parse(analysisResult);
-    
-    if (!parsedAnalysis.analyses || !Array.isArray(parsedAnalysis.analyses) || parsedAnalysis.analyses.length === 0) {
-      throw new Error("Das Schutzstatus-Ergebnis hat nicht das erwartete Format (analyses array fehlt oder leer)");
-    }
-
-    const parsedResult: AnalyseErgebnis = {
-      ...parsedAnalysis.analyses[0]
-    };
-
-    const simplifiedSchema = convertZodSchemaToSimpleDoc(schutzstatusSchema);
-
-    return { 
-      result: parsedResult,
-      llmInfo: {
-        modelSchutzstatusErkennung: serverConfig.OPENAI_CHAT_MODEL,
-        systemInstruction: prompt.systemInstruction,
-        schutzstatusQuestion: llmQuestion,
-        schutzstatusStructuredOutput: simplifiedSchema
-      }
-    };
-  } catch (error) {
-    console.error('Fehler bei der Schutzstatus-Analyse:', error);
     return { 
       result: null, 
       error: error instanceof Error ? error.message : String(error)
