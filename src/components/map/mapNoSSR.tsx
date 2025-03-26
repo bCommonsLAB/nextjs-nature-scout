@@ -46,6 +46,10 @@ declare module 'leaflet' {
     }
   }
 
+  namespace control {
+    function locationSteps(options?: LocationStepsOptions): L.Control.LocationSteps;
+  }
+
   namespace Draw {
     namespace Event {
       const CREATED_EVENT: string;
@@ -57,7 +61,7 @@ declare module 'leaflet' {
 
 interface LocationStepsOptions {
   position?: string;
-  drawnItems?: L.FeatureGroup;
+  drawnItems?: L.FeatureGroup | null;
   onStartDrawing?: () => void;
   onSavePolygon?: () => void;
   onCancelDrawing?: () => void;
@@ -225,6 +229,11 @@ const LocationStepsControl = L.Control.extend({
 
 // Registriere den Control
 L.Control.LocationSteps = LocationStepsControl;
+
+// Registriere die Factory-Funktion
+L.control.locationSteps = function(options?: LocationStepsOptions) {
+  return new L.Control.LocationSteps(options || {});
+};
 
 // Komponente als benannte Funktion deklarieren
 function MapNoSSR({ 

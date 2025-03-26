@@ -2,8 +2,15 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { GeocodingResult, NatureScoutData, DebugInfo } from "@/types/nature-scout";
-import MapNoSSR from '../map/mapNoSSR';
+import dynamic from 'next/dynamic';
 import { Button } from "@/components/ui/button";
+import 'leaflet/dist/leaflet.css';
+import 'leaflet-draw/dist/leaflet.draw.css';
+
+const MapNoSSR = dynamic(() => import('@/components/map/mapNoSSR'), {
+  ssr: false,
+  loading: () => <div>Karte wird geladen...</div>
+});
 
 export function LocationDetermination({ metadata, setMetadata }: { metadata: NatureScoutData; setMetadata: React.Dispatch<React.SetStateAction<NatureScoutData>> }) {
   console.log('LocationDetermination RENDER', { 
@@ -290,6 +297,16 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
         clearTimeout(debounceTimer.current);
       }
     };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      // Ihre bestehende Map-Initialisierung
+    } catch (error) {
+      console.error('Fehler bei der Map-Initialisierung:', error);
+    }
   }, []);
 
   return (
