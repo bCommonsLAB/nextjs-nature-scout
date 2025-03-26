@@ -41,12 +41,20 @@ export function PromptConfig() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          name: promptType,
+          version: "1.0.0",
+          description: promptType === "habitat-analysis" 
+            ? "Prompts für die Analyse von Habitattypen"
+            : "Prompts für die Analyse des Schutzstatus",
           systemInstruction: systemPrompt,
           analysisPrompt: analysisPrompt
         })
       });
       
-      if (!response.ok) throw new Error("Fehler beim Speichern");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Fehler beim Speichern");
+      }
       toast.success("Prompt erfolgreich gespeichert");
     } catch (error) {
       toast.error("Fehler beim Speichern des Prompts");

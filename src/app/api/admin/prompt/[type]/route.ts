@@ -29,12 +29,37 @@ export async function POST(
 ) {
   try {
     const promptData = await request.json();
-    await updatePrompt(params.type, promptData);
-    return NextResponse.json({ success: true });
+    
+    // Validiere die erforderlichen Felder
+    if (!promptData.name || !promptData.systemInstruction || !promptData.analysisPrompt) {
+      return NextResponse.json(
+        { error: 'Fehlende Pflichtfelder' },
+        { status: 400 }
+      );
+    }
+
+    // Stelle sicher, dass der Name mit dem Typ übereinstimmt
+    if (promptData.name !== params.type) {
+      return NextResponse.json(
+        { error: 'Der Prompt-Name muss mit dem Typ übereinstimmen' },
+        { status: 400 }
+      );
+    }
+
+    const result = await updatePrompt(undefined, promptData);
+    
+    if (!result) {
+      return NextResponse.json(
+        { error: 'Prompt konnte nicht gespeichert werden' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Fehler beim Speichern des Prompts:', error);
     return NextResponse.json(
-      { error: 'Interner Serverfehler' },
+      { error: error instanceof Error ? error.message : 'Interner Serverfehler' },
       { status: 500 }
     );
   }

@@ -13,7 +13,7 @@ import { Bild, NatureScoutData, AnalyseErgebnis, llmInfo, PlantNetResult } from 
 import { LocationDetermination } from './locationDetermination';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Code, ChevronLeft, ChevronRight } from "lucide-react";
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 const schritte = [
   "Willkommen",
@@ -56,6 +56,8 @@ function DebugLogger({ metadata }: { metadata: NatureScoutData }) {
 
 export default function NatureScout() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editJobId = searchParams.get('editJobId');
   const [aktiverSchritt, setAktiverSchritt] = useState(0);
   const [metadata, setMetadata] = useState<NatureScoutData>({
     erfassungsperson: "",
@@ -74,6 +76,59 @@ export default function NatureScout() {
     "Detailbild_1": false,
     "Detailbild_2": false
   });
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Laden von vorhandenen Habitatdaten, wenn editJobId vorhanden ist
+  useEffect(() => {
+    if (editJobId) {
+      const fetchHabitatData = async () => {
+        setIsLoading(true);
+        try {
+          const response = await fetch(`/api/habitat/${editJobId}`);
+          
+          if (!response.ok) {
+            throw new Error(`Fehler beim Laden der Daten: ${response.status}`);
+          }
+          
+          const habitatData = await response.json();
+          
+          // Setze die geladenen Daten in den State
+          if (habitatData && habitatData.metadata) {
+            setMetadata({
+              erfassungsperson: habitatData.metadata.erfassungsperson || "",
+              email: habitatData.metadata.email || "",
+              gemeinde: habitatData.metadata.gemeinde || "",
+              flurname: habitatData.metadata.flurname || "",
+              latitude: habitatData.metadata.latitude || 0,
+              longitude: habitatData.metadata.longitude || 0,
+              standort: habitatData.metadata.standort || "",
+              bilder: habitatData.metadata.bilder?.map((bild: any) => ({
+                imageKey: bild.imageKey || (bild.plantnetResult ? "Detailbild_1" : "Panoramabild"),
+                filename: bild.filename || "Bild.jpg",
+                url: bild.url,
+                analyse: bild.analyse || "",
+                plantnetResult: bild.plantnetResult
+              })) || [],
+              analyseErgebnis: habitatData.result || undefined,
+              llmInfo: habitatData.llmInfo || undefined,
+              kommentar: habitatData.metadata.kommentar || ""
+            });
+            console.log("Habitat-Daten geladen:", habitatData);
+            
+            // Direkt zum zweiten Schritt springen, wenn wir ein bestehendes Habitat bearbeiten
+            setAktiverSchritt(1);
+          }
+        } catch (error) {
+          console.error("Fehler beim Laden der Habitat-Daten:", error);
+          alert(`Fehler beim Laden der Habitat-Daten: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      fetchHabitatData();
+    }
+  }, [editJobId]);
 
   const isAnyUploadActive = Object.values(activeUploads).some(isUploading => isUploading);
 
@@ -228,10 +283,27 @@ export default function NatureScout() {
         <div className="md:col-span-3">
           <Card>
             <CardHeader>
-              <CardTitle>{schritte[aktiverSchritt]}</CardTitle>
+              <CardTitle>
+                {editJobId ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <span>Bearbeitung von Habitat</span>
+                    <span className="text-sm font-normal bg-gray-100 px-2 py-1 rounded">
+                      Job-ID: {editJobId}
+                    </span>
+                  </div>
+                ) : (
+                  schritte[aktiverSchritt]
+                )}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              {renderSchrittInhalt(aktiverSchritt)}
+              {isLoading ? (
+                <div className="flex justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                renderSchrittInhalt(aktiverSchritt)
+              )}
             </CardContent>
           </Card>
         </div>
@@ -258,7 +330,14 @@ export default function NatureScout() {
               </DialogTrigger>
               <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
                 <DialogHeader>
-                  <DialogTitle>Analysierte Daten</DialogTitle>
+                  <DialogTitle>
+                    Analysierte Daten
+                    {editJobId && (
+                      <span className="ml-2 text-sm font-normal bg-gray-100 px-2 py-1 rounded">
+                        Job-ID: {editJobId}
+                      </span>
+                    )}
+                  </DialogTitle>
                 </DialogHeader>
                 <pre className="bg-gray-100 p-4 rounded-md overflow-x-auto">
                   {JSON.stringify(metadata, null, 2)}
