@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Info, Sparkles } from "lucide-react";
 import Link from 'next/link';
 import { WelcomePopup } from "./welcome-popup";
+import { useUser } from "@clerk/nextjs";
 //console.log('LandingPage wird gerendert');
 
 const colors = {
@@ -99,6 +100,7 @@ export function NatureScoutPage() {
   //console.log('NatureScoutPage Component wird gerendert');
 
   const [showAIInfo, setShowAIInfo] = useState(false);
+  const { user, isLoaded } = useUser();
 
   return (
     <div className="flex overflow-hidden flex-col bg-black bg-opacity-20">
@@ -125,23 +127,27 @@ export function NatureScoutPage() {
                 </p>
               </div>
               <div className="flex flex-col md:flex-row gap-4 items-start self-start mt-8 text-base max-md:max-w-full">
-                <Button 
-                  size="lg"
-                  variant="default"
-                  className="min-w-[240px] w-full md:w-auto"
-                >
-                  Jetzt als NatureScout anmelden
-                </Button>
-                
-                <Link href="/naturescout" className="w-full md:w-auto">
-                  <Button 
-                    size="lg"
-                    variant="secondary"
-                    className="min-w-[240px] w-full"
-                  >
-                    Jetzt ausprobieren
-                  </Button>
-                </Link>
+                {!isLoaded || !user ? (
+                  <Link href="/anmelden">
+                    <Button 
+                      size="lg"
+                      variant="default"
+                      className="min-w-[240px] w-full md:w-auto"
+                    >
+                      Jetzt als NatureScout anmelden
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link href="/naturescout" className="w-full md:w-auto">
+                    <Button 
+                      size="lg"
+                      variant="default"
+                      className="min-w-[240px] w-full"
+                    >
+                      Habitat jetzt erfassen
+                    </Button>
+                  </Link>
+                )}
               </div>
             </div>
           </section>
@@ -232,9 +238,6 @@ export function NatureScoutPage() {
               </Card>
             </div>
           </section>
-
-          
-
         </main>
       </div>
     </div>
