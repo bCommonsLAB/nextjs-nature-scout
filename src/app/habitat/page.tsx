@@ -547,7 +547,7 @@ function HabitatPageContent() {
       {!loading && !error && data && data.entries.length === 0 && (
         <div className="bg-gray-50 border border-gray-200 p-8 rounded-lg my-4 text-center">
           <div className="mb-4">
-            <Folder className="h-10 w-10 text-gray-400 mx-auto" />
+            <ShieldCheck className="h-10 w-10 text-gray-400 mx-auto" />
           </div>
           <h3 className="text-lg font-medium mb-2">Keine Einträge gefunden</h3>
           <p className="text-gray-500 mb-6">
