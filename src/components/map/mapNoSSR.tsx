@@ -1,5 +1,5 @@
 // components/MapNoSSR.tsx
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet-draw';
 
@@ -35,7 +35,10 @@ type DrawOptions = {
 // Erweitere die Leaflet-Typen
 declare module 'leaflet' {
   namespace Control {
-    interface DrawConstructorOptions extends DrawOptions {}
+    interface DrawConstructorOptions extends DrawOptions {
+      // Füge eine eigene Eigenschaft hinzu, um den Linter-Fehler zu beheben
+      _internal?: boolean;
+    }
     
     class DrawControl extends L.Control {
       constructor(options?: DrawConstructorOptions);
@@ -44,6 +47,10 @@ declare module 'leaflet' {
     class LocationSteps extends L.Control {
       constructor(options?: LocationStepsOptions);
     }
+  }
+
+  namespace control {
+    function locationSteps(options?: LocationStepsOptions): L.Control.LocationSteps;
   }
 
   namespace Draw {
@@ -57,7 +64,7 @@ declare module 'leaflet' {
 
 interface LocationStepsOptions {
   position?: string;
-  drawnItems?: L.FeatureGroup;
+  drawnItems?: L.FeatureGroup | null;
   onStartDrawing?: () => void;
   onSavePolygon?: () => void;
   onCancelDrawing?: () => void;
@@ -82,6 +89,7 @@ interface MapNoSSRProps {
   onSavePolygonWithPoints?: (points: Array<[number, number]>) => void;
   onRestartDrawing?: () => void;
   onCancelDrawing?: () => void;
+  hasPolygon?: boolean;
 }
 
 // Custom Control für die Standortbestimmungs-Buttons
@@ -126,7 +134,7 @@ const LocationStepsControl = L.Control.extend({
     const options = this.options as LocationStepsOptions;
     if (!options.isDrawing) {
       const startButton = this.createButton(
-        'Habitatumriss erfassen',
+        options.hasPolygon ? 'Habitatumriss ändern' : 'Habitatumriss erfassen',
         true,
         () => {
           options.onStartDrawing?.();
@@ -188,7 +196,7 @@ const LocationStepsControl = L.Control.extend({
     button.innerHTML = text;
     button.style.display = 'block';
     button.style.padding = '6px 8px';
-    button.style.backgroundColor = text === 'Habitatumriss erfassen' || text === 'Umrisslinie speichern' ? '#22c55e' : '#9ca3af';
+    button.style.backgroundColor = text === 'Habitatumriss erfassen' || text === 'Habitatumriss ändern' || text === 'Umrisslinie speichern' ? '#22c55e' : '#9ca3af';
     button.style.color = 'white';
     button.style.border = 'none';
     button.style.borderRadius = '4px';
@@ -205,10 +213,10 @@ const LocationStepsControl = L.Control.extend({
     if (isEnabled) {
       L.DomEvent.on(button, 'click', onClick);
       button.addEventListener('mouseover', () => {
-        button.style.backgroundColor = text === 'Habitatumriss erfassen' || text === 'Umrisslinie speichern' ? '#16a34a' : '#6b7280';
+        button.style.backgroundColor = text === 'Habitatumriss erfassen' || text === 'Habitatumriss ändern' || text === 'Umrisslinie speichern' ? '#16a34a' : '#6b7280';
       });
       button.addEventListener('mouseout', () => {
-        button.style.backgroundColor = text === 'Habitatumriss erfassen' || text === 'Umrisslinie speichern' ? '#22c55e' : '#9ca3af';
+        button.style.backgroundColor = text === 'Habitatumriss erfassen' || text === 'Habitatumriss ändern' || text === 'Umrisslinie speichern' ? '#22c55e' : '#9ca3af';
       });
     } else {
       button.style.opacity = '0.5';
@@ -226,6 +234,11 @@ const LocationStepsControl = L.Control.extend({
 // Registriere den Control
 L.Control.LocationSteps = LocationStepsControl;
 
+// Registriere die Factory-Funktion
+L.control.locationSteps = function(options?: LocationStepsOptions) {
+  return new L.Control.LocationSteps(options || {});
+};
+
 // Komponente als benannte Funktion deklarieren
 function MapNoSSR({ 
   position, 
@@ -240,13 +253,15 @@ function MapNoSSR({
   onSavePolygon,
   onRestartDrawing,
   onCancelDrawing,
-  onSavePolygonWithPoints
+  onSavePolygonWithPoints,
+  hasPolygon
 }: MapNoSSRProps) {
   console.log('MapNoSSR RENDER', { 
     position, 
     zoom, 
     initialPolygon: initialPolygon.length,
     editMode,
+    hasPolygon,
     time: new Date().toISOString()
   });
   const mapRef = useRef<L.Map | null>(null);
@@ -408,6 +423,7 @@ function MapNoSSR({
       editMode,
       currentZoom: mapRef.current.getZoom(),
       mapCenter: mapRef.current.getCenter(),
+      polygonPoints: initialPolygon.length,
       time: new Date().toISOString(),
       hasLocationControl: locationStepsControlRef.current !== null
     });
@@ -482,7 +498,7 @@ function MapNoSSR({
           onCancelDrawing,
           onPolygonChange,
           isDrawing: editMode,
-          hasPolygon: initialPolygon.length > 0,
+          hasPolygon: hasPolygon || initialPolygon.length > 0,
           drawnItems: drawnItemsRef.current,
           onSavePolygonWithPoints
         });
@@ -531,7 +547,6 @@ function MapNoSSR({
         },
         edit: {
           featureGroup: drawnItemsRef.current!,
-
           remove: false
         }
       };
@@ -607,6 +622,12 @@ function MapNoSSR({
               const area = calculateArea(layer);
               onAreaChange(area);
             }
+            
+            // Auch die SavePolygonWithPoints-Funktion aufrufen, damit die Änderung gespeichert wird
+            if (onSavePolygonWithPoints) {
+              console.log('Speichere editiertes Polygon mit Punkten:', points);
+              onSavePolygonWithPoints(points);
+            }
 
             // Nach dem Speichern herauszoomen
             if (mapRef.current) {
@@ -624,7 +645,7 @@ function MapNoSSR({
         }
       });
     }
-  }, [editMode]); // Reduzierte Dependencies auf das Wesentliche
+  }, [editMode, calculateArea, onAreaChange, onPolygonChange, onStartDrawing, onSavePolygon, onRestartDrawing, onCancelDrawing, onSavePolygonWithPoints, hasPolygon, initialPolygon, polygonOptions]);
 
   // Aktualisiere Position und Zoom nur wenn nötig
   useEffect(() => {
@@ -639,11 +660,28 @@ function MapNoSSR({
   // Aktualisiere den Polygon, wenn sich initialPolygon ändert
   useEffect(() => {
     if (mapRef.current && drawnItemsRef.current) {
+      console.log('Aktualisiere initialPolygon:', {
+        punkteAnzahl: initialPolygon.length,
+        editMode,
+        polygonExists: !!polygonLayerRef.current,
+        time: new Date().toISOString()
+      });
+      
+      // Immer zuerst alle bestehenden Polygone entfernen
       drawnItemsRef.current.clearLayers();
+      polygonLayerRef.current = null;
       
       if (initialPolygon.length > 0) {
+        // Neues Polygon mit den aktuellen Daten erstellen
         polygonLayerRef.current = L.polygon(initialPolygon, polygonOptions);
         drawnItemsRef.current.addLayer(polygonLayerRef.current);
+        
+        // Fläche NUR BERECHNEN, NICHT AKTUALISIEREN (um Endlosschleifen zu vermeiden)
+        if (onAreaChange && polygonLayerRef.current) {
+          // Kommentiere die nächste Zeile aus, um die Endlosschleife zu vermeiden
+          // const area = calculateArea(polygonLayerRef.current);
+          // onAreaChange(area);
+        }
 
         // Füge Kreise für die Eckpunkte hinzu, wenn im Bearbeitungsmodus
         if (editMode) {
@@ -651,7 +689,7 @@ function MapNoSSR({
             L.circleMarker(point, vertexStyle).addTo(drawnItemsRef.current!);
           });
         }
-      } else if (editMode) {
+      } else if (editMode && !polygonLayerRef.current) {
         const handler = new L.Draw.Polygon(mapRef.current, {
           allowIntersection: false,
           showArea: true,
@@ -669,7 +707,7 @@ function MapNoSSR({
         handler.enable();
       }
     }
-  }, [initialPolygon, editMode]);
+  }, [initialPolygon, editMode, polygonOptions]);
 
   return (
     <>

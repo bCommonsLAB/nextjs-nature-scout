@@ -1,9 +1,33 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
 
-// Benutze die einfache Version von clerkMiddleware
-// Die Authentifizierung und Zugriffsberechtigungen für bestimmte Routen werden
-// in den entsprechenden Komponenten und API-Routen selbst geprüft
-export default clerkMiddleware();
+// Konfiguriere die Middleware
+export default clerkMiddleware({
+  publicRoutes: [
+    // Öffentliche Seiten
+    "/",
+    "/habitat/karte",
+    
+    // API-Routen
+    "/api/habitat/public",
+    "/api/habitat/search",
+    "/api/habitat/categories",
+    "/api/habitat/categoriesDict",
+    
+    // Webhook-Routen
+    "/api/webhook/clerk",
+    
+    // Debug-Routen
+    "/api/debug/log",
+    
+    // Statische Assets
+    "/(.*).png",
+    "/(.*).jpg",
+    "/(.*).jpeg",
+    "/(.*).svg",
+    "/(.*).ico",
+    "/favicon.ico"
+  ]
+});
 
 export const config = {
   matcher: [

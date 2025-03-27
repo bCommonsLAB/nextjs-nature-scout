@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
-import { Folder, Plus, ShieldAlert, X, Download, Trash2 } from 'lucide-react';
+import { ShieldCheck, Plus, ShieldAlert, X, Download, Trash2 } from 'lucide-react';
 import { HabitateList } from './components/habitate-list';
 import { SearchBar } from './components/search-bar';
 import { 
@@ -201,9 +201,15 @@ function HabitatPageContent() {
         
         if (!response.ok) {
           console.error('API-Fehler:', response.status, response.statusText);
-          const errorText = await response.text();
-          console.error('Fehlerdetails:', errorText);
-          throw new Error(`Fehler beim Laden der Daten: ${response.status}`);
+          const errorData = await response.json().catch(() => ({ error: 'Unbekannter Fehler' }));
+          console.error('Fehlerdetails:', errorData);
+          
+          // Spezifische Fehlermeldung für "Benutzer nicht gefunden"
+          if (errorData.error === 'Benutzer nicht gefunden') {
+            throw new Error('Ihr Benutzerkonto wurde in der Datenbank nicht gefunden. Bitte melden Sie sich ab und wieder an, oder kontaktieren Sie den Administrator.');
+          } else {
+            throw new Error(`Fehler beim Laden der Daten: ${response.status}`);
+          }
         }
         
         const result = await response.json();
@@ -364,8 +370,8 @@ function HabitatPageContent() {
     <div className="container mx-auto py-8 px-4">
       <div className="flex flex-wrap justify-between items-center mb-3 gap-2">
         <div className="flex items-center">
-          <Folder className="h-6 w-6 mr-2 text-primary" />
-          <h1 className="text-2xl font-bold">Unsere Habitate</h1>
+          <ShieldCheck className="h-6 w-6 mr-2 text-primary" />
+          <h1 className="text-2xl font-bold">{isExpert || isAdmin ? "Habitatverwaltung" : "Meine Habitate"}</h1>
         </div>
         
         <div className="flex flex-wrap gap-2">
@@ -415,7 +421,7 @@ function HabitatPageContent() {
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle>Hinweis</AlertTitle>
           <AlertDescription>
-            Als registrierter Benutzer sehen Sie hier Ihre eigenen Habitaterfassungen. Nur verifizierte Experten und Administratoren können alle Einträge sehen.
+            Als registrierter Benutzer sehen Sie hier Ihre eigenen Habitaterfassungen. Nur verifizierte Experten können alle Einträge sehen.
           </AlertDescription>
         </Alert>
       )}
@@ -516,14 +522,32 @@ function HabitatPageContent() {
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-md my-4">
           <h3 className="text-lg font-medium mb-2">Fehler</h3>
-          <p>{error}</p>
+          <p className="mb-4">{error}</p>
+          
+          {error.includes('Benutzerkonto wurde in der Datenbank nicht gefunden') && (
+            <div className="mt-4 space-y-2">
+              <p className="text-gray-700 text-sm">Was können Sie tun:</p>
+              <ul className="list-disc pl-5 text-sm space-y-1">
+                <li>Melden Sie sich ab und anschließend wieder an</li>
+                <li>Falls der Fehler weiterhin besteht, kontaktieren Sie bitte den Administrator</li>
+              </ul>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="mt-2"
+                onClick={() => window.location.href = "/"}
+              >
+                Zurück zur Startseite
+              </Button>
+            </div>
+          )}
         </div>
       )}
       
       {!loading && !error && data && data.entries.length === 0 && (
         <div className="bg-gray-50 border border-gray-200 p-8 rounded-lg my-4 text-center">
           <div className="mb-4">
-            <Folder className="h-10 w-10 text-gray-400 mx-auto" />
+            <ShieldCheck className="h-10 w-10 text-gray-400 mx-auto" />
           </div>
           <h3 className="text-lg font-medium mb-2">Keine Einträge gefunden</h3>
           <p className="text-gray-500 mb-6">

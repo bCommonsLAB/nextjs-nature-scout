@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -59,11 +59,12 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
   const hasInitiatedAnalysis = useRef(false);
   
   useEffect(() => {
-    if (!metadata.analyseErgebnis && !isAnalyzing && !hasInitiatedAnalysis.current) {
-      hasInitiatedAnalysis.current = true;
+    // Analyse immer starten, wenn die Komponente geladen wird
+    if (!isAnalyzing) {
+      console.log('Starte Habitat-Analyse automatisch');
       handleAnalyzeClick();
     }
-  }, [metadata.analyseErgebnis]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // Leeres Dependency-Array: wird nur beim Mounten ausgeführt
 
   const handleAnalyzeClick = async () => {
     setIsAnalyzing(true);
@@ -143,6 +144,31 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
       : {},
     [metadata.llmInfo?.schutzstatusStructuredOutput]
   );
+
+  // Neue Funktion, um sicher mit Evidenz-Daten umzugehen
+  const formatEvidenzData = useCallback((evidenzData: any, type: 'dafür_spricht' | 'dagegen_spricht') => {
+    if (!evidenzData) return '';
+    
+    const title = type === 'dafür_spricht' ? 'Dafür spricht:\n' : '\nDagegen spricht:\n';
+    
+    // Array-Prüfung
+    if (Array.isArray(evidenzData)) {
+      if (evidenzData.length === 0) return '';
+      return title + evidenzData.map(punkt => `- ${punkt}`).join('\n');
+    }
+    
+    // String-Prüfung
+    if (typeof evidenzData === 'string' && evidenzData.trim()) {
+      return title + evidenzData;
+    }
+    
+    // Objekt-Prüfung für den Fall, dass es in einer anderen Struktur vorliegt
+    if (typeof evidenzData === 'object' && Object.keys(evidenzData).length > 0) {
+      return title + JSON.stringify(evidenzData);
+    }
+    
+    return '';
+  }, []);
 
   const getStatusStyle = (type: string) => {
     const baseStyle = "text-sm font-medium px-3.5 py-2.5 rounded-full flex items-center gap-1";
@@ -318,19 +344,6 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                   </div>
                   <div className="bg-blue-50 p-4 rounded-lg space-y-3">
                     <div className="text-xs font-mono whitespace-pre-wrap">
-                      <ParameterHeading 
-                        title={habitatTooltips.standort?.title || ''}
-                        description={habitatTooltips.standort?.description || ''}
-                        details={{
-                          Hangneigung: habitatTooltips.standort?.hangneigung || '',
-                          Exposition: habitatTooltips.standort?.exposition || '',
-                          Bodenfeuchtigkeit: habitatTooltips.standort?.bodenfeuchtigkeit || ''
-                        }}
-                      />
-{`- Hangneigung: ${metadata.analyseErgebnis.standort?.hangneigung || 'n/a'}
-- Exposition: ${metadata.analyseErgebnis.standort?.exposition || 'n/a'}
-- Bodenfeuchtigkeit: ${metadata.analyseErgebnis.standort?.bodenfeuchtigkeit || 'n/a'}
-`}
 
                       <ParameterHeading 
                         title={habitatTooltips.pflanzenarten?.title || ''}
@@ -392,8 +405,7 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                         description={habitatTooltips.habitattyp?.description || ''}
                         details={{}}
                       />
-{`- Typ: ${metadata.analyseErgebnis.habitattyp || ''}
-`}
+{`- Typ: ${metadata.analyseErgebnis.habitattyp || ''}`}
 
                       <ParameterHeading 
                         title={habitatTooltips.evidenz?.title || ''}
@@ -403,52 +415,15 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                           dagegen_spricht: habitatTooltips.evidenz?.dagegen_spricht || ''
                         }}
                       />
-{`${metadata.analyseErgebnis.evidenz?.dafür_spricht?.length ? 'Dafür spricht:\n' : ''}${metadata.analyseErgebnis.evidenz?.dafür_spricht?.map(punkt => `- ${punkt}`).join('\n') || ''}
-${metadata.analyseErgebnis.evidenz?.dagegen_spricht?.length ? '\nDagegen spricht:\n' : ''}${metadata.analyseErgebnis.evidenz?.dagegen_spricht?.map(punkt => `- ${punkt}`).join('\n') || ''}
-`}
+{`${formatEvidenzData(metadata.analyseErgebnis.evidenz?.dafür_spricht, 'dafür_spricht')}
+${formatEvidenzData(metadata.analyseErgebnis.evidenz?.dagegen_spricht, 'dagegen_spricht')}`}
                       
-                      <ParameterHeading 
-                        title={schutzstatusTooltips.schutzstatus?.title || ''}
-                        description={schutzstatusTooltips.schutzstatus?.description || ''}
-                        details={{}}
-                      />
-{`- ${normalizeSchutzstatus(metadata.analyseErgebnis.schutzstatus)}`}
-
-{/*
-                      <ParameterHeading 
-                        title={tooltips.bewertung?.title || ''}
-                        description={tooltips.bewertung?.description || ''}
-                        details={{
-                          Artenreichtum: tooltips.bewertung?.artenreichtum || '',
-                          Konfidenz: tooltips.bewertung?.konfidenz || ''
-                        }}
-                      />
-{`- Artenreichtum: ${metadata.analyseErgebnis.bewertung?.artenreichtum || ''}
-- Konfidenz: ${metadata.analyseErgebnis.bewertung?.konfidenz || ''}%
-`}
-
-<ParameterHeading 
-                        title={tooltips.glaubwürdigkeit?.title || ''}
-                        description={tooltips.glaubwürdigkeit?.description || ''}
-                        details={{
-                          Konsistenzbewertung: tooltips.glaubwürdigkeit?.konsistenzbewertung || '',
-                          Indikatoren_für_konsistenz: tooltips.glaubwürdigkeit?.indikatoren_für_konsistenz || '',
-                          Indikatoren_gegen_konsistenz: tooltips.glaubwürdigkeit?.indikatoren_gegen_konsistenz || ''
-                        }}
-                      />
-{`- Konsistenzbewertung: ${metadata.analyseErgebnis.glaubwürdigkeit?.konsistenzbewertung || ''}
-- Indikatoren für Konsistenz: ${metadata.analyseErgebnis.glaubwürdigkeit?.indikatoren_für_konsistenz || ''}
-- Indikatoren gegen Konsistenz: ${metadata.analyseErgebnis.glaubwürdigkeit?.indikatoren_gegen_konsistenz || ''}
-`}
-*/}
-
                       <ParameterHeading 
                         title={habitatTooltips.zusammenfassung?.title || ''}
                         description={habitatTooltips.zusammenfassung?.description || ''}
                         details={{}}
                       />
-{`${metadata.analyseErgebnis.zusammenfassung || ''}
-`}
+{`${metadata.analyseErgebnis.zusammenfassung || ''}`}
                     </div>
                   </div>
                 </div>

@@ -50,7 +50,7 @@ export function Welcome({ metadata, setMetadata }: { metadata: NatureScoutData; 
 
       <div className="relative aspect-video overflow-hidden rounded-lg shadow-md order-1 md:order-2">
         <Image 
-          src="/images/welcome-nature.JPG" 
+          src="/images/welcome-nature.jpg" 
           alt="Willkommensbild" 
           fill
           className="object-cover"

@@ -5,34 +5,46 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import { Menu, Settings, TestTube2, Folder, Users } from "lucide-react";
+import { Menu, Settings, TestTube2, ShieldCheck, Users } from "lucide-react";
 import { SignInButton, SignedIn, SignedOut, useUser } from "@clerk/nextjs";
 import { UserProfileButton } from "@/components/user-profile";
 
 export function Navbar() {
   const { user, isLoaded } = useUser();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isExpert, setIsExpert] = useState(false);
 
-  // Überprüfe, ob der Benutzer Admin-Rechte hat
+  // Überprüfe, ob der Benutzer Admin-Rechte hat und ob er ein Experte ist
   useEffect(() => {
-    const checkAdminStatus = async () => {
+    const checkUserStatus = async () => {
       if (isLoaded && user) {
         try {
-          const response = await fetch(`/api/users/isAdmin`);
-          if (response.ok) {
-            const data = await response.json();
-            setIsAdmin(data.isAdmin);
+          // Admin-Status prüfen
+          const adminResponse = await fetch(`/api/users/isAdmin`);
+          if (adminResponse.ok) {
+            const adminData = await adminResponse.json();
+            setIsAdmin(adminData.isAdmin);
           } else {
             setIsAdmin(false);
           }
+
+          // Experten-Status prüfen
+          const expertResponse = await fetch(`/api/users/isExpert`);
+          if (expertResponse.ok) {
+            const expertData = await expertResponse.json();
+            setIsExpert(expertData.isExpert);
+          } else {
+            setIsExpert(false);
+          }
         } catch (error) {
-          console.error('Fehler beim Überprüfen des Admin-Status:', error);
+          console.error('Fehler beim Überprüfen des Benutzer-Status:', error);
           setIsAdmin(false);
+          setIsExpert(false);
         }
       }
     };
 
-    checkAdminStatus();
+    checkUserStatus();
   }, [isLoaded, user]);
 
   return (
@@ -54,43 +66,38 @@ export function Navbar() {
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex gap-8 justify-center items-center self-stretch my-auto">
-          <Link href="/">
-            <Button variant="ghost" className="text-base">
-              Über Uns
-            </Button>
-          </Link>
           <SignedIn>
             <Link href="/habitat">
               <Button variant="ghost" className="text-base">
-                <Folder className="h-4 w-4 mr-2" />
-                Habitate
+                <ShieldCheck className="h-4 w-4 mr-2" />
+                {isExpert || isAdmin ? "Habitatverwaltung" : "Meine Habitate"}
               </Button>
             </Link>
           </SignedIn>
           <SignedIn>
             {isAdmin && (
               <>
-                <Link href="/admin/config">
-                  <Button variant="ghost" className="text-base">
-                    <Settings className="h-4 w-4 mr-2" />
-                    Admin
-                  </Button>
-                </Link>
                 <Link href="/admin/users">
                   <Button variant="ghost" className="text-base">
                     <Users className="h-4 w-4 mr-2" />
                     Benutzer
                   </Button>
                 </Link>
+                <Link href="/tests">
+                  <Button variant="ghost" className="text-base">
+                    <TestTube2 className="h-4 w-4 mr-2" />
+                    Tests
+                  </Button>
+                </Link>
+                <Link href="/admin/config">
+                  <Button variant="ghost" className="text-base">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Admin
+                  </Button>
+                </Link>
               </>
             )}
           </SignedIn>
-          <Link href="/tests">
-            <Button variant="ghost" className="text-base">
-              <TestTube2 className="h-4 w-4 mr-2" />
-              Tests
-            </Button>
-          </Link>
           <SignedOut>
             <SignInButton mode="modal">
               <Button variant="secondary" className="text-base">
@@ -115,43 +122,36 @@ export function Navbar() {
               Navigation
             </SheetTitle>
             <div className="flex flex-col gap-4">
-              <Link href="/">
-                <Button variant="ghost" className="w-full text-base justify-start">
-                  Über Uns
-                </Button>
-              </Link>
               <SignedIn>
                 <Link href="/habitat">
                   <Button variant="ghost" className="w-full text-base justify-start">
-                    <Folder className="h-4 w-4 mr-2" />
-                    Habitat
+                    <ShieldCheck className="h-4 w-4 mr-2" />
+                    {isExpert || isAdmin ? "Habitatverwaltung" : "Meine Habitate"}
                   </Button>
                 </Link>
-              </SignedIn>
-              <SignedIn>
                 {isAdmin && (
                   <>
-                    <Link href="/admin/config">
-                      <Button variant="ghost" className="w-full text-base justify-start">
-                        <Settings className="h-4 w-4 mr-2" />
-                        Admin
-                      </Button>
-                    </Link>
                     <Link href="/admin/users">
                       <Button variant="ghost" className="w-full text-base justify-start">
                         <Users className="h-4 w-4 mr-2" />
                         Benutzer
                       </Button>
                     </Link>
+                    <Link href="/tests">
+                      <Button variant="ghost" className="w-full text-base justify-start">
+                        <TestTube2 className="h-4 w-4 mr-2" />
+                        Tests
+                      </Button>
+                    </Link>
+                    <Link href="/admin/config">
+                      <Button variant="ghost" className="w-full text-base justify-start">
+                        <Settings className="h-4 w-4 mr-2" />
+                        Admin
+                      </Button>
+                    </Link>
                   </>
                 )}
               </SignedIn>
-              <Link href="/tests">
-                <Button variant="ghost" className="w-full text-base justify-start">
-                  <TestTube2 className="h-4 w-4 mr-2" />
-                  Tests
-                </Button>
-              </Link>
               <SignedOut>
                 <SignInButton mode="modal">
                   <Button variant="secondary" className="w-full text-base justify-start">

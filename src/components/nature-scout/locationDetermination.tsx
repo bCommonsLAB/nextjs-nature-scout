@@ -2,8 +2,15 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { GeocodingResult, NatureScoutData, DebugInfo } from "@/types/nature-scout";
-import MapNoSSR from '../map/mapNoSSR';
+import dynamic from 'next/dynamic';
 import { Button } from "@/components/ui/button";
+import 'leaflet/dist/leaflet.css';
+import 'leaflet-draw/dist/leaflet.draw.css';
+
+const MapNoSSR = dynamic(() => import('@/components/map/mapNoSSR'), {
+  ssr: false,
+  loading: () => <div>Karte wird geladen...</div>
+});
 
 export function LocationDetermination({ metadata, setMetadata }: { metadata: NatureScoutData; setMetadata: React.Dispatch<React.SetStateAction<NatureScoutData>> }) {
   console.log('LocationDetermination RENDER', { 
@@ -22,6 +29,12 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
   const [showInstructions, setShowInstructions] = useState<boolean>(true);
   const [areaInSqMeters, setAreaInSqMeters] = useState<number>(0);
   const [zoom, setZoom] = useState<number>(13);
+  
+  // Referenz für die aktuelle Fläche, um Endlosschleifen zu vermeiden
+  const currentAreaRef = useRef<number>(metadata.plotsize || 0);
+  
+  // Referenz für die aktuellen Koordinaten, um Endlosschleifen zu vermeiden
+  const prevCoordinatesRef = useRef<{lat: number, lng: number} | null>(null);
   
   const debounceTimer = useRef<NodeJS.Timeout>();
 
@@ -43,12 +56,7 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
           // Bei Fehler werden die Default-Werte verwendet (bereits im State gesetzt)
         }
       );
-    } else {
-      // Geodaten nur abrufen, wenn bereits ein Polygon existiert (vorherige Bearbeitung)
-      if (metadata.polygonPoints && metadata.polygonPoints.length > 0) {
-        getGeoDataFromCoordinates(metadata.latitude, metadata.longitude);
-      }
-    }
+    } 
   }, [metadata.latitude, metadata.longitude, metadata.polygonPoints, setMetadata]);
 
   // Neue Funktion zum Abbrechen des Zeichnens
@@ -125,9 +133,17 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
 
   // Polygonpunkte-Handler
   const handlePolygonChange = useCallback((newPoints: Array<[number, number]>) => {
-    console.log('handlePolygonChange aufgerufen', { newPoints });
+    console.log('handlePolygonChange aufgerufen', { newPoints, length: newPoints.length });
+    
+    // Aktualisiere lokale State und Metadaten
     setPolygonPoints(newPoints);
-  }, []);
+    
+    // Das ist wichtig: Setze die polygonPoints in den Metadaten, damit sie persistent sind
+    setMetadata(prevMetadata => ({
+      ...prevMetadata,
+      polygonPoints: newPoints
+    }));
+  }, [setMetadata]);
 
   // Neue Funktion zum Speichern des Umrisses mit automatischem Schließen
   const savePolygon = useCallback(() => {
@@ -292,13 +308,23 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      // Ihre bestehende Map-Initialisierung
+    } catch (error) {
+      console.error('Fehler bei der Map-Initialisierung:', error);
+    }
+  }, []);
+
   return (
     <div className="space-y-4">
       {/* Willkommensnachricht */}
       {showInstructions && uiState === 'welcome' && (
         <div className="rounded-lg bg-blue-50 p-4 mb-4 text-sm">
           <h3 className="font-medium mb-2">Willkommen bei der Standortbestimmung</h3>
-          <p>Falls notwendig, verschieben Sie den Kartenausschnitt zu Ihrem aktuellen Standort und zoomen Sie so weit wie möglich hinein. Wenn Sie bereit sind, klicken Sie auf &quot;Habitatumriss erfassen&quot;, um fortzufahren.</p>
+          <p>Falls notwendig, verschieben Sie den Kartenausschnitt zu Ihrem aktuellen Standort und zoomen Sie so weit wie möglich hinein. Wenn Sie bereit sind, klicken Sie auf &quot;{metadata.polygonPoints && metadata.polygonPoints.length > 0 ? 'Habitatumriss ändern' : 'Habitatumriss erfassen'}&quot;, um fortzufahren.</p>
         </div>
       )}
 
@@ -317,12 +343,18 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
           onPolygonChange={handlePolygonChange}
           onAreaChange={(area) => {
             console.log('Neue Fläche berechnet:', area);
-            setAreaInSqMeters(area);
-            // Speichere die Fläche in den Metadaten
-            setMetadata(prev => ({
-              ...prev,
-              plotsize: area
-            }));
+            
+            // Nur aktualisieren, wenn sich die Fläche wesentlich geändert hat
+            if (Math.abs(currentAreaRef.current - area) > 10) { // Toleranz von 10 m²
+              setAreaInSqMeters(area);
+              currentAreaRef.current = area;
+              
+              // Speichere die Fläche in den Metadaten
+              setMetadata(prev => ({
+                ...prev,
+                plotsize: area
+              }));
+            }
           }}
           initialPolygon={polygonPoints}
           editMode={isDrawing}
@@ -339,6 +371,7 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
           onSavePolygonWithPoints={savePolygonWithPoints}
           onRestartDrawing={restartDrawing}
           onCancelDrawing={cancelDrawing}
+          hasPolygon={polygonPoints && polygonPoints.length > 0}
         />
       </div>
 
@@ -365,17 +398,17 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
           </div>
 
           {/* Rechte Spalte: Geodaten */}
-          {uiState === 'complete' && (
+          {(uiState === 'complete' || (metadata.standort && metadata.standort !== 'Standort konnte nicht ermittelt werden') || metadata.gemeinde || metadata.elevation || metadata.exposition || metadata.plotsize) && (
             <div className="space-y-2">
               <h3 className="text-sm font-medium text-gray-700">Standortinformationen</h3>
               <div className="bg-white p-3 rounded-md shadow-sm space-y-2">
-                {metadata.gemeinde !== 'unbekannt' && (
+                {metadata.gemeinde && metadata.gemeinde !== 'unbekannt' && (
                   <div>
                     <p className="text-xs text-gray-500">Gemeinde</p>
                     <p className="text-sm font-medium">{metadata.gemeinde}</p>
                   </div>
                 )}
-                {metadata.standort !== 'Standort konnte nicht ermittelt werden' && (
+                {metadata.standort && metadata.standort !== 'Standort konnte nicht ermittelt werden' && (
                   <div>
                     <p className="text-xs text-gray-500">Standort</p>
                     <p className="text-sm font-medium">{metadata.standort}</p>
@@ -384,15 +417,15 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
                 <div className="grid grid-cols-3 gap-2 pt-2">
                   <div>
                     <p className="text-xs text-gray-500">Höhe</p>
-                    <p className="text-sm font-medium">{metadata.elevation !== 'unbekannt' ? metadata.elevation : '-'}</p>
+                    <p className="text-sm font-medium">{metadata.elevation && metadata.elevation !== 'unbekannt' ? metadata.elevation : '-'}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Hangneigung</p>
-                    <p className="text-sm font-medium">{metadata.slope !== 'unbekannt' ? metadata.slope : '-'}</p>
+                    <p className="text-sm font-medium">{metadata.slope && metadata.slope !== 'unbekannt' ? metadata.slope : '-'}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Exposition</p>
-                    <p className="text-sm font-medium">{metadata.exposition !== 'unbekannt' ? metadata.exposition : '-'}</p>
+                    <p className="text-sm font-medium">{metadata.exposition && metadata.exposition !== 'unbekannt' ? metadata.exposition : '-'}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Fläche</p>

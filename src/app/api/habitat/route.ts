@@ -37,7 +37,7 @@ interface MongoDocument extends Document {
   };
   result?: {
     habitattyp?: string;
-    schutzstatus?: unknown;
+    schutzstatus?: string;
     zusammenfassung?: string;
     [key: string]: unknown;
   };

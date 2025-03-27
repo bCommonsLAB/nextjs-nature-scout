@@ -8,7 +8,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Shield, ShieldAlert, RefreshCw } from 'lucide-react';
 
 export default function AdminUsersPage() {
-  const { isAdmin, isLoading, error, makeAdmin } = useAdmin();
+  const { isAdmin, isLoading, makeAdmin } = useAdmin();
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -22,6 +22,7 @@ export default function AdminUsersPage() {
       await makeAdmin();
       setActionSuccess('Du wurdest erfolgreich zum Administrator gemacht!');
     } catch (err) {
+      console.error('Admin-Rechte Fehler:', err);
       setActionError('Fehler beim Erteilen von Admin-Rechten.');
     } finally {
       setActionLoading(false);

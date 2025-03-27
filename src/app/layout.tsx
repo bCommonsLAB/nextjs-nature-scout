@@ -8,6 +8,19 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css'; // CSS für Leaflet Draw
 import './leaflet-custom.css';  // Ihre custom Styles
 import { ClerkProvider } from "@clerk/nextjs";
+import { deDE } from '@clerk/localizations'
+
+const customLocalization = {
+  ...deDE,
+  signIn: {
+    ...deDE.signIn,
+    start: {
+      ...deDE.signIn?.start,
+      title: "Anmelden bei NatureScout",
+      subtitle: "Willkommen zurück! Bitte melden Sie sich an, um fortzufahren",
+    },
+  },
+};
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -31,8 +44,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="de">
-      <ClerkProvider>
+    <ClerkProvider localization={customLocalization}>
+      <html lang="de">
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
         >
@@ -42,7 +55,7 @@ export default function RootLayout({
           </main>
           <Footer />
         </body>
-      </ClerkProvider>
-    </html>
+      </html>
+    </ClerkProvider>
   );
 }
