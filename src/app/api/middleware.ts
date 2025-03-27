@@ -1,34 +1,36 @@
-import { authMiddleware } from "@clerk/nextjs";
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
-export default authMiddleware({
-  // Pfade, die ohne Authentifizierung zugänglich sein sollen
-  publicRoutes: [
-    // Öffentliche Seiten
-    "/",
-    "/habitat/karte",
-    "/api/habitat/public",
-    "/api/habitat/search",
-    "/api/habitat/categories",
-    "/api/habitat/categoriesDict",
-    
-    // Webhook-Routen müssen öffentlich sein
-    "/api/webhook/clerk",
-    
-    // Debug-Endpunkte (für Logging)
-    "/api/debug/log",
-    
-    // Statische Assets 
-    "/favicon(.*)",
-    "/images/(.*)",
-  ],
+// Definiere öffentliche Routen mit createRouteMatcher
+const isPublicRoute = createRouteMatcher([
+  // Öffentliche Seiten
+  "/",
+  "/habitat/karte",
+  "/api/habitat/public",
+  "/api/habitat/search",
+  "/api/habitat/categories",
+  "/api/habitat/categoriesDict",
+  "/api/webhook/clerk",
+  "/api/debug/log",
+  "/favicon(.*)",
+  "/images/(.*)",
+]);
+
+// Verwende den Handler-Ansatz für die Middleware
+export default clerkMiddleware((auth, req) => {
+  // Wenn es eine öffentliche Route ist, schütze sie nicht
+  if (isPublicRoute(req)) {
+    return;
+  }
   
-  // API-Routen, die ohne CSRF-Schutz funktionieren sollen
-  ignoredRoutes: [
-    "/api/webhook/clerk",
-  ],
+  // Alle anderen Routen sind geschützt
+  auth.protect();
 });
 
-// Exporter für die Middleware-Konfiguration
 export const config = {
-  matcher: ["/((?!.+\\.[\\w]+$|_next).*)", "/", "/(api|trpc)(.*)"],
+  matcher: [
+    // Skip Next.js internals and all static files
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // Always run for API routes
+    '/(api|trpc)(.*)',
+  ],
 }; 
