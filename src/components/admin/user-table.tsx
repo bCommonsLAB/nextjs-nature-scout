@@ -310,10 +310,10 @@ export function UserTable() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {formatDistanceToNow(new Date(user.createdAt), { 
+                    {user.createdAt ? formatDistanceToNow(new Date(user.createdAt), { 
                       addSuffix: true,
                       locale: de
-                    })}
+                    }) : 'Unbekannt'}
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
