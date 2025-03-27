@@ -421,7 +421,7 @@ function HabitatPageContent() {
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle>Hinweis</AlertTitle>
           <AlertDescription>
-            Als registrierter Benutzer sehen Sie hier Ihre eigenen Habitaterfassungen. Nur verifizierte Experten und Administratoren können alle Einträge sehen.
+            Als registrierter Benutzer sehen Sie hier Ihre eigenen Habitaterfassungen. Nur verifizierte Experten können alle Einträge sehen.
           </AlertDescription>
         </Alert>
       )}
