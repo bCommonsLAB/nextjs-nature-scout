@@ -105,9 +105,9 @@ const LocationStepsControl = L.Control.extend({
 
   onAdd: function() {
     const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control location-steps-control');
-    container.style.padding = '3px 8px';
-    container.style.backgroundColor = 'white';
-    container.style.boxShadow = '0 1px 5px rgba(0,0,0,0.4)';
+    container.style.padding = '3px';
+    container.style.backgroundColor = 'transparent';
+    container.style.boxShadow = 'none';
     container.style.borderRadius = '4px';
     
     container.classList.add('leaflet-control-layers');
@@ -201,11 +201,12 @@ const LocationStepsControl = L.Control.extend({
     button.style.border = 'none';
     button.style.borderRadius = '4px';
     button.style.cursor = 'pointer';
-    button.style.fontSize = '14px';
+    button.style.fontSize = '12px';
     button.style.width = '100%';
     button.style.textAlign = 'center';
-    button.style.marginBottom = '4px';
-    button.style.minWidth = '180px';
+    button.style.marginBottom = '25px';
+    button.style.minWidth = '120px';
+    button.style.maxWidth = '160px';
 
     button.dataset.controlType = 'location-steps';
     button.dataset.buttonType = text;

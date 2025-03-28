@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { Button } from "@/components/ui/button";
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
+import { InstructionDialog } from "@/components/ui/instruction-dialog";
 
 const MapNoSSR = dynamic(() => import('@/components/map/mapNoSSR'), {
   ssr: false,
@@ -26,7 +27,27 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
   const [uiState, setUiState] = useState<'welcome' | 'drawing' | 'complete'>(
     metadata.polygonPoints && metadata.polygonPoints.length > 0 ? 'complete' : 'welcome'
   );
-  const [showInstructions, setShowInstructions] = useState<boolean>(true);
+  
+  // Ersetzt showInstructions mit spezifischeren States für Popups
+  const [showWelcomePopup, setShowWelcomePopup] = useState<boolean>(
+    // Zeige Popup nur wenn wir im welcome State sind und noch kein Polygon gezeichnet wurde
+    uiState === 'welcome' && !(metadata.polygonPoints && metadata.polygonPoints.length > 0)
+  );
+  
+  // Neuer State für den Drawing-Popup
+  const [showDrawingPopup, setShowDrawingPopup] = useState<boolean>(false);
+  
+  // Status für "Nicht mehr anzeigen" Checkbox
+  const [dontShowWelcomeAgain, setDontShowWelcomeAgain] = useState<boolean>(
+    // Versuche aus localStorage zu laden
+    typeof window !== 'undefined' ? localStorage.getItem('dontShowWelcomeAgain') === 'true' : false
+  );
+  
+  // Status für "Nicht mehr anzeigen" Checkbox beim Drawing-Popup
+  const [dontShowDrawingAgain, setDontShowDrawingAgain] = useState<boolean>(
+    typeof window !== 'undefined' ? localStorage.getItem('dontShowDrawingAgain') === 'true' : false
+  );
+  
   const [areaInSqMeters, setAreaInSqMeters] = useState<number>(0);
   const [zoom, setZoom] = useState<number>(13);
   
@@ -37,6 +58,48 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
   const prevCoordinatesRef = useRef<{lat: number, lng: number} | null>(null);
   
   const debounceTimer = useRef<NodeJS.Timeout>();
+
+  // useEffect um dontShowWelcomeAgain im localStorage zu speichern
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dontShowWelcomeAgain', dontShowWelcomeAgain.toString());
+      
+      // Wenn "Nicht mehr anzeigen" aktiviert ist, Popup nicht anzeigen
+      if (dontShowWelcomeAgain) {
+        setShowWelcomePopup(false);
+      }
+    }
+  }, [dontShowWelcomeAgain]);
+  
+  // useEffect um dontShowDrawingAgain im localStorage zu speichern
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dontShowDrawingAgain', dontShowDrawingAgain.toString());
+      
+      // Wenn "Nicht mehr anzeigen" aktiviert ist, Popup nicht anzeigen
+      if (dontShowDrawingAgain) {
+        setShowDrawingPopup(false);
+      }
+    }
+  }, [dontShowDrawingAgain]);
+
+  // Initialisiere showWelcomePopup basierend auf dontShowWelcomeAgain
+  useEffect(() => {
+    if (uiState === 'welcome' && !dontShowWelcomeAgain) {
+      setShowWelcomePopup(true);
+    } else {
+      setShowWelcomePopup(false);
+    }
+  }, [uiState, dontShowWelcomeAgain]);
+  
+  // Zeige den Zeichnungs-Popup, wenn der Zeichenmodus aktiviert wird
+  useEffect(() => {
+    if (uiState === 'drawing' && !dontShowDrawingAgain) {
+      setShowDrawingPopup(true);
+    } else {
+      setShowDrawingPopup(false);
+    }
+  }, [uiState, dontShowDrawingAgain]);
 
   // Vereinfachter useEffect, der nur einmal beim Mount ausgeführt wird
   useEffect(() => {
@@ -248,31 +311,6 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
       }));
     }
   }
-  
-  // Debug-Funktion: GeoBrowser-API mit Debug-Flag aufrufen
-  async function testGeoBrowserApi() {
-    setIsLoading(true);
-    setDebugInfo(null);
-    
-    try {
-      const lat = currentPosition[0];
-      const lon = currentPosition[1];
-      const apiUrl = `/api/geobrowser?lat=${lat}&lon=${lon}&debug=true`;
-      
-      console.log('Test GeoBrowser API mit URL:', apiUrl);
-      
-      const response = await fetch(apiUrl);
-      const data = await response.json();
-      
-      console.log('GeoBrowser API Debug-Antwort:', data);
-      setDebugInfo(data);
-    } catch (error) {
-      console.error('Fehler beim API-Test:', error);
-      setDebugInfo({ error: String(error) });
-    } finally {
-      setIsLoading(false);
-    }
-  }
 
   // Zoom-Änderung verfolgen
   const handleZoomChange = useCallback((newZoom: number) => {
@@ -320,21 +358,7 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
 
   return (
     <div className="space-y-4">
-      {/* Willkommensnachricht */}
-      {showInstructions && uiState === 'welcome' && (
-        <div className="rounded-lg bg-blue-50 p-4 mb-4 text-sm">
-          <h3 className="font-medium mb-2">Willkommen bei der Standortbestimmung</h3>
-          <p>Falls notwendig, verschieben Sie den Kartenausschnitt zu Ihrem aktuellen Standort und zoomen Sie so weit wie möglich hinein. Wenn Sie bereit sind, klicken Sie auf &quot;{metadata.polygonPoints && metadata.polygonPoints.length > 0 ? 'Habitatumriss ändern' : 'Habitatumriss erfassen'}&quot;, um fortzufahren.</p>
-        </div>
-      )}
-
-      {uiState === 'drawing' && showInstructions && (
-        <div className="bg-yellow-50 p-3 rounded-md mt-2 mb-4">
-          <p className="text-sm">Zeichnen Sie eine Umrisslinie um das Habitat. Wählen sie als letzten Punkt den ersten aus, dann ist die Umrisslinie geschlossen. Klicken Sie dann auf &quot;Umrisslinie speichern&quot;</p>
-        </div>
-      )}
-
-      <div className="relative w-full h-[calc(100vh-6rem)]">
+      <div className="relative w-full h-[calc(100vh-16rem)]">
         <MapNoSSR
           position={currentPosition}
           zoom={zoom}
@@ -361,10 +385,10 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
           onStartDrawing={() => {
             console.log('onStartDrawing von MapNoSSR aufgerufen');
             setIsDrawing(true);
-            setShowInstructions(true);
+            // Ändere den UI-Status auf "drawing"
+            setUiState('drawing');
             console.log('Zeichenmodus aktiviert von MapNoSSR', { 
-              isDrawing: true, 
-              showInstructions: true 
+              isDrawing: true
             });
           }}
           onSavePolygon={savePolygon}
@@ -437,17 +461,6 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
           )}
         </div>
         
-        <div className="pt-4">
-          <Button 
-            onClick={testGeoBrowserApi} 
-            disabled={isLoading}
-            className="text-sm"
-            variant="outline"
-          >
-            {isLoading ? 'Wird getestet...' : 'GeoBrowser-API testen'}
-          </Button>
-        </div>
-        
         {debugInfo && (
           <div className="mt-4 p-4 bg-gray-100 rounded-md">
             <h3 className="text-sm font-medium mb-2">API Debug-Informationen:</h3>
@@ -483,6 +496,26 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
           </div>
         )}
       </div>
+      
+      {/* Willkommens-Popup - Außerhalb der Karte positionieren */}
+      <InstructionDialog
+        open={showWelcomePopup}
+        onOpenChange={setShowWelcomePopup}
+        title="Standortbestimmung"
+        content="Falls notwendig, verschieben Sie den Kartenausschnitt zu Ihrem aktuellen Standort und zoomen Sie mit dem Plus Symbol so weit wie möglich hinein. Wenn Sie bereit sind, klicken Sie auf 'Habitatumriss erfassen', um fortzufahren."
+        dontShowAgain={dontShowWelcomeAgain}
+        onDontShowAgainChange={setDontShowWelcomeAgain}
+      />
+      
+      {/* Zeichnungs-Popup - Außerhalb der Karte positionieren */}
+      <InstructionDialog
+        open={showDrawingPopup}
+        onOpenChange={setShowDrawingPopup}
+        title="Umrisslinie durch Eckpunkte bestimmen"
+        content="Klicken Sie die Eckpunkte um das Habitat im Uhrzeigersinn. Wählen Sie als letzten Punkt den ersten aus, dann ist die Umrisslinie geschlossen. Klicken Sie dann auf 'Umrisslinie speichern'."
+        dontShowAgain={dontShowDrawingAgain}
+        onDontShowAgainChange={setDontShowDrawingAgain}
+      />
     </div>
   );
 }

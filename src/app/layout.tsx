@@ -9,6 +9,7 @@ import 'leaflet-draw/dist/leaflet.draw.css'; // CSS für Leaflet Draw
 import './leaflet-custom.css';  // Ihre custom Styles
 import { ClerkProvider } from "@clerk/nextjs";
 import { deDE } from '@clerk/localizations'
+import { NatureScoutProvider } from "@/context/nature-scout-context";
 
 const customLocalization = {
   ...deDE,
@@ -49,11 +50,13 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
         >
-          <Navbar />
-          <main>
-            {children}
-          </main>
-          <Footer />
+          <NatureScoutProvider>
+            <Navbar />
+            <main>
+              {children}
+            </main>
+            <Footer />
+          </NatureScoutProvider>
         </body>
       </html>
     </ClerkProvider>

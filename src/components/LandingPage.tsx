@@ -169,7 +169,7 @@ export function NatureScoutPage() {
           <section className="landing-section flex overflow-hidden flex-col px-16 py-16 w-full bg-[#FAFFF3] max-md:px-5">
             <h2>Zuletzt verifizierte Habitate</h2>
             <div>
-              Diese Habitate wurden von engagierten Mitbürgern erfasst und Experten verifiziert
+              Diese Habitate wurden von engagierten Mitbürgern und Experten erfasst und verifiziert
             </div>
             <div className="flex flex-col mt-10 w-full max-md:max-w-full">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-8 w-full max-md:max-w-full">

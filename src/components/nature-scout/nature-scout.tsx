@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -14,6 +14,7 @@ import { LocationDetermination } from './locationDetermination';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Code, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useNatureScoutState } from "@/context/nature-scout-context";
 
 const schritte = [
   "Willkommen",
@@ -29,7 +30,7 @@ function isNextButtonDisabled(schritt: number, metadata: NatureScoutData, isAnyU
 
   switch (schritt) {
     case 0: // Willkommen
-      return !metadata.erfassungsperson || !metadata.email;
+      return false;
     
     case 1: // Standort bestimmen
       return !metadata.gemeinde || !metadata.flurname || !metadata.latitude || !metadata.longitude;
@@ -77,6 +78,24 @@ export default function NatureScout() {
     "Detailbild_2": false
   });
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Ref für die Progressbar
+  const progressBarRef = useRef<HTMLDivElement>(null);
+
+  // Scrolle zur Progressbar, wenn sich der aktive Schritt ändert
+  useEffect(() => {
+    if (progressBarRef.current) {
+      // Berechne Position mit etwas Offset nach oben (für bessere Sichtbarkeit)
+      const yOffset = -20; // 20px Offset nach oben
+      const yPosition = progressBarRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset;
+      
+      // Sanftes Scrollen zur Progressbar
+      window.scrollTo({
+        top: yPosition,
+        behavior: 'smooth'
+      });
+    }
+  }, [aktiverSchritt]);
 
   // Laden von vorhandenen Habitatdaten, wenn editJobId vorhanden ist
   useEffect(() => {
@@ -146,6 +165,17 @@ export default function NatureScout() {
   }, [editJobId]);
 
   const isAnyUploadActive = Object.values(activeUploads).some(isUploading => isUploading);
+
+  // Metadaten in den Context übertragen
+  const { setMetadata: setContextMetadata, setEditJobId: setContextEditJobId } = useNatureScoutState();
+
+  // useEffect zum Aktualisieren des Contexts
+  useEffect(() => {
+    setContextMetadata(metadata);
+    if (editJobId) {
+      setContextEditJobId(editJobId);
+    }
+  }, [metadata, editJobId, setContextMetadata, setContextEditJobId]);
 
   const setUploadStatus = (imageKey: string, isUploading: boolean) => {
     setActiveUploads(prev => ({
@@ -273,9 +303,9 @@ export default function NatureScout() {
   return (
     <div className="container mx-auto p-4">
       <DebugLogger metadata={metadata} />
-      <div className="mb-8">
+      <div className="mb-2" ref={progressBarRef}>
         <Progress value={(aktiverSchritt / (schritte.length - 1)) * 100} className="w-full" />
-        <div className="flex justify-between mt-2 px-1">
+        <div className="flex justify-between mt-1 px-1">
           {schritte.map((label, index) => (
             <span 
               key={label} 
@@ -291,32 +321,55 @@ export default function NatureScout() {
           ))}
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
         <div className="md:col-span-3">
           <Card>
-            <CardHeader>
-              <CardTitle>
-                {editJobId ? (
+            {editJobId ? (
+              <CardHeader>
+                <CardTitle>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                     <span>Bearbeitung von Habitat</span>
                     <span className="text-sm font-normal bg-gray-100 px-2 py-1 rounded">
                       Job-ID: {editJobId}
                     </span>
                   </div>
-                ) : (
-                  schritte[aktiverSchritt]
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex justify-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-                </div>
+                </CardTitle>
+              </CardHeader>
               ) : (
-                renderSchrittInhalt(aktiverSchritt)
+                aktiverSchritt !== 1 ? (
+                  <CardHeader>
+                    <CardTitle>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <span>{schritte[aktiverSchritt]}</span>
+                      </div>
+                  </CardTitle>
+                </CardHeader>
+                ) : null
               )}
-            </CardContent>
+            {aktiverSchritt === 1 ? (
+              <div className="p-0">
+                {isLoading ? (
+                  <div className="flex justify-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                  </div>
+                ) : (
+                  renderSchrittInhalt(aktiverSchritt)
+                )}
+              </div>
+            ) : (
+              <div className="p-0">
+              
+              <CardContent>
+                {isLoading ? (
+                  <div className="flex justify-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                  </div>
+                ) : (
+                  renderSchrittInhalt(aktiverSchritt)
+                )}
+              </CardContent>
+              </div>
+            )}
           </Card>
         </div>
       </div>
@@ -331,32 +384,6 @@ export default function NatureScout() {
             <ChevronLeft className="h-4 w-4" />
             Zurück
           </Button>
-          
-          {metadata && (
-            <Dialog open={isJsonDialogOpen} onOpenChange={setIsJsonDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <Code className="h-4 w-4" />
-                  Debug
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
-                <DialogHeader>
-                  <DialogTitle>
-                    Analysierte Daten
-                    {editJobId && (
-                      <span className="ml-2 text-sm font-normal bg-gray-100 px-2 py-1 rounded">
-                        Job-ID: {editJobId}
-                      </span>
-                    )}
-                  </DialogTitle>
-                </DialogHeader>
-                <pre className="bg-gray-100 p-4 rounded-md overflow-x-auto">
-                  {JSON.stringify(metadata, null, 2)}
-                </pre>
-              </DialogContent>
-            </Dialog>
-          )}
         </div>
 
         <Button 
