@@ -154,7 +154,7 @@ export function Navbar() {
               </SignedIn>
               <SignedOut>
                 <SignInButton mode="modal">
-                  <Button variant="secondary" className="w-full text-base justify-start">
+                  <Button variant="secondary" className="w-full text-base justify-start min-h-[44px]">
                     Jetzt Anmelden
                   </Button>
                 </SignInButton>
