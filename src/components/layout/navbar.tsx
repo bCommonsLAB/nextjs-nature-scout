@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import { Menu, Settings, TestTube2, ShieldCheck, Users, Code, ShieldPlus } from "lucide-react";
+import { Menu, Settings, TestTube2, MapPinCheckInside, Users, Code, MapPinPlusInside } from "lucide-react";
 import { SignInButton, SignedIn, SignedOut, useUser } from "@clerk/nextjs";
 import { UserProfileButton } from "@/components/user-profile";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -120,12 +120,12 @@ export function Navbar() {
         <div className="hidden md:flex gap-8 justify-center items-center self-stretch my-auto">
           <SignedIn>
             <Button variant="ghost" className="text-base" onClick={navigateToNewHabitat}>
-              <ShieldPlus className="h-4 w-4 mr-2" />
+              <MapPinPlusInside className="h-4 w-4 mr-2" />
               Neues Habitat
             </Button>
             <Link href="/habitat">
               <Button variant="ghost" className="text-base">
-                <ShieldCheck className="h-4 w-4 mr-2" />
+                <MapPinCheckInside className="h-4 w-4 mr-2" />
                 {isExpert || isAdmin ? "Habitatverwaltung" : "Meine Habitate"}
               </Button>
             </Link>
@@ -204,7 +204,7 @@ export function Navbar() {
             <div className="flex flex-col gap-4">
               <SignedIn>
                 <Button variant="ghost" className="w-full text-base justify-start" onClick={navigateToNewHabitat}>
-                  <ShieldPlus className="h-4 w-4 mr-2" />
+                  <MapPinPlusInside className="h-4 w-4 mr-2" />
                   Neues Habitat
                 </Button>
                 <Button 
@@ -212,7 +212,7 @@ export function Navbar() {
                   className="w-full text-base justify-start"
                   onClick={() => handleMobileNavigation('/habitat')}
                 >
-                  <ShieldCheck className="h-4 w-4 mr-2" />
+                  <MapPinCheckInside className="h-4 w-4 mr-2" />
                   {isExpert || isAdmin ? "Habitatverwaltung" : "Meine Habitate"}
                 </Button>
                 {isAdmin && (

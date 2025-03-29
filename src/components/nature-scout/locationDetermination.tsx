@@ -1,263 +1,108 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { GeocodingResult, NatureScoutData, DebugInfo } from "@/types/nature-scout";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { NatureScoutData, GeocodingResult } from "@/types/nature-scout";
 import dynamic from 'next/dynamic';
 import { Button } from "@/components/ui/button";
+import { MoveIcon, MapPinCheck, RefreshCw, CircleDashed, LocateFixed } from "lucide-react";
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import { InstructionDialog } from "@/components/ui/instruction-dialog";
+import type { MapNoSSRHandle } from "@/components/map/mapNoSSR";
 
+// Dynamisch geladene Karte ohne SSR
 const MapNoSSR = dynamic(() => import('@/components/map/mapNoSSR'), {
   ssr: false,
-  loading: () => <div>Karte wird geladen...</div>
+  loading: () => <div className="flex items-center justify-center h-full">Karte wird geladen...</div>
 });
 
-export function LocationDetermination({ metadata, setMetadata }: { metadata: NatureScoutData; setMetadata: React.Dispatch<React.SetStateAction<NatureScoutData>> }) {
-  console.log('LocationDetermination RENDER', { 
-    time: new Date().toISOString(),
-    hasExistingPolygon: metadata.polygonPoints && metadata.polygonPoints.length > 0
-  });
+// Typen für den Map-Modus
+type MapMode = 'navigation' | 'polygon' | 'none';
 
-  const [currentPosition, setCurrentPosition] = useState<[number, number]>([metadata.latitude || 46.724212, metadata.longitude || 11.65555]);
-  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isDrawing, setIsDrawing] = useState<boolean>(false);
-  const [polygonPoints, setPolygonPoints] = useState<Array<[number, number]>>(metadata.polygonPoints || []);
-  const [uiState, setUiState] = useState<'welcome' | 'drawing' | 'complete'>(
-    metadata.polygonPoints && metadata.polygonPoints.length > 0 ? 'complete' : 'welcome'
+export function LocationDetermination({ metadata, setMetadata }: { 
+  metadata: NatureScoutData; 
+  setMetadata: React.Dispatch<React.SetStateAction<NatureScoutData>> 
+}) {
+  // Grundlegende Zustände für die Map
+  const [currentPosition, setCurrentPosition] = useState<[number, number]>([
+    // Fallback-Wert für latitude verwenden, wenn undefined oder 0
+    metadata.latitude && metadata.latitude !== 0 ? metadata.latitude : 46.724212, 
+    // Fallback-Wert für longitude verwenden, wenn undefined oder 0
+    metadata.longitude && metadata.longitude !== 0 ? metadata.longitude : 11.65555
+  ]);
+  const [zoom, setZoom] = useState<number>(13);
+  const [mapMode, setMapMode] = useState<MapMode>('navigation');
+  const [polygonPoints, setPolygonPoints] = useState<Array<[number, number]>>(
+    metadata.polygonPoints || []
   );
   
-  // Ersetzt showInstructions mit spezifischeren States für Popups
-  const [showWelcomePopup, setShowWelcomePopup] = useState<boolean>(
-    // Zeige Popup nur wenn wir im welcome State sind und noch kein Polygon gezeichnet wurde
-    uiState === 'welcome' && !(metadata.polygonPoints && metadata.polygonPoints.length > 0)
+  // Referenz auf die Map-Instanz für direkte Steuerung
+  const mapRef = useRef<MapNoSSRHandle>(null);
+  
+  // Zustand für Geodaten und Ladestatus
+  const [isLoadingGeodata, setIsLoadingGeodata] = useState<boolean>(false);
+  const [showLocationInfo, setShowLocationInfo] = useState<boolean>(false);
+  const [isSavingPolygon, setIsSavingPolygon] = useState<boolean>(false);
+  
+  // Zustand für die berechnete Fläche
+  const [areaInSqMeters, setAreaInSqMeters] = useState<number>(
+    metadata.plotsize || 0
   );
   
-  // Neuer State für den Drawing-Popup
-  const [showDrawingPopup, setShowDrawingPopup] = useState<boolean>(false);
-  
-  // Status für "Nicht mehr anzeigen" Checkbox
+  // Hilfsdialog-Zustände
+  const [showWelcomePopup, setShowWelcomePopup] = useState<boolean>(true);
+  const [showPolygonPopup, setShowPolygonPopup] = useState<boolean>(false);
   const [dontShowWelcomeAgain, setDontShowWelcomeAgain] = useState<boolean>(
-    // Versuche aus localStorage zu laden
     typeof window !== 'undefined' ? localStorage.getItem('dontShowWelcomeAgain') === 'true' : false
   );
-  
-  // Status für "Nicht mehr anzeigen" Checkbox beim Drawing-Popup
-  const [dontShowDrawingAgain, setDontShowDrawingAgain] = useState<boolean>(
-    typeof window !== 'undefined' ? localStorage.getItem('dontShowDrawingAgain') === 'true' : false
+  const [dontShowPolygonAgain, setDontShowPolygonAgain] = useState<boolean>(
+    typeof window !== 'undefined' ? localStorage.getItem('dontShowPolygonAgain') === 'true' : false
   );
-  
-  const [areaInSqMeters, setAreaInSqMeters] = useState<number>(0);
-  const [zoom, setZoom] = useState<number>(13);
-  
-  // Referenz für die aktuelle Fläche, um Endlosschleifen zu vermeiden
-  const currentAreaRef = useRef<number>(metadata.plotsize || 0);
-  
-  // Referenz für die aktuellen Koordinaten, um Endlosschleifen zu vermeiden
-  const prevCoordinatesRef = useRef<{lat: number, lng: number} | null>(null);
-  
-  const debounceTimer = useRef<NodeJS.Timeout>();
 
-  // useEffect um dontShowWelcomeAgain im localStorage zu speichern
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('dontShowWelcomeAgain', dontShowWelcomeAgain.toString());
-      
-      // Wenn "Nicht mehr anzeigen" aktiviert ist, Popup nicht anzeigen
-      if (dontShowWelcomeAgain) {
-        setShowWelcomePopup(false);
-      }
-    }
-  }, [dontShowWelcomeAgain]);
-  
-  // useEffect um dontShowDrawingAgain im localStorage zu speichern
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('dontShowDrawingAgain', dontShowDrawingAgain.toString());
-      
-      // Wenn "Nicht mehr anzeigen" aktiviert ist, Popup nicht anzeigen
-      if (dontShowDrawingAgain) {
-        setShowDrawingPopup(false);
-      }
-    }
-  }, [dontShowDrawingAgain]);
-
-  // Initialisiere showWelcomePopup basierend auf dontShowWelcomeAgain
-  useEffect(() => {
-    if (uiState === 'welcome' && !dontShowWelcomeAgain) {
-      setShowWelcomePopup(true);
+  // Funktion zum Zentrieren der Karte auf die gespeicherte Position
+  const centerMapToCurrentPosition = useCallback(() => {
+    console.log('Zentriere Karte auf gespeicherte Position:', currentPosition);
+    
+    // Direkte Methode aufrufen, um die Karte zu zentrieren
+    if (mapRef.current) {
+      mapRef.current.centerMap(currentPosition[0], currentPosition[1], 18);
     } else {
-      setShowWelcomePopup(false);
+      console.warn('Map-Referenz nicht verfügbar');
+      
+      // Fallback: Nur Zoom ändern, falls keine direkte Methode verfügbar ist
+      setZoom(18);
     }
-  }, [uiState, dontShowWelcomeAgain]);
-  
-  // Zeige den Zeichnungs-Popup, wenn der Zeichenmodus aktiviert wird
-  useEffect(() => {
-    if (uiState === 'drawing' && !dontShowDrawingAgain) {
-      setShowDrawingPopup(true);
-    } else {
-      setShowDrawingPopup(false);
-    }
-  }, [uiState, dontShowDrawingAgain]);
+  }, [currentPosition]);
 
-  // Vereinfachter useEffect, der nur einmal beim Mount ausgeführt wird
-  useEffect(() => {
-    // GPS-Position nur abrufen, wenn keine Koordinaten gesetzt sind
-    if (metadata.latitude === 0 && metadata.longitude === 0) {
+  // Aktuelle GPS-Position abrufen und als currentPosition setzen
+  // Diese Funktion wird nur bei der Initialisierung eines neuen Habitats verwendet
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
+          
+          // Debug-Ausgabe
+          console.log('GPS-Position ermittelt:', { latitude, longitude });
+          
+          // Position aktualisieren
           setCurrentPosition([latitude, longitude]);
-          setMetadata(prevMetadata => ({
-            ...prevMetadata,
-            latitude,
-            longitude
-          }));
+          
+          // Zoom-Level aktualisieren
+          setZoom(18);
         },
-        () => {
-          // Bei Fehler werden die Default-Werte verwendet (bereits im State gesetzt)
+        (error) => {
+          console.error("Fehler bei der Standortermittlung:", error);
         }
       );
-    } 
-  }, [metadata.latitude, metadata.longitude, metadata.polygonPoints, setMetadata]);
-
-  // Neue Funktion zum Abbrechen des Zeichnens
-  const cancelDrawing = useCallback(() => {
-    console.log('cancelDrawing aufgerufen');
-    setPolygonPoints([]);
-    setIsDrawing(false);
-    setUiState('welcome');
-    console.log('Zeichnen abgebrochen', { isDrawing: false, uiState: 'welcome', polygonPoints: [] });
-  }, []);
-
-  // Neue Funktion zum Neustarten des Zeichnens
-  const restartDrawing = useCallback(() => {
-    console.log('restartDrawing aufgerufen');
-    setPolygonPoints([]);
-    setIsDrawing(true);
-    setMetadata(prevMetadata => ({
-      ...prevMetadata,
-      polygonPoints: []
-    }));
-    console.log('Zeichnen neu gestartet', { isDrawing: true, polygonPoints: [] });
-  }, [setMetadata]);
-
-  // Neue Funktion zum direkten Speichern des Umrisses mit übergebenen Punkten
-  const savePolygonWithPoints = useCallback((points: Array<[number, number]>) => {
-    console.log('savePolygonWithPoints aufgerufen mit Punkten:', points);
-    
-    if (!points || points.length < 3) {
-      console.log('Nicht genug Punkte zum Speichern', { pointCount: points?.length || 0 });
-      return;
     }
+  };
 
-    // Polygon schließen, falls nötig
-    const finalPoints = [...points];
-    const lastIndex = finalPoints.length - 1;
-    
-    if (finalPoints[0] && finalPoints[lastIndex] &&
-        (finalPoints[0][0] !== finalPoints[lastIndex][0] || 
-         finalPoints[0][1] !== finalPoints[lastIndex][1])) {
-      finalPoints.push(finalPoints[0]);
-    }
-
-    // Mittelpunkt berechnen
-    const centerLat = finalPoints.reduce((sum, point) => sum + point[0], 0) / finalPoints.length;
-    const centerLng = finalPoints.reduce((sum, point) => sum + point[1], 0) / finalPoints.length;
-
-    // Metadaten aktualisieren
-    setMetadata(prev => ({
-      ...prev,
-      coordinates: {
-        latitude: centerLat,
-        longitude: centerLng
-      },
-      points: finalPoints
-    }));
-
-    // Punkte im State aktualisieren
-    setPolygonPoints(finalPoints);
-
-    // Edit-Modus beenden
-    setIsDrawing(false);
-    setUiState('complete');
-    console.log('Polygon gespeichert', { 
-      isDrawing: false, 
-      uiState: 'complete', 
-      centerLat,
-      centerLng,
-      finalPoints 
-    });
-    
-    // Standortinformationen automatisch abrufen
-    getGeoDataFromCoordinates(centerLat, centerLng);
-  }, [setMetadata]);
-
-  // Polygonpunkte-Handler
-  const handlePolygonChange = useCallback((newPoints: Array<[number, number]>) => {
-    console.log('handlePolygonChange aufgerufen', { newPoints, length: newPoints.length });
-    
-    // Aktualisiere lokale State und Metadaten
-    setPolygonPoints(newPoints);
-    
-    // Das ist wichtig: Setze die polygonPoints in den Metadaten, damit sie persistent sind
-    setMetadata(prevMetadata => ({
-      ...prevMetadata,
-      polygonPoints: newPoints
-    }));
-  }, [setMetadata]);
-
-  // Neue Funktion zum Speichern des Umrisses mit automatischem Schließen
-  const savePolygon = useCallback(() => {
-    // Aktuelle Punkte aus dem State UND aus der Map holen
-    const points = polygonPoints;
-    console.log('savePolygon aufgerufen', { points });
-    
-    if (!points || points.length < 3) {
-      console.log('Nicht genug Punkte zum Speichern', { pointCount: points?.length || 0 });
-      return;
-    }
-
-    // Polygon schließen, falls nötig
-    const finalPoints = [...points];
-    const lastIndex = finalPoints.length - 1;
-    
-    if (finalPoints[0] && finalPoints[lastIndex] &&
-        (finalPoints[0][0] !== finalPoints[lastIndex][0] || 
-         finalPoints[0][1] !== finalPoints[lastIndex][1])) {
-      finalPoints.push(finalPoints[0]);
-    }
-
-    // Mittelpunkt berechnen
-    const centerLat = finalPoints.reduce((sum, point) => sum + point[0], 0) / finalPoints.length;
-    const centerLng = finalPoints.reduce((sum, point) => sum + point[1], 0) / finalPoints.length;
-
-    // Metadaten aktualisieren
-    setMetadata(prev => ({
-      ...prev,
-      coordinates: {
-        latitude: centerLat,
-        longitude: centerLng
-      },
-      points: finalPoints
-    }));
-
-    // Edit-Modus beenden
-    setIsDrawing(false);
-    setUiState('complete');
-    console.log('Polygon gespeichert', { 
-      isDrawing: false, 
-      uiState: 'complete', 
-      centerLat,
-      centerLng,
-      finalPoints 
-    });
-  }, [polygonPoints, setMetadata]);
-
-  async function getGeoDataFromCoordinates(lat: number, lon: number) {
+  // Geodaten vom Server abrufen
+  const getGeoDataFromCoordinates = async (lat: number, lng: number) => {
+    setIsLoadingGeodata(true);
     try {
-      const apiUrl = `/api/geobrowser?lat=${lat}&lon=${lon}`;
+      const apiUrl = `/api/geobrowser?lat=${lat}&lon=${lng}`;
       const response = await fetch(apiUrl);
       
       if (!response.ok) {
@@ -292,11 +137,14 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
         standort: data.standort || 'Standort konnte nicht ermittelt werden',
         gemeinde: data.gemeinde || 'unbekannt',
         flurname: data.flurname || 'unbekannt',
-        // Speichere Höhe und Exposition auch im Metadata-Objekt
         elevation: data.elevation || 'unbekannt',
         exposition: data.exposition || 'unbekannt',
         slope: data.slope || 'unbekannt'
       }));
+      
+      // Anzeige der Standortinformationen aktivieren
+      setShowLocationInfo(true);
+      
     } catch (error) {
       console.error('Fehler bei der Geo-Datenermittlung:', error);
       
@@ -309,213 +157,331 @@ export function LocationDetermination({ metadata, setMetadata }: { metadata: Nat
         exposition: 'unbekannt',
         slope: 'unbekannt'
       }));
+    } finally {
+      setIsLoadingGeodata(false);
     }
-  }
+  };
 
-  // Zoom-Änderung verfolgen
-  const handleZoomChange = useCallback((newZoom: number) => {
-    console.log('ZOOM ÄNDERUNG', { 
-      currentZoom: zoom,
-      newZoom,
-      time: new Date().toISOString()
-    });
-    setZoom(newZoom);
-  }, [zoom]);
+  // Modus wechseln
+  const toggleMapMode = (mode: MapMode) => {
+    // Wenn der aktuelle Modus bereits der gewählte Modus ist, auf 'none' setzen
+    const newMode = mapMode === mode ? 'none' : mode;
+    
+    setMapMode(newMode);
+    
+    // Standortinformationen nur im 'none'-Modus anzeigen
+    setShowLocationInfo(newMode === 'none');
+    
+    // Dialog für Polygon-Modus anzeigen
+    if (newMode === 'polygon' && !dontShowPolygonAgain) {
+      setShowPolygonPopup(true);
+    }
+  };
 
-  // Handler für die Zentrumsänderung der Karte
-  const handleCenterChange = useCallback((newCenter: [number, number]) => {
-    console.log('CENTER ÄNDERUNG', { 
-      currentPosition,
-      newCenter,
-      time: new Date().toISOString()
-    });
-    setCurrentPosition(newCenter);
+  // Handler für Flächenänderungen
+  const handleAreaChange = (newArea: number) => {
+    console.log('LocationDetermination: handleAreaChange aufgerufen mit Fläche:', newArea, 'm²');
+    
+    // Zusätzliche Validierung
+    if (newArea <= 0) {
+      console.warn('Ungültige Fläche erhalten:', newArea);
+      return;
+    }
+    
+    // Alte Fläche zur Debugging-Zwecken loggen
+    console.log('Alte Fläche war:', areaInSqMeters, 'm²');
+    
+    // Nur den lokalen State aktualisieren, NICHT die Metadaten
+    // Die Metadaten werden erst beim Speichern aktualisiert
+    setAreaInSqMeters(newArea);
+    
+    // WICHTIG: Keine Aktualisierung der Metadaten hier, um Endlosschleifen zu vermeiden
+    // setMetadata ruft einen Re-Render hervor, der wieder zu handleAreaChange führt
+  };
+
+  // Polygonpunkte aktualisieren
+  const handlePolygonChange = (newPoints: Array<[number, number]>) => {
+    console.log('Polygon-Punkte aktualisiert:', newPoints.length, 'Punkte');
+    setPolygonPoints(newPoints);
+    
+    // In den Metadaten speichern
     setMetadata(prevMetadata => ({
       ...prevMetadata,
-      latitude: newCenter[0],
-      longitude: newCenter[1],
+      polygonPoints: newPoints
     }));
-  }, [currentPosition, setMetadata]);
+  };
 
-  // Cleanup beim Unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimer.current) {
-        clearTimeout(debounceTimer.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
+  // Polygon abschließen
+  const savePolygon = async () => {
+    setIsSavingPolygon(true);
     try {
-      // Ihre bestehende Map-Initialisierung
+      // Aktuelle Polygon-Punkte von der Map holen
+      
+      // Im Bearbeitungsmodus die aktuellen Punkte direkt aus der Karte extrahieren
+      const currentPoints = mapRef.current?.getCurrentPolygonPoints() || [];
+      console.log('Speichere Polygon mit', currentPoints.length, 'Punkten und Fläche:', areaInSqMeters, 'm²');
+      
+      const message = 
+          "Der Habitat-Umriss ist noch nicht geschlossen.\n\n" +
+          "Bitte klicken Sie zum Abschluss wieder auf den ersten Punkt, damit ein geschlossenes Polygon entsteht. " +
+          "Ein korrekt geschlossener Umriss ist wichtig für die Berechnung der Fläche und die Lagebestimmung.";
+        
+      // Prüfen, ob genug Punkte vorhanden sind
+      if (currentPoints.length < 3) {
+        setIsSavingPolygon(false);
+        alert(message);
+        return;
+      }
+      
+      // Sicherstellen, dass der Polygonzug geschlossen ist (erster und letzter Punkt identisch)
+      const firstPoint = currentPoints[0];
+      const lastPoint = currentPoints[currentPoints.length - 1];
+      
+      
+      console.log('Speichere Polygon mit Punkten:', currentPoints.length);
+      
+      // Mittelpunkt berechnen
+      const centerLat = currentPoints.reduce((sum, point) => sum + point[0], 0) / currentPoints.length;
+      const centerLng = currentPoints.reduce((sum, point) => sum + point[1], 0) / currentPoints.length;
+      
+      // Finale Metadaten mit aktualisierten Werten
+      const updatedMetadata = {
+        ...metadata,
+        latitude: centerLat,
+        longitude: centerLng,
+        polygonPoints: currentPoints,
+        plotsize: areaInSqMeters // Sicherstellen, dass die aktuelle Fläche verwendet wird
+      };
+      
+      console.log('Finales Update der Metadaten mit Fläche:', updatedMetadata.plotsize);
+      
+      // Metadaten in einem Schritt aktualisieren
+      setMetadata(updatedMetadata);
+      
+      // Lokaler State für Polygon-Punkte und Position aktualisieren
+      setPolygonPoints(currentPoints);
+      setCurrentPosition([centerLat, centerLng]);
+      
+      // Standortinformationen abrufen
+      await getGeoDataFromCoordinates(centerLat, centerLng);
+      
+      // Explizit den "none"-Modus setzen, um anzuzeigen, dass wir fertig sind
+      setMapMode('none');
     } catch (error) {
-      console.error('Fehler bei der Map-Initialisierung:', error);
+      console.error("Fehler beim Speichern des Polygons:", error);
+      setIsSavingPolygon(false);
+      alert("Beim Speichern des Habitats ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.");
+    } finally {
+      setIsSavingPolygon(false);
     }
-  }, []);
+  };
+
+  // Polygon neu beginnen
+  const restartPolygon = () => {
+    setPolygonPoints([]);
+    setMetadata(prevMetadata => ({
+      ...prevMetadata,
+      polygonPoints: []
+    }));
+    
+    // Standortinformationsanzeige ausblenden
+    setShowLocationInfo(false);
+  };
+
+  // "Nicht mehr anzeigen" Einstellungen speichern
+  const saveWelcomePreference = (value: boolean) => {
+    setDontShowWelcomeAgain(value);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dontShowWelcomeAgain', value.toString());
+    }
+  };
+
+  const savePolygonPreference = (value: boolean) => {
+    setDontShowPolygonAgain(value);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dontShowPolygonAgain', value.toString());
+    }
+  };
+
+  // Beim Laden prüfen, ob bereits Geodaten vorhanden sind
+  useEffect(() => {
+    if (metadata.standort && 
+        metadata.standort !== 'Standort konnte nicht ermittelt werden' && 
+        metadata.standort !== 'unbekannt') {
+      setShowLocationInfo(true);
+    }
+  }, [metadata.standort]);
+  
+  // Bei der ersten Initialisierung ohne gültige Position GPS verwenden
+  useEffect(() => {
+    if (!metadata.latitude && !metadata.longitude) {
+      // Nur bei der Initialisierung ohne gültige Position die GPS-Position abrufen
+      getCurrentLocation();
+    }
+  }, [metadata.latitude, metadata.longitude]);
 
   return (
-    <div className="space-y-4">
-      <div className="relative w-full h-[calc(100vh-16rem)]">
+    <div className="flex flex-col h-[calc(100vh-9rem)]">
+      {/* Map-Container mit relativer Positionierung für überlagerte UI-Elemente */}
+      <div className="relative w-full flex-grow">
         <MapNoSSR
+          ref={mapRef}
           position={currentPosition}
           zoom={zoom}
-          onCenterChange={handleCenterChange}
-          onZoomChange={handleZoomChange}
+          onCenterChange={(newCenter) => {
+            // Diese Funktion setzt die currentPosition nur bei Drag der Karte
+            // Soll keine Auswirkung auf die gespeicherte Position haben
+          }}
+          onZoomChange={setZoom}
           onPolygonChange={handlePolygonChange}
-          onAreaChange={(area) => {
-            console.log('Neue Fläche berechnet:', area);
-            
-            // Nur aktualisieren, wenn sich die Fläche wesentlich geändert hat
-            if (Math.abs(currentAreaRef.current - area) > 10) { // Toleranz von 10 m²
-              setAreaInSqMeters(area);
-              currentAreaRef.current = area;
-              
-              // Speichere die Fläche in den Metadaten
-              setMetadata(prev => ({
-                ...prev,
-                plotsize: area
-              }));
-            }
-          }}
+          onAreaChange={handleAreaChange}
+          editMode={mapMode === 'polygon'}
           initialPolygon={polygonPoints}
-          editMode={isDrawing}
-          onStartDrawing={() => {
-            console.log('onStartDrawing von MapNoSSR aufgerufen');
-            setIsDrawing(true);
-            // Ändere den UI-Status auf "drawing"
-            setUiState('drawing');
-            console.log('Zeichenmodus aktiviert von MapNoSSR', { 
-              isDrawing: true
-            });
-          }}
-          onSavePolygon={savePolygon}
-          onSavePolygonWithPoints={savePolygonWithPoints}
-          onRestartDrawing={restartDrawing}
-          onCancelDrawing={cancelDrawing}
           hasPolygon={polygonPoints && polygonPoints.length > 0}
+          showZoomControls={mapMode !== 'polygon'}
+          showPositionMarker={mapMode === 'navigation'}
         />
-      </div>
-
-      <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-        {polygonPoints.length > 0 && (
-          <div className="text-sm text-gray-600 mb-4">
-            {polygonPoints.length} {polygonPoints.length === 1 ? 'Punkt' : 'Punkte'} definiert
-            {polygonPoints.length < 3 && (
-              <span className="text-amber-600 ml-2">(mindestens 3 Punkte erforderlich)</span>
+        
+        {/* Standortinformationen (unten rechts) */}
+        {showLocationInfo && (
+          <div className="absolute bottom-11 right-3 z-[9999] bg-gray-800/30 backdrop-blur-sm rounded-lg shadow-lg p-3 max-w-[60vw]">
+            <h3 className="text-[10px] font-semibold mb-1 text-white">Standortinformationen</h3>
+            {isLoadingGeodata ? (
+              <div className="flex items-center justify-center py-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary"></div>
+                <span className="ml-2 text-[10px] text-white">Daten werden geladen...</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-white">
+                {metadata.gemeinde && metadata.gemeinde !== 'unbekannt' && (
+                  <>
+                    <div className="text-gray-200">Gemeinde:</div>
+                    <div className="font-medium">{metadata.gemeinde}</div>
+                  </>
+                )}
+                {metadata.standort && metadata.standort !== 'Standort konnte nicht ermittelt werden' && (
+                  <>
+                    <div className="text-gray-200">Standort:</div>
+                    <div className="font-medium">{metadata.standort}</div>
+                  </>
+                )}
+                <div className="text-gray-200">Höhe:</div>
+                <div className="font-medium">{metadata.elevation && metadata.elevation !== 'unbekannt' ? metadata.elevation : '-'}</div>
+                <div className="text-gray-200">Hangneigung:</div>
+                <div className="font-medium">{metadata.slope && metadata.slope !== 'unbekannt' ? metadata.slope : '-'}</div>
+                <div className="text-gray-200">Exposition:</div>
+                <div className="font-medium">{metadata.exposition && metadata.exposition !== 'unbekannt' ? metadata.exposition : '-'}</div>
+                <div className="text-gray-200">Fläche:</div>
+                <div className="font-medium">{metadata.plotsize ? `${metadata.plotsize.toLocaleString('de-DE')} m²` : '-'}</div>
+              </div>
             )}
           </div>
         )}
-
-        {/* Geodaten in einem Grid-Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Linke Spalte: Basisinformationen */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-gray-700">Aktuelle Position</h3>
-            <div className="bg-white p-3 rounded-md shadow-sm">
-              <p className="text-sm">Breitengrad: {currentPosition[0]?.toFixed(6)}°</p>
-              <p className="text-sm">Längengrad: {currentPosition[1]?.toFixed(6)}°</p>
-              
-            </div>
-          </div>
-
-          {/* Rechte Spalte: Geodaten */}
-          {(uiState === 'complete' || (metadata.standort && metadata.standort !== 'Standort konnte nicht ermittelt werden') || metadata.gemeinde || metadata.elevation || metadata.exposition || metadata.plotsize) && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium text-gray-700">Standortinformationen</h3>
-              <div className="bg-white p-3 rounded-md shadow-sm space-y-2">
-                {metadata.gemeinde && metadata.gemeinde !== 'unbekannt' && (
-                  <div>
-                    <p className="text-xs text-gray-500">Gemeinde</p>
-                    <p className="text-sm font-medium">{metadata.gemeinde}</p>
-                  </div>
-                )}
-                {metadata.standort && metadata.standort !== 'Standort konnte nicht ermittelt werden' && (
-                  <div>
-                    <p className="text-xs text-gray-500">Standort</p>
-                    <p className="text-sm font-medium">{metadata.standort}</p>
-                  </div>
-                )}
-                <div className="grid grid-cols-3 gap-2 pt-2">
-                  <div>
-                    <p className="text-xs text-gray-500">Höhe</p>
-                    <p className="text-sm font-medium">{metadata.elevation && metadata.elevation !== 'unbekannt' ? metadata.elevation : '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Hangneigung</p>
-                    <p className="text-sm font-medium">{metadata.slope && metadata.slope !== 'unbekannt' ? metadata.slope : '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Exposition</p>
-                    <p className="text-sm font-medium">{metadata.exposition && metadata.exposition !== 'unbekannt' ? metadata.exposition : '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Fläche</p>
-                    <p className="text-sm font-medium">{metadata.plotsize ? `${metadata.plotsize.toLocaleString('de-DE')} m²` : '-'}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+        
+        {/* UI-Overlay: Modus-Buttons (unten links) */}
+        <div className="absolute bottom-11 left-3 z-[9999] flex flex-row gap-2">
+          <Button 
+            variant={mapMode === 'navigation' ? 'outline' : 'default'} 
+            size="icon"
+            onClick={() => toggleMapMode('navigation')}
+            className="h-8 w-8 shadow-lg"
+          >
+            <MoveIcon className="h-6 w-6" />
+          </Button>
+          
+          <Button 
+            variant={mapMode === 'polygon' ? 'outline' : 'default'} 
+            size="icon"
+            onClick={() => toggleMapMode('polygon')}
+            className="h-8 w-8 shadow-lg"
+          >
+            <CircleDashed className="h-6 w-6" />
+          </Button>
         </div>
         
-        {debugInfo && (
-          <div className="mt-4 p-4 bg-gray-100 rounded-md">
-            <h3 className="text-sm font-medium mb-2">API Debug-Informationen:</h3>
-            <details className="text-xs">
-              <summary className="cursor-pointer font-medium">Exposition API</summary>
-              <p className="mt-1"><strong>URL:</strong> <a href={debugInfo.debug?.expositionUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 break-all">{debugInfo.debug?.expositionUrl}</a></p>
-              <p className="mt-1"><strong>Status:</strong> {debugInfo.debug?.expositionResponse?.status} {debugInfo.debug?.expositionResponse?.statusText}</p>
-              <p className="mt-1"><strong>Content-Type:</strong> {debugInfo.debug?.expositionResponse?.contentType}</p>
-              <pre className="mt-2 p-2 bg-gray-200 rounded overflow-auto max-h-40">
-                {JSON.stringify(debugInfo.debug?.parsedData?.exposition, null, 2)}
-              </pre>
-            </details>
-            
-            <details className="text-xs mt-4">
-              <summary className="cursor-pointer font-medium">Hangneigung API</summary>
-              <p className="mt-1"><strong>URL:</strong> <a href={debugInfo.debug?.slopeUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 break-all">{debugInfo.debug?.slopeUrl}</a></p>
-              <p className="mt-1"><strong>Status:</strong> {debugInfo.debug?.slopeResponse?.status} {debugInfo.debug?.slopeResponse?.statusText}</p>
-              <p className="mt-1"><strong>Content-Type:</strong> {debugInfo.debug?.slopeResponse?.contentType}</p>
-              <pre className="mt-2 p-2 bg-gray-200 rounded overflow-auto max-h-40">
-                {JSON.stringify(debugInfo.debug?.parsedData?.slope, null, 2)}
-              </pre>
-            </details>
-            
-            <details className="text-xs mt-4">
-              <summary className="cursor-pointer font-medium">Gemeinde API</summary>
-              <p className="mt-1"><strong>URL:</strong> <a href={debugInfo.debug?.municipalityUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 break-all">{debugInfo.debug?.municipalityUrl}</a></p>
-              <p className="mt-1"><strong>Status:</strong> {debugInfo.debug?.municipalityResponse?.status} {debugInfo.debug?.municipalityResponse?.statusText}</p>
-              <p className="mt-1"><strong>Content-Type:</strong> {debugInfo.debug?.municipalityResponse?.contentType}</p>
-              <pre className="mt-2 p-2 bg-gray-200 rounded overflow-auto max-h-40">
-                {JSON.stringify(debugInfo.debug?.parsedData?.municipality, null, 2)}
-              </pre>
-            </details>
+        {/* UI-Overlay: Aktions-Buttons (oben links) */}
+        {mapMode !== 'polygon' && (
+        <div className="absolute z-[9999] flex flex-row gap-2 items-center" style={{left: 10, top: 75}}>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={centerMapToCurrentPosition} 
+              className="h-7 w-7 shadow-lg"
+              title="Karte auf gespeicherte Position zentrieren"
+            >
+              <LocateFixed className="h-6 w-6" />
+            </Button>
           </div>
+        )}
+        {!showLocationInfo && (
+          <>
+            
+            {mapMode === 'polygon' && (
+              <div className="absolute bottom-11 right-3 z-[9999] flex flex-row gap-2 items-center">
+                <Button 
+                  variant="default" 
+                  size="sm" 
+                  onClick={savePolygon}
+                  className="shadow-lg flex items-center gap-1 h-8"
+                  disabled={isSavingPolygon}
+                >
+                  {isSavingPolygon ? (
+                    <div className="flex items-center gap-1">
+                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary-foreground"></div>
+                      <span>Speichern...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <MapPinCheck className="h-8 w-8" />
+                      <span>Speichern</span>
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  variant="default" 
+                  size="sm" 
+                  onClick={restartPolygon}
+                  className="shadow-lg flex items-center gap-1 h-8"
+                  disabled={isSavingPolygon}
+                >
+                  <RefreshCw className="h-8 w-8" />
+                  <span>Neu</span>
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
       
-      {/* Willkommens-Popup - Außerhalb der Karte positionieren */}
+      {/* Willkommens-Dialog */}
       <InstructionDialog
         open={showWelcomePopup}
         onOpenChange={setShowWelcomePopup}
-        title="Standortbestimmung"
-        content="Falls notwendig, verschieben Sie den Kartenausschnitt zu Ihrem aktuellen Standort und zoomen Sie mit dem Plus Symbol so weit wie möglich hinein. Wenn Sie bereit sind, klicken Sie auf 'Habitatumriss erfassen', um fortzufahren."
+        title="Modus 'Karte verschieben'"
+        content="Verschieben Sie den Kartenausschnitt zu Ihrem Habitat und zoomen Sie so weit wie möglich hinein. Wechsel Sie unten links dann den Modus 'Habitat eingrenzen'."
         dontShowAgain={dontShowWelcomeAgain}
-        onDontShowAgainChange={setDontShowWelcomeAgain}
+        onDontShowAgainChange={saveWelcomePreference}
       />
       
-      {/* Zeichnungs-Popup - Außerhalb der Karte positionieren */}
+      {/* Polygon-Dialog */}
       <InstructionDialog
-        open={showDrawingPopup}
-        onOpenChange={setShowDrawingPopup}
-        title="Umrisslinie durch Eckpunkte bestimmen"
-        content="Klicken Sie die Eckpunkte um das Habitat im Uhrzeigersinn. Wählen Sie als letzten Punkt den ersten aus, dann ist die Umrisslinie geschlossen. Klicken Sie dann auf 'Umrisslinie speichern'."
-        dontShowAgain={dontShowDrawingAgain}
-        onDontShowAgainChange={setDontShowDrawingAgain}
+        open={showPolygonPopup}
+        onOpenChange={setShowPolygonPopup}
+        title="Modus 'Habitat eingrenzen'"
+        content="Klicken Sie auf die Karte, um Eckpunkte des Habitat-Umrisses im Uhrzeigersinn zu setzen. Sie benötigen mindestens 3 Punkte. Abschließend klicken Sie auf das 'Speichern'-Symbol."
+        dontShowAgain={dontShowPolygonAgain}
+        onDontShowAgainChange={savePolygonPreference}
       />
+      
+      {/* Vollbild-Overlay während des Speichervorgangs */}
+      {isSavingPolygon && (
+        <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[10000]">
+          <div className="bg-white/10 backdrop-blur-md rounded-lg p-6 flex flex-col items-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
+            <div className="mt-3 text-white font-medium">Standortdaten werden ermittelt...</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
