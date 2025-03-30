@@ -10,7 +10,6 @@ import { ArrowDown, ArrowRight   } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Info, Sparkles } from "lucide-react";
 import Link from 'next/link';
-import { WelcomePopup } from "./welcome-popup";
 import { useUser } from "@clerk/nextjs";
 //console.log('LandingPage wird gerendert');
 
@@ -104,7 +103,6 @@ export function NatureScoutPage() {
 
   return (
     <div className="flex overflow-hidden flex-col bg-black bg-opacity-20">
-      <WelcomePopup />
       <div className="flex flex-col w-full max-md:max-w-full">
         <main>
           <section 

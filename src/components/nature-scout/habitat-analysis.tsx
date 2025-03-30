@@ -338,8 +338,12 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                 <div className="mt-4">
                   <div className="text-sm text-gray-600 space-y-2 mb-6">
                       <p>
-                        Diese Parameter wurden aufgrund von Wahrscheinlichkeiten analysiert. Technisch wir jeder Parameter durch eine gezielte Fargestellung erkannt, die hinter dem Fragesymbol erklärt wird. Es kann sein, dass einige erkannte Parameter falsch sind. Aber es hilft die Einschätzugen nachzuvollziehen und evtl. Fehler zu analysieren. 
-                        Wenn ein Parameter so falsch ist, dass es Auswirkungen auf den erkannten Habitattyp hätte, bitten wir sie, das im nächsten Abschnitt zu anzumerken.                      
+                        Die hier gelisteten Parameter wurden durch das LLM aufgrund von Wahrscheinlichkeiten analysiert. 
+                        Jeder Parameter wird durch eine gezielte Frage bestimmt, die hinter dem Fragesymbol erklärt wird. 
+                        Es kann sein, dass einige erkannte Parameter falsch sind, aber es zwingt das LLM viele Indizien 
+                        zu berücksichtigen und die Einschätzung zu verbessern. 
+                        Wenn ein Parameter so falsch ist, dass es Auswirkungen auf den erkannten Habitattyp hätte, 
+                        bitten wir sie, das im nächsten Abschnitt zu anzumerken.                      
                       </p>
                   </div>
                   <div className="bg-blue-50 p-4 rounded-lg space-y-3">

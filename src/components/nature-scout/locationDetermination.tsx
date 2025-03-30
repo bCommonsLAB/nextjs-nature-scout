@@ -19,9 +19,18 @@ const MapNoSSR = dynamic(() => import('@/components/map/mapNoSSR'), {
 // Typen für den Map-Modus
 type MapMode = 'navigation' | 'polygon' | 'none';
 
-export function LocationDetermination({ metadata, setMetadata }: { 
+export function LocationDetermination({ 
+  metadata, 
+  setMetadata,
+  showHelp,
+  onHelpShown,
+  scrollToNext
+}: { 
   metadata: NatureScoutData; 
-  setMetadata: React.Dispatch<React.SetStateAction<NatureScoutData>> 
+  setMetadata: React.Dispatch<React.SetStateAction<NatureScoutData>>;
+  showHelp?: boolean;
+  onHelpShown?: () => void;
+  scrollToNext?: () => void;
 }) {
   // Grundlegende Zustände für die Map
   const [currentPosition, setCurrentPosition] = useState<[number, number]>([
@@ -267,6 +276,14 @@ export function LocationDetermination({ metadata, setMetadata }: {
       
       // Explizit den "none"-Modus setzen, um anzuzeigen, dass wir fertig sind
       setMapMode('none');
+      
+      // Zum Weiter-Button scrollen, nachdem alles gespeichert wurde
+      if (scrollToNext) {
+        // Kurze Verzögerung, damit die UI Zeit hat, sich zu aktualisieren
+        setTimeout(() => {
+          scrollToNext();
+        }, 500);
+      }
     } catch (error) {
       console.error("Fehler beim Speichern des Polygons:", error);
       setIsSavingPolygon(false);
@@ -319,6 +336,21 @@ export function LocationDetermination({ metadata, setMetadata }: {
       getCurrentLocation();
     }
   }, [metadata.latitude, metadata.longitude]);
+
+  // Effekt für den Hilfe-Button
+  useEffect(() => {
+    if (showHelp) {
+      // Je nach aktuellem Modus den entsprechenden Dialog anzeigen
+      if (mapMode === 'polygon') {
+        setShowPolygonPopup(true);
+      } else {
+        setShowWelcomePopup(true);
+      }
+      
+      // Nach dem Anzeigen das Help-Flag NICHT sofort zurücksetzen
+      // Wird stattdessen beim Schließen des Dialogs gemacht
+    }
+  }, [showHelp, mapMode]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-9rem)]">
@@ -456,21 +488,35 @@ export function LocationDetermination({ metadata, setMetadata }: {
       {/* Willkommens-Dialog */}
       <InstructionDialog
         open={showWelcomePopup}
-        onOpenChange={setShowWelcomePopup}
+        onOpenChange={(open) => {
+          setShowWelcomePopup(open);
+          // Wenn der Dialog geschlossen wird und es war ein Hilfe-Klick, den onHelpShown-Callback aufrufen
+          if (!open && showHelp && onHelpShown) {
+            onHelpShown();
+          }
+        }}
         title="Modus 'Karte verschieben'"
         content="Verschieben Sie den Kartenausschnitt zu Ihrem Habitat und zoomen Sie so weit wie möglich hinein. Wechsel Sie unten links dann den Modus 'Habitat eingrenzen'."
         dontShowAgain={dontShowWelcomeAgain}
         onDontShowAgainChange={saveWelcomePreference}
+        skipDelay={!!showHelp}
       />
       
       {/* Polygon-Dialog */}
       <InstructionDialog
         open={showPolygonPopup}
-        onOpenChange={setShowPolygonPopup}
+        onOpenChange={(open) => {
+          setShowPolygonPopup(open);
+          // Wenn der Dialog geschlossen wird und es war ein Hilfe-Klick, den onHelpShown-Callback aufrufen
+          if (!open && showHelp && onHelpShown) {
+            onHelpShown();
+          }
+        }}
         title="Modus 'Habitat eingrenzen'"
         content="Klicken Sie auf die Karte, um Eckpunkte des Habitat-Umrisses im Uhrzeigersinn zu setzen. Sie benötigen mindestens 3 Punkte. Abschließend klicken Sie auf das 'Speichern'-Symbol."
         dontShowAgain={dontShowPolygonAgain}
         onDontShowAgainChange={savePolygonPreference}
+        skipDelay={!!showHelp}
       />
       
       {/* Vollbild-Overlay während des Speichervorgangs */}

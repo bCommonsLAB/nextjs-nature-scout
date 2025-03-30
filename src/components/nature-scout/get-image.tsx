@@ -10,40 +10,45 @@ import { Button } from "../ui/button";
 
 const SAMPLE_IMAGES = [
   {
-    src: '/panoramasamples/trockenrasen-kurzgrasig.jpg',
+    src: '/habitatsamples/trockenrasen-kurzgrasig.jpg',
     title: 'Trockenrasen kurzgrasig',
-    type: 'panorama'
+    type: 'habitat'
   },
   {
-    src: '/panoramasamples/verlandungsmoor.jpg',
+    src: '/habitatsamples/verlandungsmoor.jpg',
     title: 'Moor Verlandungsmoor',
-    type: 'panorama'
+    type: 'habitat'
   },
   {
-    src: '/panoramasamples/magerwiese-artenreich.jpg',
+    src: '/habitatsamples/magerwiese-artenreich.jpg',
     title: 'Magerwiese artenreich',
-    type: 'panorama'
+    type: 'habitat'
   },
   {
-    src: '/panoramasamples/fettwiese-standard.jpg',
+    src: '/habitatsamples/fettwiese-standard.jpg',
     title: 'Fettwiese',
-    type: 'panorama'
+    type: 'habitat'
   },
   {
-    src: '/detailsamples/Arnika.jpg',
+    src: '/plantsamples/arnika.jpg',
     title: 'Arnika (typisch für Magerwiese)',
-    type: 'detail'
+    type: 'plant'
   },
   {
-    src: '/detailsamples/Salvia pratensis.JPG',
-    title: 'Salva pratensis (typisch für Magerwiese)',
-    type: 'detail'
+    src: '/plantsamples/salvia-pratensis.jpg',
+    title: 'Salvia pratensis (typisch für Magerwiese)',
+    type: 'plant'
   },
   {
-    src: '/detailsamples/Trifolium montanum.JPG',
+    src: '/plantsamples/trifolium-montanum.jpg',
     title: 'Trifolium montanum (typisch für Magerwiese)',
-    type: 'detail'
-  }
+    type: 'plant'
+  },
+  {
+    src: '/plantsamples/fumana-ericoides.jpg',
+    title: 'Fumana ericoides (typisch für Trockenrasen)',
+    type: 'plant'
+  },
 ];
 
 interface GetImageProps {
@@ -75,6 +80,7 @@ export function GetImage({
 }: GetImageProps) {
   const [localUploadProgress, setLocalUploadProgress] = useState(0);
   const [uploadedImage, setUploadedImage] = useState<string | null>(existingImage?.url || null);
+  const [progressPhase, setProgressPhase] = useState<'upload' | 'analyze' | 'complete'>('upload');
   const [backgroundImageStyle, setBackgroundImageStyle] = useState<React.CSSProperties>(
     existingImage?.url ? {
       backgroundImage: `url("${existingImage.url}")`,
@@ -98,6 +104,37 @@ export function GetImage({
     }
   }, [existingImage]);
 
+  // Timer für kontinuierliche Fortschrittsanzeige
+  useEffect(() => {
+    let progressTimer: NodeJS.Timeout | null = null;
+    
+    if (isUploading) {
+      if (progressPhase === 'upload' && localUploadProgress < 60) {
+        // Upload-Phase (0-60%)
+        progressTimer = setInterval(() => {
+          setLocalUploadProgress(prevProgress => {
+            if (prevProgress < 10) return 10; // Sofort auf 10% setzen
+            if (prevProgress < 30) return prevProgress + 0.8;
+            if (prevProgress < 50) return prevProgress + 0.4;
+            return Math.min(prevProgress + 0.2, 59); // Maximal 59% bis Upload fertig
+          });
+        }, 100);
+      } else if (progressPhase === 'analyze' && localUploadProgress < 90) {
+        // Analyse-Phase (60-90%)
+        progressTimer = setInterval(() => {
+          setLocalUploadProgress(prevProgress => {
+            if (prevProgress < 70) return prevProgress + 0.3;
+            if (prevProgress < 80) return prevProgress + 0.2;
+            return Math.min(prevProgress + 0.1, 89); // Maximal 89% bis Analyse fertig
+          });
+        }, 100);
+      }
+    }
+    
+    return () => {
+      if (progressTimer) clearInterval(progressTimer);
+    };
+  }, [isUploading, localUploadProgress, progressPhase]);
 
   async function uploadImage(imageUrl: string, filename: string): Promise<{ url: string; filename: string }> {
     const response = await fetch(imageUrl);
@@ -125,6 +162,9 @@ export function GetImage({
     filename: string;
     analysis: PlantNetResponse | null;
   }> {
+    setProgressPhase('upload');
+    setLocalUploadProgress(5);
+    
     let uploadResult;
     if (typeof imageSource === 'string') {
       uploadResult = await uploadImage(imageSource, originalFileName);
@@ -143,11 +183,12 @@ export function GetImage({
 
     let analysis = null;
     if (doAnalyzePlant) {
-      setLocalUploadProgress(70);
+      setProgressPhase('analyze');
       analysis = await analyzePlants([uploadResult.url]);
       setLocalUploadProgress(90);
     }
 
+    setProgressPhase('complete');
     return { 
       url: uploadResult.url, 
       filename: uploadResult.filename, 
@@ -160,7 +201,8 @@ export function GetImage({
     if (!file) return;
     
     setIsUploading(true);
-    setLocalUploadProgress(20);
+    setProgressPhase('upload');
+    setLocalUploadProgress(5);
 
     try {
       const { url, filename, analysis } = await processImage(
@@ -192,7 +234,8 @@ export function GetImage({
 
   const handleSampleImageClick = async (sampleSrc: string) => {
     setIsUploading(true);
-    setLocalUploadProgress(20);
+    setProgressPhase('upload');
+    setLocalUploadProgress(5);
 
     try {
       const pathParts = sampleSrc.split('/');
@@ -239,6 +282,7 @@ export function GetImage({
       backgroundImage: `url("${url}")`,
       backgroundSize: 'contain',
       backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
       opacity: 1
     });
 
@@ -266,93 +310,93 @@ export function GetImage({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col items-center justify-start w-64 min-h-64 border-2 border-gray-300 rounded-lg bg-gray-50 p-4 space-y-2">
-        <h2 className="text-lg font-semibold">{imageTitle} Upload</h2>
-        <p className="text-sm text-center">{anweisung}</p>
-        
-        <div className="relative w-full">
-          <div 
-            className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-100 hover:bg-gray-200" 
-            style={backgroundImageStyle}
-            onLoad={() => console.log("🎨 Hintergrundbild geladen:", uploadedImage)}
-          >
-            {uploadedImage && (
-              <Button
-                variant="destructive"
-                size="icon"
-                className="absolute top-2 right-2 z-10"
-                onClick={(e) => {
-                  e.preventDefault();
-                  onDeleteImage(imageTitle);
-                  setUploadedImage(null);
-                  setBackgroundImageStyle({});
-                }}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-            
-            <label htmlFor={`dropzone-file-${imageTitle}`} className="flex flex-col items-center justify-center w-full h-full">
-              {isUploading ? (
-                <div className="w-full px-4">
-                  <Progress value={localUploadProgress} className="w-full" />
-                  <p className="text-xs text-center mt-2">{Math.round(localUploadProgress)}% hochgeladen</p>
+    <div>
+      <div className="relative max-w-xs mx-auto">
+        <div 
+          className={`flex flex-col items-center justify-center h-[150px] w-[150px] border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-100 hover:bg-gray-200 p-2 ${uploadedImage ? "" : "space-y-1"}`}
+          style={backgroundImageStyle}
+        >
+          {uploadedImage && (
+            <Button
+              variant="destructive"
+              size="icon"
+              className="absolute top-2 right-2 z-10"
+              onClick={(e) => {
+                e.preventDefault();
+                onDeleteImage(imageTitle);
+                setUploadedImage(null);
+                setBackgroundImageStyle({});
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+          
+          <label htmlFor={`dropzone-file-${imageTitle}`} className="flex flex-col items-center justify-center w-full h-full">
+            {isUploading ? (
+              <div className="w-full px-4">
+                <Progress value={localUploadProgress} className="w-full" />
+                <p className="text-xs text-center mt-2">
+                  {Math.round(localUploadProgress)}% 
+                  {progressPhase === 'analyze' ? ' analysiert' : ' hochgeladen'}
+                </p>
+              </div>
+            ) : !uploadedImage ? (
+              <>
+                <h2 className="text-sm font-semibold">{imageTitle.replace(/_/g, ' ')}</h2>
+                <p className="text-xs text-center text-gray-500">{anweisung}</p>
+                <Upload className="w-8 h-8 my-1 text-gray-400" />
+                <p className="text-xs text-gray-500">Klicken zum Hochladen</p>
+                
+                <div className="mt-1">
+                  <p className="text-xs text-gray-600">Beispielbilder:</p>
+                  <div className="grid grid-cols-4 gap-1 mt-1">
+                  {SAMPLE_IMAGES
+                    .filter(sample => 
+                      doAnalyzePlant ? sample.type === 'plant' 
+                        : sample.type === 'habitat'
+                    )
+                    .map((sample, index) => (
+                      <button
+                        key={index}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          handleSampleImageClick(sample.src);
+                        }}
+                        className="relative w-[30px] h-[30px] rounded overflow-hidden hover:opacity-90 transition-opacity"
+                        title={sample.title}
+                      >
+                        <Image
+                          src={sample.src}
+                          alt={sample.title}
+                          width={30}
+                          height={30}
+                          className="object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              ) : !uploadedImage ? (
-                <>
-                  <Upload className="w-10 h-10 mb-3 text-gray-400" />
-                  <p className="text-xs text-gray-500">Klicken Sie zum Hochladen oder ziehen Sie die Datei hierher</p>
-                  <p className="text-xs text-gray-500">PNG, JPG</p>
-                </>
-              ) : null}
-              <input 
-                id={`dropzone-file-${imageTitle}`} 
-                type="file" 
-                className="hidden" 
-                onChange={handleBildUpload}
-                accept="image/*"
-              />
-            </label>
-          </div>
+              </>
+            ) : null}
+            <input 
+              id={`dropzone-file-${imageTitle}`} 
+              type="file" 
+              className="hidden" 
+              onChange={handleBildUpload}
+              accept="image/*"
+            />
+          </label>
         </div>
         
         {uploadedImage && doAnalyzePlant && (
-          <div className="w-full mt-2 text-sm">
+          <div className="mt-2 text-xs w-[150px]">
             <p className="font-medium">Erkannte Pflanze:</p>
             <p className="text-gray-600">{existingImage?.analyse || "Analyse läuft..."}</p>
           </div>
         )}
-
-        <div className="mt-4">
-          <p className="text-sm text-gray-600 mb-2">Oder wähle ein Beispielbild:</p>
-          <div className="grid grid-cols-4 gap-1">
-          {SAMPLE_IMAGES
-            .filter(sample => 
-              imageTitle.toLowerCase().includes('detail') 
-                ? sample.type === 'detail' 
-                : sample.type === 'panorama'
-            )
-            .map((sample, index) => (
-              <button
-                key={index}
-                onClick={() => handleSampleImageClick(sample.src)}
-                className="relative w-[50px] h-[50px] rounded-lg overflow-hidden hover:opacity-90 transition-opacity"
-                title={sample.title}
-              >
-                <Image
-                  src={sample.src}
-                  alt={sample.title}
-                  width={50}
-                  height={50}
-                  className="object-cover"
-                />
-              </button>
-              ))}
-          </div>
-        </div>
       </div>
     </div>
   );
-
 } 

@@ -197,7 +197,7 @@ export function Navbar() {
               <Menu className="h-6 w-6" />
             </Button>
           </SheetTrigger>
-          <SheetContent>
+          <SheetContent className="!pointer-events-auto">
             <SheetTitle className="text-left mb-4">
               Navigation
             </SheetTitle>

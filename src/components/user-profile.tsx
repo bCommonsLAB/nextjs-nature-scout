@@ -62,9 +62,9 @@ export function UserProfileButton() {
           elements: {
             userButtonAvatarBox: "h-10 w-10",
             userButtonTrigger: "focus:outline-none focus:ring-0",
-            userButtonPopoverCard: "!z-[9999]", // Wichtig: ! erzwingt die Style-Anwendung
+            userButtonPopoverCard: "!z-[9999] !pointer-events-auto",
             userButtonPopoverActions: "",
-            userButtonPopoverActionButton: "!p-4 !text-base", // Größere Buttons mit mehr Abstand
+            userButtonPopoverActionButton: "!p-4 !text-base",
           }
         }}
       />

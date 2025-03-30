@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -9,17 +9,18 @@ import { GetImage } from "./get-image";
 import { Summary } from "./summary";
 import { UploadedImageList } from "./uploaded-image-list";
 import { HabitatAnalysis } from "./habitat-analysis";
+import { UploadImages } from "./upload-images";
 import { Bild, NatureScoutData, AnalyseErgebnis, llmInfo, PlantNetResult } from "@/types/nature-scout";
 import { LocationDetermination } from './locationDetermination';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Code, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNatureScoutState } from "@/context/nature-scout-context";
+import { InstructionDialog } from "@/components/ui/instruction-dialog";
 
 const schritte = [
   "Willkommen",
   "Standort bestimmen",
-  "Bilder hochladen",
+  "Bilder erfassen",
   "Habitat analysieren",
   "Verifizierung"
 ];
@@ -72,15 +73,15 @@ export default function NatureScout() {
     analyseErgebnis: undefined
   });
   const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
-  const [activeUploads, setActiveUploads] = useState<Record<string, boolean>>({
-    "Panoramabild": false,
-    "Detailbild_1": false,
-    "Detailbild_2": false
-  });
   const [isLoading, setIsLoading] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [shouldScrollToNext, setShouldScrollToNext] = useState(false);
+  const [isAnyUploadActive, setIsAnyUploadActive] = useState(false);
   
   // Ref für die Progressbar
   const progressBarRef = useRef<HTMLDivElement>(null);
+  // Ref für den Weiter-Button
+  const nextButtonRef = useRef<HTMLButtonElement>(null);
 
   // Scrolle zur Progressbar, wenn sich der aktive Schritt ändert
   useEffect(() => {
@@ -164,8 +165,6 @@ export default function NatureScout() {
     }
   }, [editJobId]);
 
-  const isAnyUploadActive = Object.values(activeUploads).some(isUploading => isUploading);
-
   // Metadaten in den Context übertragen
   const { setMetadata: setContextMetadata, setEditJobId: setContextEditJobId } = useNatureScoutState();
 
@@ -177,11 +176,9 @@ export default function NatureScout() {
     }
   }, [metadata, editJobId, setContextMetadata, setContextEditJobId]);
 
-  const setUploadStatus = (imageKey: string, isUploading: boolean) => {
-    setActiveUploads(prev => ({
-      ...prev,
-      [imageKey]: isUploading
-    }));
+  // Handler für den Upload-Status aus der UploadImages-Komponente
+  const handleUploadActiveChange = (isActive: boolean) => {
+    setIsAnyUploadActive(isActive);
   };
 
   const handleBildUpload = (imageKey: string, filename: string, url: string, analysis: string, plantnetResult?: PlantNetResult) => {
@@ -224,10 +221,74 @@ export default function NatureScout() {
     }));
   };
 
+  const handleHelpClick = () => {
+    setShowHelp(prev => !prev);
+  };
+
+  // Debug-Funktion zum direkten Springen zum Bilder-Upload-Schritt
+  const skipToImagesUpload = useCallback(() => {
+    // Für Debug-Zwecke fülle eine minimale Konfiguration der Standortdaten aus
+    setMetadata(prev => ({
+      ...prev,
+      gemeinde: prev.gemeinde || "Debug-Gemeinde",
+      flurname: prev.flurname || "Debug-Flurname",
+      latitude: prev.latitude || 47.123456,
+      longitude: prev.longitude || 11.123456,
+      standort: prev.standort || "Debug-Standort"
+    }));
+
+    // Direkt zu Schritt 2 springen (Bilder hochladen)
+    setAktiverSchritt(2);
+  }, []);
+
+  // Funktion zum Scrollen zum Weiter-Button
+  const scrollToNext = useCallback(() => {
+    setShouldScrollToNext(true);
+  }, []);
+
+  // Effekt für das Scrollen zum Weiter-Button
+  useEffect(() => {
+    if (shouldScrollToNext && nextButtonRef.current) {
+      const buttonPosition = nextButtonRef.current.getBoundingClientRect();
+      
+      // Prüfen, ob der Button bereits sichtbar ist
+      const isVisible = 
+        buttonPosition.top >= 0 &&
+        buttonPosition.left >= 0 &&
+        buttonPosition.bottom <= window.innerHeight &&
+        buttonPosition.right <= window.innerWidth;
+      
+      // Nur scrollen, wenn der Button nicht sichtbar ist
+      if (!isVisible) {
+        // Neue Scroll-Position berechnen, damit der Button gerade am unteren Rand sichtbar wird
+        // Wir nehmen die absolute Position des Buttons (pageYOffset + top)
+        // und ziehen die Viewport-Höhe ab, fügen aber die Button-Höhe hinzu
+        // plus etwas Abstand (20px)
+        const yPosition = (buttonPosition.top + window.pageYOffset) - window.innerHeight + buttonPosition.height + 20;
+        
+        // Sanftes Scrollen zum Weiter-Button
+        window.scrollTo({
+          top: yPosition,
+          behavior: 'smooth'
+        });
+      }
+      
+      // State zurücksetzen, um weitere Scrollaufrufe zu ermöglichen
+      setShouldScrollToNext(false);
+    }
+  }, [shouldScrollToNext]);
+
   const renderSchrittInhalt = (schritt: number) => {
     switch (schritt) {
       case 0:
-        return <Welcome metadata={metadata} setMetadata={setMetadata} />;
+        return <Welcome 
+          metadata={metadata} 
+          setMetadata={setMetadata} 
+          showHelp={showHelp} 
+          onHelpShown={() => setShowHelp(false)} 
+          scrollToNext={scrollToNext}
+          onSkipToImages={skipToImagesUpload}
+        />;
       case 1:
         console.log("LocationDetermination wird gerendert mit:", { 
           latitude: metadata.latitude, 
@@ -235,45 +296,16 @@ export default function NatureScout() {
           polygonPoints: metadata.polygonPoints,
           hasPolygonPoints: metadata.polygonPoints && metadata.polygonPoints.length > 0
         });
-        return <LocationDetermination metadata={metadata} setMetadata={setMetadata} />;
+        return <LocationDetermination metadata={metadata} setMetadata={setMetadata} showHelp={showHelp} onHelpShown={() => setShowHelp(false)} scrollToNext={scrollToNext} />;
       case 2:
-        return (
-          <div>
-            <p>Habitat bestimmen</p>
-            <div className="flex flex-wrap justify-center gap-4">
-              <GetImage 
-                imageTitle="Panoramabild" 
-                anweisung="Laden Sie ein Panoramabild des gesamten Habitats hoch." 
-                onBildUpload={handleBildUpload}
-                onDeleteImage={handleDeleteImage}
-                existingImage={metadata.bilder.find(b => b.imageKey === "Panoramabild")}
-                doAnalyzePlant={false}
-                isUploading={activeUploads["Panoramabild"] ?? false}
-                setIsUploading={(value) => setUploadStatus("Panoramabild", value)}
-              />
-              <GetImage 
-                imageTitle="Detailbild_1" 
-                anweisung="Laden Sie ein Detailbild hoch, das eine typische Pflanzenart zeigt." 
-                onBildUpload={handleBildUpload}
-                onDeleteImage={handleDeleteImage}
-                existingImage={metadata.bilder.find(b => b.imageKey === "Detailbild_1")}
-                doAnalyzePlant={true}
-                isUploading={activeUploads["Detailbild_1"] ?? false}
-                setIsUploading={(value) => setUploadStatus("Detailbild_1", value)}
-              />
-              <GetImage 
-                imageTitle="Detailbild_2" 
-                anweisung="Laden Sie ein weiteres Detailbild hoch, das eine typische Pflanzenart zeigt." 
-                onBildUpload={handleBildUpload}
-                onDeleteImage={handleDeleteImage}
-                existingImage={metadata.bilder.find(b => b.imageKey === "Detailbild_2")}
-                doAnalyzePlant={true}
-                isUploading={activeUploads["Detailbild_2"] ?? false}
-                setIsUploading={(value) => setUploadStatus("Detailbild_2", value)}
-              />
-            </div>
-          </div>
-        );
+        return <UploadImages 
+          metadata={metadata} 
+          setMetadata={setMetadata} 
+          showHelp={showHelp} 
+          onHelpShown={() => setShowHelp(false)} 
+          scrollToNext={scrollToNext}
+          onUploadActiveChange={handleUploadActiveChange}
+        />;
       case 3:
         return (
           <div className="space-y-4">
@@ -287,13 +319,39 @@ export default function NatureScout() {
                 onKommentarChange={handleKommentarChange}
               />
             </div>
+            {showHelp && (
+              <InstructionDialog
+                open={showHelp}
+                onOpenChange={(open) => {
+                  if (!open) setShowHelp(false);
+                }}
+                title="Habitat analysieren"
+                content="Starten Sie die Analyse, um das Habitat zu bestimmen. Die hochgeladenen Bilder und Standortdaten werden für die Analyse verwendet. Sie können auch einen Kommentar hinzufügen."
+                showDontShowAgain={false}
+                skipDelay={true}
+              />
+            )}
           </div>
         );
       case 4:
         return (
-          <Summary 
-            metadata={metadata}
-          />
+          <>
+            <Summary 
+              metadata={metadata}
+            />
+            {showHelp && (
+              <InstructionDialog
+                open={showHelp}
+                onOpenChange={(open) => {
+                  if (!open) setShowHelp(false);
+                }}
+                title="Zusammenfassung"
+                content="Hier sehen Sie eine Zusammenfassung aller erfassten Daten und das Ergebnis der Habitatanalyse. Sie können nun den Vorgang abschließen."
+                showDontShowAgain={false}
+                skipDelay={true}
+              />
+            )}
+          </>
         );
       default:
         return "Unbekannter Schritt";
@@ -384,9 +442,20 @@ export default function NatureScout() {
             <ChevronLeft className="h-4 w-4" />
             Zurück
           </Button>
+          
+          <Button
+            onClick={handleHelpClick}
+            variant="outline"
+            size="icon"
+            className="h-9 w-9"
+            title="Hilfe anzeigen"
+          >
+            <HelpCircle className="h-5 w-5" />
+          </Button>
         </div>
 
         <Button 
+          ref={nextButtonRef}
           onClick={() => setAktiverSchritt(prev => prev + 1)} 
           disabled={isNextButtonDisabled(aktiverSchritt, metadata, isAnyUploadActive)}
           className="gap-2"

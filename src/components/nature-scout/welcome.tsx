@@ -6,8 +6,23 @@ import { useUser } from "@clerk/nextjs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NatureScoutData } from "@/types/nature-scout";
 import { InstructionDialog } from "@/components/ui/instruction-dialog";
+import { Button } from "@/components/ui/button";
 
-export function Welcome({ metadata, setMetadata }: { metadata: NatureScoutData; setMetadata: React.Dispatch<React.SetStateAction<NatureScoutData>> }) {
+export function Welcome({ 
+  metadata, 
+  setMetadata, 
+  showHelp, 
+  onHelpShown,
+  scrollToNext,
+  onSkipToImages
+}: { 
+  metadata: NatureScoutData; 
+  setMetadata: React.Dispatch<React.SetStateAction<NatureScoutData>>;
+  showHelp?: boolean;
+  onHelpShown?: () => void;
+  scrollToNext?: () => void;
+  onSkipToImages?: () => void;
+}) {
   const { user, isLoaded } = useUser();
   
   // State für den Willkommens-Dialog
@@ -19,26 +34,13 @@ export function Welcome({ metadata, setMetadata }: { metadata: NatureScoutData; 
     typeof window !== 'undefined' ? localStorage.getItem('dontShowWelcomeGuideAgain') === 'true' : false
   );
   
-  // Timer-Referenz für das verzögerte Anzeigen des Dialogs
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // useEffect für den Timer - Zeige Dialog nach 3 Sekunden
+  // Beim ersten Laden Dialog anzeigen, wenn "Nicht mehr anzeigen" nicht aktiviert ist
   useEffect(() => {
-    // Wenn "Nicht mehr anzeigen" aktiviert ist, keinen Timer starten
+    // Wenn "Nicht mehr anzeigen" aktiviert ist, Dialog nicht anzeigen
     if (dontShowWelcomeGuideAgain) return;
     
-    // Timer starten für 3 Sekunden
-    timerRef.current = setTimeout(() => {
-      setShowWelcomeGuide(true);
-    }, 3000);
-    
-    // Cleanup-Funktion
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-    };
+    // Sonst den Dialog sofort aktivieren, die Verzögerung erfolgt in der InstructionDialog-Komponente
+    setShowWelcomeGuide(true);
   }, [dontShowWelcomeGuideAgain]);
   
   // useEffect um dontShowWelcomeGuideAgain im localStorage zu speichern
@@ -46,13 +48,9 @@ export function Welcome({ metadata, setMetadata }: { metadata: NatureScoutData; 
     if (typeof window !== 'undefined') {
       localStorage.setItem('dontShowWelcomeGuideAgain', dontShowWelcomeGuideAgain.toString());
       
-      // Wenn "Nicht mehr anzeigen" aktiviert ist, Popup nicht anzeigen und Timer löschen
+      // Wenn "Nicht mehr anzeigen" aktiviert ist, Popup nicht anzeigen
       if (dontShowWelcomeGuideAgain) {
         setShowWelcomeGuide(false);
-        if (timerRef.current) {
-          clearTimeout(timerRef.current);
-          timerRef.current = null;
-        }
       }
     }
   }, [dontShowWelcomeGuideAgain]);
@@ -69,6 +67,15 @@ export function Welcome({ metadata, setMetadata }: { metadata: NatureScoutData; 
     }
   }, [setMetadata, isLoaded, user]);
 
+  // Effekt für den Hilfe-Button
+  useEffect(() => {
+    if (showHelp) {
+      setShowWelcomeGuide(true);
+      // Den onHelpShown-Callback nicht sofort aufrufen!
+      // Er wird später durch onOpenChange in InstructionDialog aufgerufen
+    }
+  }, [showHelp]);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <Alert className="h-fit order-2 md:order-1">
@@ -79,7 +86,7 @@ export function Welcome({ metadata, setMetadata }: { metadata: NatureScoutData; 
                 {isLoaded && user?.fullName ? `Hallo ${user.fullName},` : 'Hallo,'}
               </p>
               <p className="mb-3">
-                in diesem Frageassistenten werden Sie gebeten, einige Standort-Merkmale eines Naturhabitats zu erfassen 
+                in diesem Frageassistenten werden Sie gebeten, vor Ort einige Standort-Merkmale eines Naturhabitats zu erfassen 
                 und mehrere Bilder hochzuladen. Wir werden diese Daten analysieren, um einzuschätzen, ob das 
                 Habitat schützenswert ist.
               </p>
@@ -87,6 +94,33 @@ export function Welcome({ metadata, setMetadata }: { metadata: NatureScoutData; 
                 Vielen Dank für diese wertvolle und gewissenhafte Erfassung.<br/>
                 Ihr NatureScout Team
               </p>
+
+              {/* 
+              <div className="mt-4">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => scrollToNext && scrollToNext()}
+                >
+                  Weiter zum nächsten Schritt
+                </Button>
+              </div>
+              */}
+              
+              {/* Debug-Button zum Überspringen der Standortbestimmung */}
+              {onSkipToImages && (
+                <div className="mt-4 border-t pt-3 border-dashed border-gray-300">
+                  <p className="text-xs text-gray-500 mb-2">Debug-Modus:</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={onSkipToImages}
+                    className="border-red-300 text-red-500 hover:text-red-600 hover:bg-red-50"
+                  >
+                    Zu Bilder-Upload springen
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </AlertDescription>
@@ -102,14 +136,21 @@ export function Welcome({ metadata, setMetadata }: { metadata: NatureScoutData; 
         />
       </div>
       
-      {/* Anleitung Popup - nach 3 Sekunden anzeigen */}
+      {/* Anleitung Popup */}
       <InstructionDialog
         open={showWelcomeGuide}
-        onOpenChange={setShowWelcomeGuide}
+        onOpenChange={(open) => {
+          setShowWelcomeGuide(open);
+          // Wenn der Dialog angezeigt wurde und es war ein Hilfe-Klick, den onHelpShown-Callback aufrufen
+          if (!open && showHelp && onHelpShown) {
+            onHelpShown();
+          }
+        }}
         title="Schritt für Schritt"
         content="Gehen sie ganz einfach jeden Schritt durch und beenden sie ihn mit der Taste 'Weiter' am unteren Seitenende."
         dontShowAgain={dontShowWelcomeGuideAgain}
         onDontShowAgainChange={setDontShowWelcomeGuideAgain}
+        skipDelay={!!showHelp} // Verzögerung überspringen wenn über Hilfe-Button geöffnet
       />
     </div>
   );

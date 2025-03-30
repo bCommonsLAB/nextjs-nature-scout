@@ -13,7 +13,8 @@ export function InstructionDialog({
   content, 
   showDontShowAgain = true,
   onDontShowAgainChange,
-  dontShowAgain = false
+  dontShowAgain = false,
+  skipDelay = false // Diese Option überspringt die Verzögerung
 }: { 
   open: boolean; 
   onOpenChange: (open: boolean) => void; 
@@ -22,16 +23,23 @@ export function InstructionDialog({
   showDontShowAgain?: boolean;
   onDontShowAgainChange?: (checked: boolean) => void;
   dontShowAgain?: boolean;
+  skipDelay?: boolean;
 }) {
   // State für die verzögerte Anzeige
-  const [delayedOpen, setDelayedOpen] = useState(false);
+  const [delayedOpen, setDelayedOpen] = useState(skipDelay ? open : false);
   
   // Referenz für den Timer
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Verzögerte Anzeige des Dialogs
   useEffect(() => {
-    // Wenn open true ist, starten wir einen Timer für 2 Sekunden
+    // Wenn skipDelay aktiv ist, sofort anzeigen ohne Verzögerung
+    if (skipDelay) {
+      setDelayedOpen(open);
+      return;
+    }
+    
+    // Sonst die ursprüngliche Verzögerungslogik
     if (open) {
       // Timer setzen, um delayedOpen nach 2 Sekunden auf true zu setzen
       timerRef.current = setTimeout(() => {
@@ -55,7 +63,7 @@ export function InstructionDialog({
         timerRef.current = null;
       }
     };
-  }, [open]);
+  }, [open, skipDelay]);
   
   return (
     <Dialog open={delayedOpen} onOpenChange={(value) => {
