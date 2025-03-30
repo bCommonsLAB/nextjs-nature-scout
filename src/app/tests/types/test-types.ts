@@ -47,12 +47,28 @@ export interface TestHistory {
   lastRun?: TestRun;
 }
 
-export type { 
-  TestCase, 
-  TestResult, 
-  TestRun, 
-  GroupedTestCases, 
-  TestMetadata,
-  TestState,
-  TestHistory 
-}; 
+// Neue Interfaces für Habitat-Typen-Analyse
+export interface MissingHabitatType {
+  name: string;
+  category: string;
+}
+
+export interface HabitatWithMissingPlants {
+  name: string;
+  missingPlants: string[];
+}
+
+export interface HabitatAnalysisResult {
+  totalHabitatTypes: number;
+  totalTestCases: number;
+  missingHabitatTypes: MissingHabitatType[];
+  habitatTypesWithMissingPlants: HabitatWithMissingPlants[];
+}
+
+export interface HabitatUpdateResult extends HabitatAnalysisResult {
+  updatedHabitatTypes: {
+    name: string;
+    addedPlants: string[];
+    totalPlants: number;
+  }[];
+} 

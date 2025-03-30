@@ -20,7 +20,7 @@ export function ParameterHeading({ title, description, details }: ParameterHeadi
         data-tooltip-id={`${title.toLowerCase()}-tooltip`}
       />
       <Tooltip id={`${title.toLowerCase()}-tooltip`}>
-        <div className="max-w-xs">
+        <div className="max-w-[90vw]">
           <h3 className="font-semibold mb-2 capitalize">{title}</h3>
           <p className="mb-2">{description}</p>
           <ul className="space-y-4">

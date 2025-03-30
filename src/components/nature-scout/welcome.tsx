@@ -59,6 +59,7 @@ export function Welcome({
   useEffect(() => {
     if (isLoaded && user) {
       // Automatisch Daten vom angemeldeten Benutzer übernehmen
+      console.log("Benutzerdaten übernehmen:", user);
       setMetadata(prev => ({
         ...prev,
         erfassungsperson: user.fullName || "",
@@ -95,32 +96,6 @@ export function Welcome({
                 Ihr NatureScout Team
               </p>
 
-              {/* 
-              <div className="mt-4">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => scrollToNext && scrollToNext()}
-                >
-                  Weiter zum nächsten Schritt
-                </Button>
-              </div>
-              */}
-              
-              {/* Debug-Button zum Überspringen der Standortbestimmung */}
-              {onSkipToImages && (
-                <div className="mt-4 border-t pt-3 border-dashed border-gray-300">
-                  <p className="text-xs text-gray-500 mb-2">Debug-Modus:</p>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={onSkipToImages}
-                    className="border-red-300 text-red-500 hover:text-red-600 hover:bg-red-50"
-                  >
-                    Zu Bilder-Upload springen
-                  </Button>
-                </div>
-              )}
             </div>
           </div>
         </AlertDescription>

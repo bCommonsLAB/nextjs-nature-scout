@@ -4,8 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
 
 /**
- * Löscht alle Einträge ohne result-Objekt oder mit leerem result-Objekt
- * Nur für Administratoren verfügbar
+ * Löscht alle Einträge des aktuell angemeldeten Benutzers basierend auf der E-Mail-Adresse
  */
 export async function DELETE() {
   try {
@@ -19,13 +18,13 @@ export async function DELETE() {
       );
     }
     
-    // Überprüfen, ob der Benutzer Administrator ist
-    const isAdmin = await UserService.isAdmin(userId);
+    // Benutzer-E-Mail-Adresse ermitteln
+    const user = await UserService.findByClerkId(userId);
     
-    if (!isAdmin) {
+    if (!user) {
       return NextResponse.json(
-        { error: 'Zugriff verweigert. Nur Administratoren können diese Aktion ausführen.' },
-        { status: 403 }
+        { error: 'Benutzer nicht gefunden' },
+        { status: 404 }
       );
     }
     
@@ -33,24 +32,21 @@ export async function DELETE() {
     const db = await connectToDatabase();
     const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
     
-    // Suche nach Einträgen ohne result-Objekt oder mit leerem result-Objekt
+    // Lösche alle Einträge des Benutzers basierend auf seiner E-Mail-Adresse
+    console.log('Lösche alle Einträge des Benutzers:', user.email);
     const result = await collection.deleteMany({
-      $or: [
-        { result: { $exists: false } },
-        { result: null },
-        { result: {} }
-      ]
+      'metadata.email': user.email
     });
     
     return NextResponse.json({
       success: true,
-      message: `${result.deletedCount} Einträge ohne result-Objekt wurden gelöscht`,
+      message: `${result.deletedCount} Einträge des Benutzers ${user.email} wurden gelöscht`,
       deletedCount: result.deletedCount
     });
   } catch (error) {
-    console.error('Fehler beim Löschen der Einträge ohne result-Objekt:', error);
+    console.error('Fehler beim Löschen der Benutzereinträge:', error);
     return NextResponse.json(
-      { error: 'Fehler beim Löschen der Einträge ohne result-Objekt' },
+      { error: 'Fehler beim Löschen der Benutzereinträge' },
       { status: 500 }
     );
   }

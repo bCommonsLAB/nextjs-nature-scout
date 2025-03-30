@@ -59,14 +59,16 @@ export function LocationDetermination({
   );
   
   // Hilfsdialog-Zustände
-  const [showWelcomePopup, setShowWelcomePopup] = useState<boolean>(true);
-  const [showPolygonPopup, setShowPolygonPopup] = useState<boolean>(false);
   const [dontShowWelcomeAgain, setDontShowWelcomeAgain] = useState<boolean>(
     typeof window !== 'undefined' ? localStorage.getItem('dontShowWelcomeAgain') === 'true' : false
   );
   const [dontShowPolygonAgain, setDontShowPolygonAgain] = useState<boolean>(
     typeof window !== 'undefined' ? localStorage.getItem('dontShowPolygonAgain') === 'true' : false
   );
+  
+  // Dialog-Zustände - initial auf false setzen, wenn "Nicht mehr anzeigen" aktiviert ist
+  const [showWelcomePopup, setShowWelcomePopup] = useState<boolean>(!dontShowWelcomeAgain);
+  const [showPolygonPopup, setShowPolygonPopup] = useState<boolean>(false);
 
   // Funktion zum Zentrieren der Karte auf die gespeicherte Position
   const centerMapToCurrentPosition = useCallback(() => {
@@ -181,7 +183,7 @@ export function LocationDetermination({
     // Standortinformationen nur im 'none'-Modus anzeigen
     setShowLocationInfo(newMode === 'none');
     
-    // Dialog für Polygon-Modus anzeigen
+    // Dialog für Polygon-Modus anzeigen, nur wenn "Nicht mehr anzeigen" nicht aktiviert ist
     if (newMode === 'polygon' && !dontShowPolygonAgain) {
       setShowPolygonPopup(true);
     }

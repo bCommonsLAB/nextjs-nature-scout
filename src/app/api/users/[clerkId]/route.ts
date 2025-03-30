@@ -85,8 +85,8 @@ export async function PATCH(
     
     // Normale Benutzer dürfen ihre Rolle nicht ändern
     const updateData = {
-      name, 
-      email,
+      ...(name !== undefined ? { name } : {}), 
+      ...(email !== undefined ? { email } : {}),
       ...(isAdmin && role ? { role } : {})
     };
     

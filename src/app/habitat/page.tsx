@@ -337,7 +337,7 @@ function HabitatPageContent() {
     }
     
     try {
-      const response = await fetch('/api/habitat/cleanup', {
+      const response = await fetch('/api/habitat/cleanup/user', {
         method: 'DELETE'
       });
       
@@ -387,6 +387,7 @@ function HabitatPageContent() {
                 Daten herunterladen
               </Button>
               
+              {/* Button zum Löschen aller Einträge des Benutzers 
               <Button
                 variant="outline"
                 size="sm"
@@ -396,6 +397,7 @@ function HabitatPageContent() {
                 <Trash2 className="h-4 w-4" />
                 Leere Einträge löschen
               </Button>
+              */}
             </>
           )}
           {hasAdvancedPermissions && isExpert && (

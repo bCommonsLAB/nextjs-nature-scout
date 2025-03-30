@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import { TestControls } from './components/test-controls';
 import { TestTable } from './components/test-table';
 import { TestHistory } from './components/test-history';
-import type { GroupedTestCases, TestResult, TestRun } from './types/test-types';
+import type { GroupedTestCases, TestResult, TestRun, HabitatAnalysisResult, HabitatUpdateResult } from './types/test-types';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { HabitatAnalysis } from './components/habitat-analysis';
 
 // Hilfsfunktion für strukturiertes Logging
 function logTestEvent(event: string, data: any) {
@@ -29,6 +30,11 @@ export default function TestPage() {
   const [warning, setWarning] = useState<string | null>(null);
   const [invalidHabitats, setInvalidHabitats] = useState<{ testCase: string; habitat: string }[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  
+  // Neue State-Variablen für die Habitat-Analyse
+  const [habitatAnalysis, setHabitatAnalysis] = useState<HabitatAnalysisResult | undefined>(undefined);
+  const [habitatUpdateResult, setHabitatUpdateResult] = useState<HabitatUpdateResult | undefined>(undefined);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Lade initiale Testfälle
   useEffect(() => {
@@ -78,8 +84,8 @@ export default function TestPage() {
   const handleTestResult = (result: TestResult) => {
     logTestEvent('test_result_received', {
       caseId: result.testCaseId,
-      success: result.success,
-      detectedHabitat: result.detectedHabitat,
+      success: result.isCorrect,
+      detectedHabitat: result.predictedHabitat,
       expectedHabitat: result.expectedHabitat
     });
     setCurrentResults(prev => [...prev, result]);
@@ -96,6 +102,63 @@ export default function TestPage() {
 
   const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);
+  };
+
+  // Neue Funktionen für die Habitat-Analyse
+
+  // Analysiere Habitattypen
+  const analyzeHabitatTypes = async () => {
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch('/api/habitat-types', {
+        method: 'GET',
+        cache: 'no-store'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setHabitatAnalysis(data.analysis);
+      
+      logTestEvent('habitat_analysis_completed', {
+        missingHabitatTypes: data.analysis.missingHabitatTypes.length,
+        habitatTypesWithMissingPlants: data.analysis.habitatTypesWithMissingPlants.length
+      });
+    } catch (error) {
+      console.error('Fehler bei der Habitat-Analyse:', error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // Aktualisiere Habitattypen in der Datenbank
+  const updateHabitatTypes = async () => {
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch('/api/habitat-types', {
+        method: 'POST',
+        cache: 'no-store'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setHabitatUpdateResult(data.results);
+      // Aktualisiere auch die Analyse nach der Aktualisierung
+      setHabitatAnalysis(data.results);
+      
+      logTestEvent('habitat_types_updated', {
+        updatedHabitatTypes: data.results.updatedHabitatTypes.length
+      });
+    } catch (error) {
+      console.error('Fehler beim Aktualisieren der Habitattypen:', error);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   // Erstelle flache Liste aller Testfälle
@@ -126,7 +189,18 @@ export default function TestPage() {
 
       <div className="space-y-8">
         <div className="bg-card rounded-lg p-6 shadow-sm">
-          <h2 className="text-2xl font-semibold mb-4">Test Kontrollen</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-semibold">Test Kontrollen</h2>
+            <div className="flex items-center gap-2">
+              <HabitatAnalysis 
+                onAnalyze={analyzeHabitatTypes}
+                onUpdate={updateHabitatTypes}
+                analysis={habitatAnalysis}
+                updateResult={habitatUpdateResult}
+                isLoading={isAnalyzing}
+              />
+            </div>
+          </div>
           <Suspense fallback={<div>Lade Kontrollen...</div>}>
             <TestControls 
               testCases={testCases} 
