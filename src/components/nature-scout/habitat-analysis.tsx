@@ -214,7 +214,7 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
               <Flower2 className="w-8 h-8 text-green-600 flex-shrink-0" />
               <div className="space-y-3 flex-1">
                 <div>
-                  <div className="text-sm text-gray-500">Erkanntes Habitat</div>
+                  <div className="text-sm text-gray-500">Vorläufig erkanntes Habitat</div>
                   <div className="text-xl font-bold text-gray-900">
                     {metadata.analyseErgebnis.habitattyp}
                   </div>

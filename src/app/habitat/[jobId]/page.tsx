@@ -62,8 +62,8 @@ interface HabitatData {
     };
     pflanzenarten?: Pflanze[];
     evidenz?: {
-      dafür_spricht?: string[];
-      dagegen_spricht?: string[];
+      dafür_spricht?: string[] | string;
+      dagegen_spricht?: string[] | string;
     };
     habitatFamilie?: string;
     typicalSpecies?: string[];
@@ -580,24 +580,32 @@ export default function HabitateDetailPage() {
                             {data.result.evidenz && (
                               <div className="bg-gray-50 p-4 rounded">
                                 <h3 className="font-semibold text-sm">Evidenz</h3>
-                                {data.result.evidenz.dafür_spricht && data.result.evidenz.dafür_spricht.length > 0 && (
+                                {data.result.evidenz.dafür_spricht && (
                                   <div className="mt-2">
                                     <h4 className="text-xs font-medium text-green-600">Dafür spricht:</h4>
-                                    <ul className="list-disc pl-5 space-y-1 text-sm">
-                                      {data.result.evidenz.dafür_spricht.map((punkt: string, index: number) => (
-                                        <li key={index}>{punkt}</li>
-                                      ))}
-                                    </ul>
+                                    {Array.isArray(data.result.evidenz.dafür_spricht) ? (
+                                      <ul className="list-disc pl-5 space-y-1 text-sm">
+                                        {data.result.evidenz.dafür_spricht.map((punkt: string, index: number) => (
+                                          <li key={index}>{punkt}</li>
+                                        ))}
+                                      </ul>
+                                    ) : (
+                                      <p className="text-sm">{data.result.evidenz.dafür_spricht}</p>
+                                    )}
                                   </div>
                                 )}
-                                {data.result.evidenz.dagegen_spricht && data.result.evidenz.dagegen_spricht.length > 0 && (
+                                {data.result.evidenz.dagegen_spricht && (
                                   <div className="mt-2">
                                     <h4 className="text-xs font-medium text-red-500">Dagegen spricht:</h4>
-                                    <ul className="list-disc pl-5 space-y-1 text-sm">
-                                      {data.result.evidenz.dagegen_spricht.map((punkt: string, index: number) => (
-                                        <li key={index}>{punkt}</li>
-                                      ))}
-                                    </ul>
+                                    {Array.isArray(data.result.evidenz.dagegen_spricht) ? (
+                                      <ul className="list-disc pl-5 space-y-1 text-sm">
+                                        {data.result.evidenz.dagegen_spricht.map((punkt: string, index: number) => (
+                                          <li key={index}>{punkt}</li>
+                                        ))}
+                                      </ul>
+                                    ) : (
+                                      <p className="text-sm">{data.result.evidenz.dagegen_spricht}</p>
+                                    )}
                                   </div>
                                 )}
                               </div>

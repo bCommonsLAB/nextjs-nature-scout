@@ -92,6 +92,13 @@ export function EffektiverHabitatEditor({
         }
         
         const data = await response.json();
+        
+        // Überprüfe, ob data ein Array ist
+        if (!Array.isArray(data)) {
+          console.error('Unerwartetes Datenformat:', data);
+          throw new Error('Die API hat ein ungültiges Datenformat zurückgegeben');
+        }
+        
         setHabitatOptions(data);
         
         // Extrahiere einzigartige Habitatfamilien
@@ -130,7 +137,7 @@ export function EffektiverHabitatEditor({
   
   // Separater Effect für Änderungen an den Props
   useEffect(() => {
-    if (habitatOptions.length === 0) return; // Noch nicht geladen
+    if (!habitatOptions || !Array.isArray(habitatOptions) || habitatOptions.length === 0) return; // Noch nicht geladen oder kein Array
     
     const newSelectedHabitat = effectiveHabitat || detectedHabitat || '';
     
@@ -152,6 +159,13 @@ export function EffektiverHabitatEditor({
   const handleFamilyChange = (value: string) => {
     setSelectedFamily(value);
     
+    // Prüfe, ob habitatOptions ein Array ist
+    if (!Array.isArray(habitatOptions)) {
+      console.error('habitatOptions ist kein Array');
+      setError('Ein Fehler ist aufgetreten. Bitte laden Sie die Seite neu.');
+      return;
+    }
+    
     // Filtere Habitate nach ausgewählter Familie
     const filteredOptions = habitatOptions.filter((h: HabitatType) => h.habitatFamilie === value);
     setFilteredHabitats(filteredOptions);
@@ -167,6 +181,13 @@ export function EffektiverHabitatEditor({
   // Wenn sich der ausgewählte Habitat ändert, aktualisiere die zugehörigen Informationen
   const handleHabitatChange = (value: string) => {
     setSelectedHabitat(value);
+    
+    // Prüfe, ob habitatOptions ein Array ist
+    if (!Array.isArray(habitatOptions)) {
+      console.error('habitatOptions ist kein Array');
+      return;
+    }
+    
     const selectedInfo = habitatOptions.find((h: HabitatType) => h.name === value);
     if (selectedInfo) {
       setSelectedHabitatInfo(selectedInfo);

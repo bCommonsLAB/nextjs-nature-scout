@@ -251,10 +251,7 @@ export async function GET() {
     // Analyse der Testcases und Habitattypen
     const analysis = await analyzeHabitatTypes();
     
-    return NextResponse.json({
-      habitatTypes: sortedHabitatTypes,
-      analysis
-    });
+    return NextResponse.json(sortedHabitatTypes);
   } catch (error) {
     console.error('Fehler beim Abrufen der Habitattypen:', error);
     return NextResponse.json(
