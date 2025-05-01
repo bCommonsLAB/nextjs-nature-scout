@@ -50,85 +50,114 @@ async function loadTestCasesFromDirectory(): Promise<TestCase[]> {
   const testImagesPath = process.env.HABITAT_TEST_IMAGES_PATH;
   
   if (!testImagesPath) {
-    throw new Error('HABITAT_TEST_IMAGES_PATH ist nicht in der .env Datei definiert');
+    console.warn('HABITAT_TEST_IMAGES_PATH ist nicht in der .env Datei definiert');
+    return [];
   }
 
   try {
+    // Prüfen, ob der Pfad existiert
+    try {
+      await fs.access(testImagesPath);
+    } catch (error) {
+      console.warn(`Pfad ${testImagesPath} ist nicht zugänglich:`, error);
+      return [];
+    }
+
     const categories = await fs.readdir(testImagesPath, { withFileTypes: true });
     const testCases: TestCase[] = [];
     
     for (const category of categories) {
       if (!category.isDirectory()) continue;
       
-      const categoryPath = path.join(testImagesPath, category.name);
-      const subCategories = await fs.readdir(categoryPath, { withFileTypes: true });
-      
-      for (const subCategory of subCategories) {
-        if (!subCategory.isDirectory()) continue;
-
-        const subCategoryPath = path.join(categoryPath, subCategory.name);
+      try {
+        const categoryPath = path.join(testImagesPath, category.name);
+        const subCategories = await fs.readdir(categoryPath, { withFileTypes: true });
         
-        // Prüfe Standard-Pflanzenliste
-        const subCategoryPlantsFile = path.join(subCategoryPath, 'pflanzen.md');
-        let subCategoryPlants: string[] = [];
-        
-        try {
-          const fileContent = await fs.readFile(subCategoryPlantsFile, 'utf-8');
-          subCategoryPlants = fileContent
-            .split('\n')
-            .map(line => line.trim())
-            .filter(line => line.length > 0);
-        } catch {
-          // Datei existiert nicht oder kann nicht gelesen werden
-        }
+        for (const subCategory of subCategories) {
+          if (!subCategory.isDirectory()) continue;
 
-        // Alle Beispielverzeichnisse durchsuchen
-        const examples = await fs.readdir(subCategoryPath, { withFileTypes: true });
-        for (const example of examples) {
-          if (!example.isDirectory() || !example.name.startsWith('Beispiel')) continue;
-          
-          const examplePath = path.join(subCategoryPath, example.name);
-          const examplePlantsFile = path.join(examplePath, 'pflanzen.md');
-          
-          let plants: string[] = [...subCategoryPlants]; // Standard-Pflanzen als Basis
-          
           try {
-            const fileContent = await fs.readFile(examplePlantsFile, 'utf-8');
-            const examplePlants = fileContent
-              .split('\n')
-              .map(line => line.trim())
-              .filter(line => line.length > 0);
+            const subCategoryPath = path.join(categoryPath, subCategory.name);
             
-            // Beispiel-spezifische Pflanzen hinzufügen
-            plants = Array.from(new Set([...plants, ...examplePlants]));
-          } catch {
-            // Datei existiert nicht oder kann nicht gelesen werden
-          }
-          
-          if (plants.length > 0) {
-            testCases.push({
-              habitatType: subCategory.name,
-              category: category.name,
-              plants: plants
-            });
+            // Prüfe Standard-Pflanzenliste
+            const subCategoryPlantsFile = path.join(subCategoryPath, 'pflanzen.md');
+            let subCategoryPlants: string[] = [];
+            
+            try {
+              const fileContent = await fs.readFile(subCategoryPlantsFile, 'utf-8');
+              subCategoryPlants = fileContent
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+            } catch {
+              // Datei existiert nicht oder kann nicht gelesen werden
+            }
+
+            // Alle Beispielverzeichnisse durchsuchen
+            try {
+              const examples = await fs.readdir(subCategoryPath, { withFileTypes: true });
+              for (const example of examples) {
+                if (!example.isDirectory() || !example.name.startsWith('Beispiel')) continue;
+                
+                try {
+                  const examplePath = path.join(subCategoryPath, example.name);
+                  const examplePlantsFile = path.join(examplePath, 'pflanzen.md');
+                  
+                  let plants: string[] = [...subCategoryPlants]; // Standard-Pflanzen als Basis
+                  
+                  try {
+                    const fileContent = await fs.readFile(examplePlantsFile, 'utf-8');
+                    const examplePlants = fileContent
+                      .split('\n')
+                      .map(line => line.trim())
+                      .filter(line => line.length > 0);
+                    
+                    // Beispiel-spezifische Pflanzen hinzufügen
+                    plants = Array.from(new Set([...plants, ...examplePlants]));
+                  } catch {
+                    // Datei existiert nicht oder kann nicht gelesen werden
+                  }
+                  
+                  if (plants.length > 0) {
+                    testCases.push({
+                      habitatType: subCategory.name,
+                      category: category.name,
+                      plants: plants
+                    });
+                  }
+                } catch (exampleError) {
+                  console.warn(`Fehler beim Verarbeiten des Beispiels ${example.name}:`, exampleError);
+                  continue;
+                }
+              }
+            } catch (examplesError) {
+              console.warn(`Fehler beim Lesen der Beispiele in ${subCategoryPath}:`, examplesError);
+            }
+            
+            // Falls keine Beispiele aber Pflanzen vorhanden sind
+            if (subCategoryPlants.length > 0 && !testCases.some(tc => tc.habitatType === subCategory.name)) {
+              testCases.push({
+                habitatType: subCategory.name,
+                category: category.name,
+                plants: subCategoryPlants
+              });
+            }
+          } catch (subCategoryError) {
+            console.warn(`Fehler beim Verarbeiten der Unterkategorie ${subCategory.name}:`, subCategoryError);
+            continue;
           }
         }
-        
-        // Falls keine Beispiele aber Pflanzen vorhanden sind
-        if (subCategoryPlants.length > 0 && !testCases.some(tc => tc.habitatType === subCategory.name)) {
-          testCases.push({
-            habitatType: subCategory.name,
-            category: category.name,
-            plants: subCategoryPlants
-          });
-        }
+      } catch (categoryError) {
+        console.warn(`Fehler beim Verarbeiten der Kategorie ${category.name}:`, categoryError);
+        continue;
       }
     }
     
     return testCases;
   } catch (error) {
     console.error('Fehler beim Lesen der Testcases:', error);
-    throw error;
+    // Bei Fehler leere Liste zurückgeben
+    return [];
   }
 }
 
@@ -142,44 +171,62 @@ async function analyzeHabitatTypes(): Promise<AnalysisResult> {
   // Konvertierung zu HabitatTypeDB
   const habitatTypes: HabitatTypeDB[] = habitatTypesRaw.map(doc => doc as unknown as HabitatTypeDB);
   
-  // Alle Testcases laden
-  const testCases = await loadTestCasesFromDirectory();
-  
   // Ergebnis-Objekt vorbereiten
   const result: AnalysisResult = {
     totalHabitatTypes: habitatTypes.length,
-    totalTestCases: testCases.length,
+    totalTestCases: 0,
     missingHabitatTypes: [],
     habitatTypesWithMissingPlants: []
   };
   
-  // Für jeden Testcase prüfen, ob der Habitattyp existiert
-  for (const testCase of testCases) {
-    const matchingHabitatType = habitatTypes.find(ht => ht.name === testCase.habitatType);
+  // Optional: Analyse überspringen, wenn kein Dateipfad definiert ist
+  if (!process.env.HABITAT_TEST_IMAGES_PATH) {
+    return result;
+  }
+  
+  try {
+    // Alle Testcases laden
+    const testCases = await loadTestCasesFromDirectory();
+    result.totalTestCases = testCases.length;
     
-    if (!matchingHabitatType) {
-      // Habitattyp existiert nicht in der Datenbank
-      if (!result.missingHabitatTypes.some(mht => mht.name === testCase.habitatType)) {
-        result.missingHabitatTypes.push({
-          name: testCase.habitatType,
-          category: testCase.category
+    // Habitattypen-Map für schnellere Suche erstellen
+    const habitatTypeMap = new Map<string, HabitatTypeDB>();
+    habitatTypes.forEach(ht => habitatTypeMap.set(ht.name, ht));
+    
+    // Für jeden Testcase prüfen, ob der Habitattyp existiert
+    for (const testCase of testCases) {
+      const matchingHabitatType = habitatTypeMap.get(testCase.habitatType);
+      
+      if (!matchingHabitatType) {
+        // Habitattyp existiert nicht in der Datenbank
+        if (!result.missingHabitatTypes.some(mht => mht.name === testCase.habitatType)) {
+          result.missingHabitatTypes.push({
+            name: testCase.habitatType,
+            category: testCase.category
+          });
+        }
+        continue;
+      }
+      
+      // Prüfen, ob alle Pflanzen im Habitattyp vorhanden sind
+      const typicalSpecies = matchingHabitatType.typicalSpecies || [];
+      // Für schnellere Suche ein Set aus typischen Arten erstellen
+      const typicalSpeciesSet = new Set(typicalSpecies);
+      
+      const missingPlants = testCase.plants.filter(
+        plant => !typicalSpeciesSet.has(plant)
+      );
+      
+      if (missingPlants.length > 0) {
+        result.habitatTypesWithMissingPlants.push({
+          name: matchingHabitatType.name,
+          missingPlants: missingPlants
         });
       }
-      continue;
     }
-    
-    // Prüfen, ob alle Pflanzen im Habitattyp vorhanden sind
-    const typicalSpecies = matchingHabitatType.typicalSpecies || [];
-    const missingPlants = testCase.plants.filter(
-      plant => !typicalSpecies.includes(plant)
-    );
-    
-    if (missingPlants.length > 0) {
-      result.habitatTypesWithMissingPlants.push({
-        name: matchingHabitatType.name,
-        missingPlants: missingPlants
-      });
-    }
+  } catch (error) {
+    console.error('Fehler bei der Analyse der Habitattypen:', error);
+    // Bei Fehler zumindest die grundlegenden Informationen zurückgeben
   }
   
   return result;
@@ -198,25 +245,38 @@ async function updateHabitatTypesWithMissingPlants(): Promise<UpdateResult> {
     totalPlants: number;
   }[] = [];
   
+  // Wenn keine Habitattypen mit fehlenden Pflanzen vorhanden sind, früh zurückkehren
+  if (!analysis.habitatTypesWithMissingPlants || analysis.habitatTypesWithMissingPlants.length === 0) {
+    return {
+      ...analysis,
+      updatedHabitatTypes: []
+    };
+  }
+  
   // Für jeden Habitattyp mit fehlenden Pflanzen
   for (const habitat of analysis.habitatTypesWithMissingPlants) {
-    const habitatType = await collection.findOne({ name: habitat.name }) as unknown as HabitatTypeDB;
-    
-    if (habitatType) {
-      const typicalSpecies = habitatType.typicalSpecies || [];
-      const updatedSpecies = Array.from(new Set([...typicalSpecies, ...habitat.missingPlants]));
+    try {
+      const habitatType = await collection.findOne({ name: habitat.name }) as unknown as HabitatTypeDB;
       
-      // Aktualisieren des Habitattyps
-      await collection.updateOne(
-        { _id: habitatType._id },
-        { $set: { typicalSpecies: updatedSpecies } }
-      );
-      
-      updateResults.push({
-        name: habitat.name,
-        addedPlants: habitat.missingPlants,
-        totalPlants: updatedSpecies.length
-      });
+      if (habitatType) {
+        const typicalSpecies = habitatType.typicalSpecies || [];
+        const updatedSpecies = Array.from(new Set([...typicalSpecies, ...habitat.missingPlants]));
+        
+        // Aktualisieren des Habitattyps
+        await collection.updateOne(
+          { _id: habitatType._id },
+          { $set: { typicalSpecies: updatedSpecies } }
+        );
+        
+        updateResults.push({
+          name: habitat.name,
+          addedPlants: habitat.missingPlants,
+          totalPlants: updatedSpecies.length
+        });
+      }
+    } catch (error) {
+      console.error(`Fehler beim Aktualisieren des Habitattyps ${habitat.name}:`, error);
+      // Fahre mit dem nächsten Habitat fort, anstatt die gesamte Verarbeitung abzubrechen
     }
   }
   
@@ -248,8 +308,20 @@ export async function GET() {
       return a.name.localeCompare(b.name);
     });
     
-    // Analyse der Testcases und Habitattypen
-    const analysis = await analyzeHabitatTypes();
+    // Führe die Analyse nur aus, wenn die Umgebungsvariable gesetzt ist
+    if (process.env.HABITAT_TEST_IMAGES_PATH) {
+      try {
+        // Analyse der Testcases und Habitattypen
+        const analysis = await analyzeHabitatTypes();
+        console.log('Habitat-Analyse durchgeführt:', {
+          missingTypes: analysis.missingHabitatTypes.length,
+          typesWithMissingPlants: analysis.habitatTypesWithMissingPlants.length
+        });
+      } catch (analyzeError) {
+        // Bei Fehler in der Analyse nur loggen, aber keine Fehlerantwort zurückgeben
+        console.error('Fehler bei der Habitat-Analyse (nicht kritisch):', analyzeError);
+      }
+    }
     
     return NextResponse.json(sortedHabitatTypes);
   } catch (error) {
@@ -270,6 +342,20 @@ export async function POST() {
         { error: 'Nicht autorisiert' },
         { status: 401 }
       );
+    }
+    
+    // Prüfen, ob der Test-Images-Pfad existiert
+    if (!process.env.HABITAT_TEST_IMAGES_PATH) {
+      return NextResponse.json({
+        message: 'Keine Aktualisierung durchgeführt: HABITAT_TEST_IMAGES_PATH ist nicht definiert',
+        results: {
+          totalHabitatTypes: 0,
+          totalTestCases: 0,
+          missingHabitatTypes: [],
+          habitatTypesWithMissingPlants: [],
+          updatedHabitatTypes: []
+        }
+      });
     }
     
     // Führe die Aktualisierung durch
