@@ -263,10 +263,10 @@ export function HabitatTypesConfig() {
           <h2 className="text-2xl font-semibold">Habitat-Typen</h2>
           <Select value={selectedFamily} onValueChange={setSelectedFamily}>
             <SelectTrigger className="w-[220px]">
-              <SelectValue placeholder="Alle Familien" />
+              <SelectValue placeholder="Alle Gruppen" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Alle Familien</SelectItem>
+              <SelectItem value="all">Alle Gruppen</SelectItem>
               {availableFamilies
                 .filter(family => family !== "all")
                 .map(family => (
@@ -295,7 +295,7 @@ export function HabitatTypesConfig() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-[150px]">Name</TableHead>
-              <TableHead className="w-[150px]">Habitat-Familie</TableHead>
+              <TableHead className="w-[150px]">Habitat-Gruppe</TableHead>
               <TableHead className="w-[160px]">Schutzstatus</TableHead>
               <TableHead className="w-[200px]">Beschreibung</TableHead>
               <TableHead>Typische Arten</TableHead>
@@ -308,7 +308,7 @@ export function HabitatTypesConfig() {
               return (
                 <TableRow key={`type-${globalIndex}`}>
                   <TableCell>{type.name || <span className="text-gray-400">Kein Name</span>}</TableCell>
-                  <TableCell>{type.habitatFamilie || <span className="text-gray-400">Keine Familie</span>}</TableCell>
+                  <TableCell>{type.habitatFamilie || <span className="text-gray-400">Keine Gruppe</span>}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     {type.schutzstatus ? (
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(type.schutzstatus)}`}>
@@ -395,13 +395,13 @@ export function HabitatTypesConfig() {
                 {/* Rechte Spalte: Familie und Schutzstatus */}
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="habitatFamilie">Habitat-Familie</Label>
+                    <Label htmlFor="habitatFamilie">Habitat-Gruppe</Label>
                     <Select 
                       value={currentType.habitatFamilie || ""} 
                       onValueChange={(value) => updateCurrentType('habitatFamilie', value)}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Habitat-Familie auswählen" />
+                        <SelectValue placeholder="Habitat-Gruppe auswählen" />
                       </SelectTrigger>
                       <SelectContent>
                         {habitatGroups.sort((a, b) => a.pos - b.pos).map((group) => (

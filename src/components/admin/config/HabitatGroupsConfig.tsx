@@ -134,7 +134,7 @@ export function HabitatGroupsConfig() {
       // Nach Erfolg lokalen State aktualisieren
       const updatedGroups = groups.filter((g) => g._id !== groupToRemove._id);
       setGroups(updatedGroups);
-      toast.success("Habitat-Familie erfolgreich gelöscht");
+      toast.success("Habitat-Gruppe erfolgreich gelöscht");
     } catch (error) {
       toast.error(`Fehler: ${error instanceof Error ? error.message : String(error)}`);
       console.error("Fehler beim Löschen:", error);
@@ -234,12 +234,12 @@ export function HabitatGroupsConfig() {
       });
       
       if (!response.ok) throw new Error("Fehler beim Speichern");
-      toast.success("Habitat-Familie erfolgreich gespeichert");
+      toast.success("Habitat-Gruppe erfolgreich gespeichert");
       
       // Dialog schließen
       closeDetail();
     } catch (error) {
-      toast.error("Fehler beim Speichern der Habitat-Familie");
+      toast.error("Fehler beim Speichern der Habitat-Gruppe");
       console.error(error);
     } finally {
       setIsLoading(false);
@@ -271,7 +271,7 @@ export function HabitatGroupsConfig() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold">Habitat-Familien</h2>
+        <h2 className="text-2xl font-semibold">Habitat-Gruppen</h2>
         <div className="space-x-2">
           <Button
             variant="outline"
@@ -342,7 +342,7 @@ export function HabitatGroupsConfig() {
             {sortedGroups.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
-                  Keine Habitat-Familien gefunden
+                  Keine Habitat-Gruppen gefunden
                 </TableCell>
               </TableRow>
             )}
@@ -355,7 +355,7 @@ export function HabitatGroupsConfig() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {currentIndex !== null ? "Habitat-Familie bearbeiten" : "Neue Habitat-Familie erstellen"}
+              {currentIndex !== null ? "Habitat-Gruppe bearbeiten" : "Neue Habitat-Gruppe erstellen"}
             </DialogTitle>
           </DialogHeader>
           
@@ -368,7 +368,7 @@ export function HabitatGroupsConfig() {
                     id="name"
                     value={currentGroup.name}
                     onChange={(e) => updateCurrentGroup('name', e.target.value)}
-                    placeholder="Name der Habitat-Familie"
+                    placeholder="Name der Habitat-Gruppe"
                   />
                 </div>
                 
@@ -419,9 +419,9 @@ export function HabitatGroupsConfig() {
       <Dialog open={deleteConfirmation.isOpen} onOpenChange={closeDeleteConfirmation}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Habitat-Familie löschen</DialogTitle>
+            <DialogTitle>Habitat-Gruppe löschen</DialogTitle>
             <DialogDescription>
-              Möchten Sie diese Habitat-Familie wirklich löschen? 
+              Möchten Sie diese Habitat-Gruppe wirklich löschen? 
               Diese Aktion kann nicht rückgängig gemacht werden.
             </DialogDescription>
           </DialogHeader>

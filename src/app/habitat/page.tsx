@@ -96,9 +96,8 @@ function HabitatPageContent() {
         const dataAdmin = await responseAdmin.json();
         setIsAdmin(dataAdmin.isAdmin);
         
-        const responseAdvanced = await fetch('/api/users/hasAdvancedPermissions');
-        const dataAdvanced = await responseAdvanced.json();
-        setHasAdvancedPermissions(dataAdvanced.hasAdvancedPermissions);
+        // Setze hasAdvancedPermissions basierend auf isAdmin oder isExpert
+        setHasAdvancedPermissions(dataAdmin.isAdmin || dataExpert.isExpert);
       } catch (error) {
         console.error('Fehler beim Überprüfen der Benutzerberechtigungen:', error);
       } finally {
@@ -484,8 +483,8 @@ function HabitatPageContent() {
             type="familien"
             value={selectedHabitatFamilie || 'alle'}
             onValueChange={(value) => applyFilter('habitatFamilie', value)}
-            placeholder="Familie"
-            allLabel="Alle Familien"
+            placeholder="Gruppe"
+            allLabel="Alle Gruppen"
           />
           
           <FilterSelect

@@ -8,6 +8,7 @@ import { ChevronDown, ChevronUp, Flower2, Sparkles, CheckCircle2, Camera, Messag
 import { NatureScoutData, AnalyseErgebnis, llmInfo, SimplifiedSchema } from "@/types/nature-scout";
 import { ParameterHeading } from './parameter-heading';
 import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
+import { useNatureScoutState } from "@/context/nature-scout-context";
 
 interface ImageAnalysisProps {
   metadata: NatureScoutData;
@@ -57,6 +58,7 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isParametersOpen, setIsParametersOpen] = useState(false);
   const hasInitiatedAnalysis = useRef(false);
+  const { setJobId } = useNatureScoutState();
   
   useEffect(() => {
     // Analyse immer starten, wenn die Komponente geladen wird
@@ -87,6 +89,9 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
       }
 
       const { jobId } = responseData;
+      console.log("Analyse gestartet mit jobId:", jobId);
+      // Speichere die jobId im NatureScoutState
+      setJobId(jobId);
 
       const checkStatus = async () => {
         try {
@@ -103,6 +108,8 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
           const { status, result, llmInfo } = statusData;
 
           if (status === 'completed' && result) {
+            // Speichere die JobId im NatureScoutState wenn Analyse erfolgreich war
+            setJobId(jobId);
             onAnalysisComplete({
               ...metadata.analyseErgebnis,
               ...result,

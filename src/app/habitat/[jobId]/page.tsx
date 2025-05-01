@@ -444,7 +444,7 @@ export default function HabitateDetailPage() {
                       <div className="p-4 border rounded-lg bg-white">
                         <h3 className="font-medium text-lg mb-2">Habitat: {data.result.habitattyp}</h3>
                         {data.result.habitatFamilie && (
-                          <p className="text-gray-500 mb-4">Habitatfamilie: {data.result.habitatFamilie}</p>
+                          <p className="text-gray-500 mb-4">Habitat-Gruppe: {data.result.habitatFamilie}</p>
                         )}
                         {data.result.zusammenfassung && (
                           <p className="mb-4">{data.result.zusammenfassung}</p>

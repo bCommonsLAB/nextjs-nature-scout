@@ -83,7 +83,7 @@ export async function GET(request: Request) {
         // Aggregation für eindeutige Habitat-Familien
         const habitateForFamilies = await collection.aggregate([
           { $match: baseMatch },
-          { $group: { _id: '$result.habitatFamilie' } }, // Direkt nach Habitat-Familie suchen
+          { $group: { _id: '$result.habitatGroups' } }, // Direkt nach Habitat-Familie suchen
           { $match: { _id: { $ne: null } } },
           { $sort: { _id: 1 } }
         ]).toArray();

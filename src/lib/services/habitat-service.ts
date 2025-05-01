@@ -10,9 +10,31 @@ export interface HabitatType {
   schutzstatus?: string;
 }
 
+/**
+ * Erstellt Indizes für die Habitat-Sammlung
+ */
+export async function createHabitatTypeIndexes(): Promise<void> {
+  const db = await connectToDatabase();
+  const collection = db.collection('habitatTypes');
+  
+  // Index für den Namen (häufig für Suche und Sortierung verwendet)
+  await collection.createIndex({ name: 1 }, { unique: true });
+  
+  // Index für habitatFamilie, falls häufig danach gefiltert wird
+  await collection.createIndex({ habitatFamilie: 1 });
+  
+  // Index für schutzstatus, falls häufig danach gefiltert wird
+  await collection.createIndex({ schutzstatus: 1 });
+  
+  console.log('Habitat-Indizes wurden erstellt oder aktualisiert');
+}
+
 export async function initializeHabitatTypes(): Promise<void> {
   const db = await connectToDatabase();
   const collection = db.collection('habitatTypes');
+
+  // Indizes erstellen
+  await createHabitatTypeIndexes();
 
   // Prüfe ob bereits Habitattypen existieren
   const count = await collection.countDocuments();
@@ -125,18 +147,46 @@ export async function initializeHabitatTypes(): Promise<void> {
   await collection.insertMany(habitatTypes);
 }
 
+// Einfacher In-Memory-Cache für häufige Abfragen
+let habitatTypesCache: {
+  data: HabitatType[] | null;
+  timestamp: number;
+} = {
+  data: null,
+  timestamp: 0
+};
+
+// Cache-Lebensdauer in Millisekunden (5 Minuten)
+const CACHE_TTL = 5 * 60 * 1000;
+
 export async function getAllHabitatTypes(): Promise<HabitatType[]> {
   try {
+    // Cache-Check: Wenn Daten im Cache und nicht älter als CACHE_TTL
+    const now = Date.now();
+    if (habitatTypesCache.data && (now - habitatTypesCache.timestamp) < CACHE_TTL) {
+      return habitatTypesCache.data;
+    }
+    
     const db = await connectToDatabase();
     const collection = db.collection<HabitatType>('habitatTypes');
     
-    const habitatTypes = await collection.find({}).toArray();
+    // Nutze den Index für name, um die Sortierung zu beschleunigen
+    const habitatTypes = await collection.find({})
+      .sort({ name: 1 })
+      .toArray();
+    
+    // Aktualisiere den Cache
+    habitatTypesCache = {
+      data: habitatTypes,
+      timestamp: now
+    };
     
     // Logging nur im Development
     if (process.env.NODE_ENV === 'development') {
       console.log('Geladene Habitat-Typen:', {
         count: habitatTypes.length,
-        types: habitatTypes.map(h => h.name)
+        types: habitatTypes.map(h => h.name),
+        source: 'Datenbank'
       });
     }
     
@@ -153,6 +203,13 @@ export async function getHabitatTypeById(id: string): Promise<HabitatType | null
   return collection.findOne({ _id: new ObjectId(id) });
 }
 
+/**
+ * Setzt den Cache zurück, wenn Habitattypen geändert werden
+ */
+function invalidateCache(): void {
+  habitatTypesCache.data = null;
+}
+
 export async function createHabitatType(habitatType: Omit<HabitatType, '_id'>): Promise<HabitatType> {
   const db = await connectToDatabase();
   const collection = db.collection<HabitatType>('habitatTypes');
@@ -164,6 +221,10 @@ export async function createHabitatType(habitatType: Omit<HabitatType, '_id'>): 
   }
 
   const result = await collection.insertOne(habitatType);
+  
+  // Cache zurücksetzen
+  invalidateCache();
+  
   return {
     _id: result.insertedId,
     ...habitatType
@@ -191,6 +252,9 @@ export async function updateHabitatType(id: string, updates: Partial<Omit<Habita
     { returnDocument: 'after' }
   );
 
+  // Cache zurücksetzen
+  invalidateCache();
+  
   return result;
 }
 
@@ -199,6 +263,10 @@ export async function deleteHabitatType(id: string): Promise<boolean> {
   const collection = db.collection<HabitatType>('habitatTypes');
   
   const result = await collection.deleteOne({ _id: new ObjectId(id) });
+  
+  // Cache zurücksetzen
+  invalidateCache();
+  
   return result.deletedCount === 1;
 }
 

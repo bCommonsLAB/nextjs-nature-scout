@@ -202,6 +202,13 @@ export function EffektiverHabitatEditor({
       return;
     }
     
+    console.log("Versuche Habitat zu speichern mit jobId:", jobId);
+    
+    if (!jobId) {
+      setError('Keine gültige Habitat-ID vorhanden');
+      return;
+    }
+    
     setSaving(true);
     try {
       const response = await fetch(`/api/habitat/${jobId}/effective-habitat`, {
@@ -216,6 +223,12 @@ export function EffektiverHabitatEditor({
       });
       
       if (!response.ok) {
+        console.error("API-Fehler beim Speichern:", {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url
+        });
+        
         const errorData = await response.json();
         throw new Error(errorData.error || 'Fehler beim Speichern des effektiven Habitats');
       }

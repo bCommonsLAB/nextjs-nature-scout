@@ -134,14 +134,6 @@ export class UserService {
    */
   static async isExpert(clerkId: string): Promise<boolean> {
     const user = await this.findByClerkId(clerkId);
-    return user?.role === 'experte';
-  }
-  
-  /**
-   * Prüft, ob ein Benutzer erweiterte Rechte hat (Experte oder Admin)
-   */
-  static async hasAdvancedPermissions(clerkId: string): Promise<boolean> {
-    const user = await this.findByClerkId(clerkId);
     return user?.role === 'experte' || user?.role === 'admin' || user?.role === 'superadmin';
   }
 } 

@@ -9,6 +9,8 @@ interface NatureScoutContextType {
   setMetadata: React.Dispatch<React.SetStateAction<NatureScoutData | null>>;
   editJobId: string | null;
   setEditJobId: React.Dispatch<React.SetStateAction<string | null>>;
+  jobId: string | null;
+  setJobId: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
 // Erstelle den Context mit Defaultwerten
@@ -17,6 +19,8 @@ const NatureScoutContext = createContext<NatureScoutContextType>({
   setMetadata: () => {},
   editJobId: null,
   setEditJobId: () => {},
+  jobId: null,
+  setJobId: () => {},
 });
 
 // Hook zum Verwenden des Contexts
@@ -28,6 +32,7 @@ export const useNatureScoutState = () => {
 export function NatureScoutProvider({ children }: { children: ReactNode }) {
   const [metadata, setMetadata] = useState<NatureScoutData | null>(null);
   const [editJobId, setEditJobId] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
 
   return (
     <NatureScoutContext.Provider 
@@ -35,7 +40,9 @@ export function NatureScoutProvider({ children }: { children: ReactNode }) {
         metadata, 
         setMetadata,
         editJobId,
-        setEditJobId
+        setEditJobId,
+        jobId,
+        setJobId
       }}
     >
       {children}
