@@ -286,7 +286,7 @@ export function EffektiverHabitatEditor({
             <div className="space-y-2">
               {/* Erkannte Habitatfamilie */}
               <div className="space-y-1">
-                <div className="text-xs text-gray-500">Habitatfamilie</div>
+                <div className="text-xs text-gray-500">Habitatgruppe</div>
                 <div className="px-3 py-2 border rounded-md bg-gray-50">
                   {detectedFamilie || 'Unbekannt'}
                 </div>
@@ -315,14 +315,14 @@ export function EffektiverHabitatEditor({
             <div className="space-y-2">
               {/* Dropdown für Habitatfamilie */}
               <div className="space-y-1">
-                <div className="text-xs text-gray-500">Habitatfamilie auswählen</div>
+                <div className="text-xs text-gray-500">Habitatgruppe auswählen</div>
                 <Select 
                   value={selectedFamily}
                   onValueChange={handleFamilyChange}
                   disabled={saving}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Habitatfamilie auswählen" />
+                    <SelectValue placeholder="Habitatgruppe auswählen" />
                   </SelectTrigger>
                   <SelectContent>
                     {habitatFamilies.map((family) => (

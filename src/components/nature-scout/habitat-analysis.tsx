@@ -355,6 +355,17 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
                   </div>
                   <div className="bg-blue-50 p-4 rounded-lg space-y-3">
                     <div className="text-xs font-mono whitespace-pre-wrap">
+                    <ParameterHeading 
+                        title={habitatTooltips.bildanalyse?.title || ''}
+                        description={habitatTooltips.bildanalyse?.description || ''}
+                        details={{
+                          Bilder: habitatTooltips.bildanalyse?.bilder || ''
+                        }}
+                      />
+{`${metadata.analyseErgebnis.bildanalyse?.map(bild => 
+  `- ${bild.bilder}`
+).join('\n') || ''}
+`}
 
                       <ParameterHeading 
                         title={habitatTooltips.pflanzenarten?.title || ''}

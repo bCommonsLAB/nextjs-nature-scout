@@ -137,6 +137,12 @@ async function createHabitatAnalyseSchema(
   return z.object({
     analyses: z.array(
       z.object({
+        bildanalyse: z.array(
+          z.object({
+            bilder: z.string()
+              .describe(String(analysisSchema.schema.bild_analyse))
+          })
+        ).describe("Bilder analysieren"),
         pflanzenarten: z.array(
           z.object({
             name: z.string()
@@ -215,7 +221,7 @@ export async function analyzeImageStructured(metadata: NatureScoutData): Promise
 
 async function getImageContents(metadata: NatureScoutData) {
   //console.log('🔄 Starte Bildanalyse für URLs:', metadata.bilder);
-        
+  
   const imageBase64Contents = await Promise.all(
     metadata.bilder.map(bild => urlToBase64(bild.url))
   );

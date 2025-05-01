@@ -104,6 +104,9 @@ export interface llmInfo {
 }
 
 export interface AnalyseErgebnis {
+  bildanalyse: Array<{
+    bilder: string;
+  }>;
   pflanzenarten: Array<{
     name: string;
     häufigkeit: string;

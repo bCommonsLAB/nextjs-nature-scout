@@ -483,7 +483,7 @@ export default function HabitateDetailPage() {
                           <div>
                             <h3 className="font-medium text-lg mb-2">Habitat: {data.verifiedResult.habitattyp}</h3>
                             {data.verifiedResult.habitatFamilie && (
-                              <p className="text-gray-500 mb-4">Habitatfamilie: {data.verifiedResult.habitatFamilie}</p>
+                              <p className="text-gray-500 mb-4">Habitatgruppe: {data.verifiedResult.habitatFamilie}</p>
                             )}
                           </div>
                           {data.verifiedResult.schutzstatus && (
