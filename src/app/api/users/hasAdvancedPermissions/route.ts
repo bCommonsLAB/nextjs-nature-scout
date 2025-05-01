@@ -4,7 +4,6 @@ import { UserService } from '@/lib/services/user-service';
 
 /**
  * GET /api/users/hasAdvancedPermissions - Überprüft, ob der aktuelle Benutzer erweiterte Rechte hat
- * (Benutzer ist entweder Experte, Admin oder Superadmin)
  */
 export async function GET(req: NextRequest) {
   try {
@@ -21,7 +20,7 @@ export async function GET(req: NextRequest) {
     
     return NextResponse.json({ hasAdvancedPermissions });
   } catch (error) {
-    console.error('Fehler beim Überprüfen der erweiterten Berechtigungen:', error);
+    console.error('Fehler beim Überprüfen der erweiterten Rechte:', error);
     return NextResponse.json({ hasAdvancedPermissions: false }, { status: 500 });
   }
 } 

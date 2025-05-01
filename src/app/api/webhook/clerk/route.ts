@@ -67,6 +67,45 @@ async function handleWebhookEvent(evt: WebhookEvent) {
   const eventType = evt.type;
   console.log(`Verarbeite Webhook-Event: ${eventType}`, JSON.stringify(evt.data, null, 2));
   
+  // Verarbeite session.created Events - Aktualisiere lastAccess
+  if (eventType === 'session.created') {
+    const { user_id } = evt.data;
+    
+    if (!user_id) {
+      console.error('Keine Benutzer-ID in den Session-Daten gefunden');
+      await addWebhookEvent({
+        type: 'error_no_user_id_in_session',
+        data: evt.data
+      });
+      return NextResponse.json({ error: 'Keine Benutzer-ID vorhanden' }, { status: 400 });
+    }
+    
+    try {
+      // Aktualisiere das lastAccess-Datum des Benutzers
+      const updatedUser = await UserService.updateLastAccess(user_id);
+      
+      // Erfolg zur Debug-Liste hinzufügen
+      await addWebhookEvent({
+        type: 'user_last_access_updated',
+        userId: user_id,
+        timestamp: new Date().toISOString()
+      });
+      
+      return NextResponse.json({ success: true, action: 'lastAccessUpdated' });
+    } catch (error) {
+      console.error('Fehler beim Aktualisieren des lastAccess-Datums:', error);
+      
+      // Fehler zur Debug-Liste hinzufügen
+      await addWebhookEvent({
+        type: 'user_last_access_update_error',
+        userId: user_id,
+        error: (error as Error).message
+      });
+      
+      return NextResponse.json({ error: 'Interner Serverfehler' }, { status: 500 });
+    }
+  }
+  
   if (eventType === 'user.created' || eventType === 'user.updated') {
     console.log('Verarbeite Benutzer-Event:', eventType);
     

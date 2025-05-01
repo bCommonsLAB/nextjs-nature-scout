@@ -10,6 +10,7 @@ export interface IUser {
   image?: string;
   createdAt?: Date;
   updatedAt?: Date;
+  lastAccess?: Date;
 }
 
 export interface CreateUserData {
@@ -60,7 +61,8 @@ export class UserService {
       ...userData,
       role: userData.role || 'user',
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      lastAccess: new Date()
     };
     
     const result = await collection.insertOne(newUser as any);
@@ -81,6 +83,21 @@ export class UserService {
     const result = await collection.findOneAndUpdate(
       { clerkId },
       { $set: updateData },
+      { returnDocument: 'after' }
+    );
+    
+    return result;
+  }
+  
+  /**
+   * Aktualisiert das lastAccess-Datum eines Benutzers
+   */
+  static async updateLastAccess(clerkId: string): Promise<IUser | null> {
+    const collection = await this.getUsersCollection();
+    
+    const result = await collection.findOneAndUpdate(
+      { clerkId },
+      { $set: { lastAccess: new Date() } },
       { returnDocument: 'after' }
     );
     
