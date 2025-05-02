@@ -416,21 +416,20 @@ function ProfileContent() {
             <p className="text-sm text-muted-foreground">
               Du kannst deine Entscheidungen jederzeit ändern.
             </p>
-            <Button 
-              onClick={() => {
-                if (hasAllConsents) {
-                  saveProfile();
-                } else {
-                  setConsentDialogOpen(true);
-                }
-              }} 
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Speichere...' : 'Organisationseinstellungen speichern'}
-            </Button>
-
           </CardFooter>
         </Card>
+        <Button 
+          onClick={() => {
+            if (hasAllConsents) {
+              saveProfile();
+            } else {
+              setConsentDialogOpen(true);
+            }
+          }} 
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'Speichere...' : 'Organisationseinstellungen speichern'}
+        </Button>      
       </div>
 
       {/* Einwilligungs-Dialog */}
