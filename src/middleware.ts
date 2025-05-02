@@ -1,32 +1,42 @@
-import { clerkMiddleware } from '@clerk/nextjs/server';
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
-// Konfiguriere die Middleware
-export default clerkMiddleware({
-  publicRoutes: [
-    // Öffentliche Seiten
-    "/",
-    "/habitat/karte",
-    
-    // API-Routen
-    "/api/habitat/public",
-    "/api/habitat/search",
-    "/api/habitat/categories",
-    "/api/habitat/categoriesDict",
-    
-    // Webhook-Routen
-    "/api/webhook/clerk",
-    
-    // Debug-Routen
-    "/api/debug/log",
-    
-    // Statische Assets
-    "/(.*).png",
-    "/(.*).jpg",
-    "/(.*).jpeg",
-    "/(.*).svg",
-    "/(.*).ico",
-    "/favicon.ico"
-  ]
+// Definiere öffentliche Routen mit createRouteMatcher
+const isPublicRoute = createRouteMatcher([
+  // Öffentliche Seiten
+  "/",
+  "/habitat/karte",
+  
+  // API-Routen
+  "/api/habitat/public",
+  "/api/habitat/search",
+  "/api/habitat/categories",
+  "/api/habitat/categoriesDict",
+  "/api/organizations",
+  
+  // Webhook-Routen
+  "/api/webhook/clerk",
+  
+  // Debug-Routen
+  "/api/debug/log",
+  
+  // Statische Assets
+  "/(.*).png",
+  "/(.*).jpg",
+  "/(.*).jpeg",
+  "/(.*).svg",
+  "/(.*).ico",
+  "/favicon.ico"
+]);
+
+// Verwende den Handler-Ansatz für die Middleware
+export default clerkMiddleware((auth, req) => {
+  // Wenn es eine öffentliche Route ist, schütze sie nicht
+  if (isPublicRoute(req)) {
+    return;
+  }
+  
+  // Alle anderen Routen sind geschützt
+  auth.protect();
 });
 
 export const config = {

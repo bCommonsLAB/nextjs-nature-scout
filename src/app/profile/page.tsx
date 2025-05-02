@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useUser, useClerk } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,8 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InfoIcon, AlertTriangle } from "lucide-react";
 
-export default function ProfilePage() {
+// Komponente für die Parameter-Verarbeitung
+function ProfileContent() {
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
   const router = useRouter();
@@ -522,5 +523,14 @@ export default function ProfilePage() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+// Hauptkomponente mit Suspense-Boundary
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center h-screen">Lade...</div>}>
+      <ProfileContent />
+    </Suspense>
   );
 } 

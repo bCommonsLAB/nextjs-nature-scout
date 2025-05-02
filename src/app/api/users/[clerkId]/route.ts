@@ -4,7 +4,7 @@ import { UserService } from '@/lib/services/user-service';
 
 // GET /api/users/[clerkId] - Holt einen bestimmten Benutzer
 export async function GET(
-  req: NextRequest,
+  req: Request,
   { params }: { params: { clerkId: string } }
 ) {
   try {
@@ -41,7 +41,7 @@ export async function GET(
 
 // PATCH /api/users/[clerkId] - Aktualisiert einen bestimmten Benutzer
 export async function PATCH(
-  req: NextRequest,
+  req: Request,
   { params }: { params: { clerkId: string } }
 ) {
   try {
@@ -118,7 +118,7 @@ export async function PATCH(
 
 // DELETE /api/users/[clerkId] - Löscht einen bestimmten Benutzer
 export async function DELETE(
-  req: NextRequest,
+  req: Request,
   { params }: { params: { clerkId: string } }
 ) {
   try {
