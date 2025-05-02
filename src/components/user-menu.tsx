@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useUser, useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -25,16 +26,26 @@ export function UserMenu() {
   // Die Initialen des Benutzers extrahieren
   const initials = user?.firstName?.[0]?.toUpperCase() || user?.username?.[0]?.toUpperCase() || '?';
 
+  // URL für die Kontoverwaltung - wir verwenden die offizielle Clerk-URL
+  const manageAccountUrl = 'https://accounts.clerk.com';
+
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative w-9 h-9 rounded-full">
+        <Button variant="ghost" className="relative w-9 h-9 rounded-full overflow-hidden">
           {user?.imageUrl ? (
-            <img 
-              src={user.imageUrl} 
-              alt={user.fullName || "Benutzer"} 
-              className="w-8 h-8 rounded-full"
-            />
+            <div className="w-8 h-8 relative">
+              <Image 
+                src={user.imageUrl} 
+                alt={user.fullName || "Benutzer"} 
+                fill
+                sizes="32px"
+                className="rounded-full object-cover"
+                priority
+                loading="eager"
+                fetchPriority="high"
+              />
+            </div>
           ) : (
             <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground">
               {initials}
@@ -46,11 +57,18 @@ export function UserMenu() {
         <div className="flex items-center p-2">
           <div className="flex items-center gap-2">
             {user?.imageUrl ? (
-              <img 
-                src={user.imageUrl} 
-                alt={user.fullName || "Benutzer"} 
-                className="w-8 h-8 rounded-full"
-              />
+              <div className="w-8 h-8 relative">
+                <Image 
+                  src={user.imageUrl} 
+                  alt={user.fullName || "Benutzer"} 
+                  fill
+                  sizes="32px"
+                  className="rounded-full object-cover"
+                  priority
+                  loading="eager"
+                  fetchPriority="high"
+                />
+              </div>
             ) : (
               <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground">
                 {initials}
@@ -73,7 +91,7 @@ export function UserMenu() {
         </Link>
         <DropdownMenuItem 
           className="cursor-pointer"
-          onClick={() => window.open(process.env.NEXT_PUBLIC_CLERK_ACCOUNT_URL || 'https://accounts.clerk.dev')}
+          onClick={() => window.open(manageAccountUrl, '_blank')}
         >
           <Settings className="mr-2 h-4 w-4" />
           <span>Konto verwalten</span>

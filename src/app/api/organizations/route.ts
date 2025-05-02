@@ -3,24 +3,28 @@ import { getAuth } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
 import { OrganizationService } from '@/lib/services/organization-service';
 
-// GET /api/organizations - Holt alle Organisationen (nur für Admins)
-export async function GET(req: NextRequest) {
+// GET /api/organizations - Holt alle Organisationen (für alle authentifizierten Benutzer)
+export async function GET(request: Request) {
   try {
-    const auth = getAuth(req);
+    const auth = getAuth(request);
     const userId = auth.userId;
     
     if (!userId) {
       return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
     }
     
-    // Prüfe, ob der anfragende Benutzer ein Admin ist
+    // Prüfe, ob der anfragende Benutzer ein Admin ist - für erweiterte Informationen
     const isAdmin = await UserService.isAdmin(userId);
     
+    // Alle authentifizierten Benutzer können Organisationen sehen, ohne Admin-Überprüfung
+    const organizations = await OrganizationService.getAllOrganizations();
+    
+    // Für nicht-Admins könnten wir die Daten einschränken, falls nötig
     if (!isAdmin) {
-      return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
+      // Hier könnten wir sensible Felder entfernen, wenn nötig
+      // Für jetzt geben wir die kompletten Daten zurück
     }
     
-    const organizations = await OrganizationService.getAllOrganizations();
     return NextResponse.json(organizations);
   } catch (error) {
     console.error('Fehler beim Abrufen der Organisationen:', error);
@@ -29,9 +33,9 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/organizations - Erstellt eine neue Organisation (nur für Admins)
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const auth = getAuth(req);
+    const auth = getAuth(request);
     const userId = auth.userId;
     
     if (!userId) {
@@ -45,7 +49,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
     }
     
-    const body = await req.json();
+    const body = await request.json();
     
     if (!body.name) {
       return NextResponse.json({ error: 'Name ist erforderlich' }, { status: 400 });

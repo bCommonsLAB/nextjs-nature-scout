@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useUser } from '@clerk/nextjs';
-import { useRouter } from 'next/navigation';
+import { useUser, useClerk } from '@clerk/nextjs';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -18,16 +18,35 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { InfoIcon, AlertTriangle } from "lucide-react";
 
 export default function ProfilePage() {
   const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [userData, setUserData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [selectedOrg, setSelectedOrg] = useState<string>('none');
   const [consentDialogOpen, setConsentDialogOpen] = useState(false);
+  const [attemptedToSave, setAttemptedToSave] = useState(false);
+  
+  // Dialog für Abbruch der Einwilligungen
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  
+  // Überprüfen, ob der Benutzer über die Umleitung auf diese Seite gekommen ist
+  const isRedirected = searchParams.has('consent_required') || 
+                       sessionStorage.getItem('consent_redirect') === 'true';
+  
+  // Status im sessionStorage speichern, damit er nach dem Neuladen der Seite erhalten bleibt
+  useEffect(() => {
+    if (isRedirected && typeof window !== 'undefined') {
+      sessionStorage.setItem('consent_redirect', 'true');
+    }
+  }, [isRedirected]);
   
   // Zustand für die Einwilligungen
   const [consentDataProcessing, setConsentDataProcessing] = useState(false);
@@ -60,12 +79,14 @@ export default function ProfilePage() {
         setHabitatNameVisibility(data.habitat_name_visibility || 'public');
         setSelectedOrg(data.organizationId || 'none');
         
-        // Wenn Einwilligungen fehlen, Dialog anzeigen
-        if (!data.consent_data_processing || !data.consent_image_ccby) {
-          setConsentDialogOpen(true);
-        }
+        // Dialog nicht automatisch anzeigen, sondern nur auf Anforderung
+        // Der Dialog wird nur angezeigt, wenn man versucht zu speichern
+
+        // Organisationsdaten nur laden, wenn der Benutzer angemeldet ist
+        await fetchOrganizations();
       } catch (err) {
         console.error('Error fetching user data:', err);
+        toast.error('Fehler beim Laden der Benutzerdaten');
       } finally {
         setIsLoading(false);
       }
@@ -73,19 +94,39 @@ export default function ProfilePage() {
 
     async function fetchOrganizations() {
       try {
-        const response = await fetch('/api/organizations');
-        if (!response.ok) {
-          throw new Error('Fehler beim Laden der Organisationen');
+        // Überprufen, ob ein Benutzer angemeldet ist
+        if (!isLoaded || !user) {
+          console.log("Keine Benutzer-Sitzung verfügbar für Organisationsabfrage");
+          setOrganizations([]);
+          return;
         }
+        
+        const response = await fetch('/api/organizations', {
+          // Credentials mitschicken für Cookie-basierte Auth (Clerk Session)
+          credentials: 'include'
+        });
+        
+        if (response.status === 401) {
+          console.log("Nicht angemeldet für Organisationsabfrage");
+          setOrganizations([]);
+          return;
+        }
+        
+        if (!response.ok) {
+          throw new Error(`Fehler beim Laden der Organisationen: ${response.status}`);
+        }
+        
         const data = await response.json();
         setOrganizations(data);
       } catch (err) {
         console.error('Error fetching organizations:', err);
+        toast.error('Fehler beim Laden der Organisationen');
+        // Standardwert für Organisationen setzen, damit die UI nicht abstürzt
+        setOrganizations([]);
       }
     }
 
     fetchUserData();
-    fetchOrganizations();
   }, [user, isLoaded]);
 
   // Wenn keine Organisation ausgewählt ist, setze die Sichtbarkeit auf "public"
@@ -98,6 +139,9 @@ export default function ProfilePage() {
   // Alle Profileinstellungen speichern
   const saveProfile = async () => {
     if (!isLoaded || !user) return;
+    setAttemptedToSave(true);
+    
+    // Wenn Einwilligungen fehlen, den Dialog anzeigen statt sofort zu speichern
     if (!hasAllConsents) {
       setConsentDialogOpen(true);
       return;
@@ -130,6 +174,14 @@ export default function ProfilePage() {
       // Benutzerdaten aktualisieren
       const updatedUserData = await response.json();
       setUserData(updatedUserData);
+      
+      // Redirect-Marker aus dem sessionStorage entfernen
+      sessionStorage.removeItem('consent_redirect');
+      
+      // Wenn alle Einwilligungen jetzt vorhanden sind, zur Startseite zurückkehren
+      if (consentDataProcessing && consentImageCcby) {
+        router.push('/');
+      }
     } catch (err) {
       console.error('Error saving profile:', err);
       toast.error('Fehler beim Speichern der Profileinstellungen');
@@ -154,8 +206,10 @@ export default function ProfilePage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          organizationId: selectedOrg === 'none' ? null : selectedOrg,
           consent_data_processing: consentDataProcessing,
           consent_image_ccby: consentImageCcby,
+          habitat_name_visibility: habitatNameVisibility,
         }),
       });
 
@@ -171,6 +225,12 @@ export default function ProfilePage() {
       
       // Dialog schließen
       setConsentDialogOpen(false);
+      
+      // Redirect-Marker aus dem sessionStorage entfernen
+      sessionStorage.removeItem('consent_redirect');
+      
+      // Zur Startseite zurückkehren, da jetzt alle Einwilligungen vorhanden sind
+      router.push('/');
     } catch (err) {
       console.error('Error saving consents:', err);
       toast.error('Fehler beim Speichern der Einwilligungen');
@@ -178,13 +238,41 @@ export default function ProfilePage() {
       setIsSubmitting(false);
     }
   };
+  
+  // Benutzer abmelden, wenn der Dialog abgebrochen wird
+  const handleCancelConsent = () => {
+    setConsentDialogOpen(false);
+    // Dialog für Abbruch anzeigen
+    setLogoutDialogOpen(true);
+  };
+  
+  // Tatsächliche Abmeldung durchführen
+  const performLogout = async () => {
+    setLogoutDialogOpen(false);
+    
+    try {
+      await signOut(() => {
+        router.push('/');
+      });
+    } catch (error) {
+      console.error('Fehler beim Abmelden:', error);
+      // Fallback, falls signOut fehlschlägt
+      router.push('/');
+    }
+  };
+
+  // Navigiere zur Anmeldeseite, wenn der Benutzer nicht angemeldet ist
+  useEffect(() => {
+    if (isLoaded && !user) {
+      router.push('/anmelden');
+    }
+  }, [isLoaded, user, router]);
 
   if (!isLoaded || isLoading) {
     return <div className="flex justify-center items-center h-screen">Lade...</div>;
   }
 
   if (!user) {
-    router.push('/anmelden');
     return null;
   }
 
@@ -198,12 +286,23 @@ export default function ProfilePage() {
   return (
     <>
       <div className="container max-w-4xl py-8 space-y-8">
+        {/* Hinweisbanner, wenn der Benutzer umgeleitet wurde */}
+        {isRedirected && (
+          <Alert className="mb-8 border-amber-500 bg-amber-50">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-800">Organisationseinstellungen erforderlich</AlertTitle>
+            <AlertDescription className="text-amber-700">
+              Um Ihre Anmeldung abzuschließen, müssen Sie Ihre Organisationseinstellungen speichern und erforderlichen Einwilligungen erteilen.
+            </AlertDescription>
+          </Alert>
+        )}
+        
         {/* Profilkarte */}
         <Card>
           <CardHeader>
-            <CardTitle>Mein Profil</CardTitle>
+            <CardTitle>Meine Daten</CardTitle>
             <CardDescription>
-              Hier findest du deine persönlichen Informationen.
+              Hier findest du deine persönlichen Informationen und Organisationszugehörigkeit.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -260,24 +359,7 @@ export default function ProfilePage() {
 
               </p>
             </div>
-            </CardContent>
-          <CardFooter className="flex justify-between">
-            <p className="text-sm text-muted-foreground">
-              Du kannst deine Entscheidungen jederzeit ändern.
-            </p>
-            <Button 
-              onClick={() => {
-                if (hasAllConsents) {
-                  saveProfile();
-                } else {
-                  setConsentDialogOpen(true);
-                }
-              }} 
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Speichere...' : 'Profileinstellungen speichern'}
-            </Button>
-          </CardFooter>
+          </CardContent>
         </Card>
 
         <Card>
@@ -333,25 +415,36 @@ export default function ProfilePage() {
             <p className="text-sm text-muted-foreground">
               Du kannst deine Entscheidungen jederzeit ändern.
             </p>
-           
+            <Button 
+              onClick={() => {
+                if (hasAllConsents) {
+                  saveProfile();
+                } else {
+                  setConsentDialogOpen(true);
+                }
+              }} 
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Speichere...' : 'Organisationseinstellungen speichern'}
+            </Button>
+
           </CardFooter>
         </Card>
       </div>
 
       {/* Einwilligungs-Dialog */}
       <Dialog open={consentDialogOpen} onOpenChange={(open) => {
-        // Wenn Dialog geschlossen wird und Einwilligungen fehlen, dann zur Startseite umleiten
-        if (!open && !hasAllConsents) {
-          router.push('/');
-        } else {
-          setConsentDialogOpen(open);
+        // Dialog nur schließen, wenn wir explizit schließen möchten
+        // Die Abmeldung übernimmt handleCancelConsent
+        if (!open && attemptedToSave) {
+          setConsentDialogOpen(false);
         }
       }}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Erforderliche Einwilligungen</DialogTitle>
             <DialogDescription>
-              Du musst diesen Einwilligungen zustimmen, um dein Profil zu speichern und die Anwendung zu nutzen.
+              Du musst diesen Einwilligungen zustimmen und deine Organisationseinstellungen speichern, um deine Anmeldung abzuschliessen.
             </DialogDescription>
           </DialogHeader>
           
@@ -396,14 +489,34 @@ export default function ProfilePage() {
           </div>
           
           <DialogFooter>
-            <Button onClick={() => router.push('/')} variant="outline">
-              Abbrechen
+            <Button 
+              onClick={handleCancelConsent} 
+              variant="outline"
+            >
+              Abbrechen und abmelden
             </Button>
             <Button 
               onClick={saveConsents} 
               disabled={!isFormValid || isSubmitting}
             >
               {isSubmitting ? 'Speichere...' : 'Einwilligungen bestätigen'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Abmeldungs-Dialog */}
+      <Dialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Abmeldung nach Abbruch der Einwilligungen</DialogTitle>
+            <DialogDescription>
+              Du hast die Einwilligungen abgebrochen. Du wirst abgemeldet und kannst dich jederzeit wieder anmelden, um deine Organisationseinstellungen zu vervollständigen.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button onClick={performLogout} variant="default">
+              OK, verstanden
             </Button>
           </DialogFooter>
         </DialogContent>

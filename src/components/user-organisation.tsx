@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
-import { UserMenu } from "@/components/user-menu";
+import { CustomUserButton } from "@/components/custom-user-button";
 
-export function UserProfileButton() {
+export function UserOrganisationButton() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -56,7 +56,7 @@ export function UserProfileButton() {
           {userRole}
         </Badge>
       )}
-      <UserMenu />
+      <CustomUserButton />
     </div>
   );
 } 
