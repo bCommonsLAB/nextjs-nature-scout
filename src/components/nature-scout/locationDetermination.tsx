@@ -633,7 +633,6 @@ export function LocationDetermination({
           showPositionMarker={mapMode === 'navigation'}
           habitats={existingHabitats}
           onHabitatClick={handleHabitatClick}
-          markerZoomThreshold={12} // Ab Zoom-Level 12 werden Polygone angezeigt
         />
         
         {/* Status-Anzeige während Habitate geladen werden */}
