@@ -17,6 +17,8 @@ export function Summary({ metadata }: SummaryProps) {
   const [isExpert, setIsExpert] = useState(false);
   const { editJobId, jobId } = useNatureScoutState();
   const [isAnalysisDetailsOpen, setIsAnalysisDetailsOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   
   // Verwende entweder editJobId (wenn ein bestehendes Habitat bearbeitet wird)
   // oder jobId (wenn ein neues Habitat erstellt wurde)
@@ -38,6 +40,46 @@ export function Summary({ metadata }: SummaryProps) {
     
     checkPermissions();
   }, []);
+
+  // Speichere die Daten (insbesondere den Kommentar) beim Öffnen der Summary
+  useEffect(() => {
+    async function updateHabitatWithComments() {
+      // Nur speichern, wenn eine jobId vorhanden ist und die Metadaten vollständig sind
+      if (currentJobId && metadata.analyseErgebnis) {
+        setIsSaving(true);
+        setSaveError(null);
+        
+        try {
+          // Aktualisiere den Habitat-Eintrag mit der aktuellen Metadaten (inkl. Kommentar)
+          const response = await fetch(`/api/habitat/${currentJobId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              newAnalysisModule: 'Metadata-Update',
+              kommentar: metadata.kommentar || ''
+            }),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Fehler beim Speichern der Daten');
+          }
+          
+          console.log('Habitat-Daten wurden erfolgreich aktualisiert (inkl. Kommentar)');
+        } catch (error) {
+          console.error('Fehler beim Speichern des Habitats:', error);
+          setSaveError(error instanceof Error ? error.message : 'Unbekannter Fehler beim Speichern');
+          // Kein Alert hier, da wir den Benutzer nicht stören wollen, falls etwas schief geht
+        } finally {
+          setIsSaving(false);
+        }
+      }
+    }
+    
+    updateHabitatWithComments();
+  }, [currentJobId, metadata]);
 
   // Debug-Logging für die Werte
   useEffect(() => {
@@ -129,7 +171,7 @@ export function Summary({ metadata }: SummaryProps) {
             <EffektiverHabitatEditor
               jobId={currentJobId}
               detectedHabitat={metadata.analyseErgebnis.habitattyp || ""}
-              detectedFamilie={metadata.analyseErgebnis.schutzstatus ? metadata.analyseErgebnis.habitattyp?.split(" - ")[0] : ""}
+              detectedFamilie={metadata.analyseErgebnis.habitatfamilie || ""}
               effectiveHabitat={metadata.analyseErgebnis.habitattyp || ""}
               kommentar={metadata.kommentar}
               isExpert={true}

@@ -477,20 +477,16 @@ ${formatEvidenzData(metadata.analyseErgebnis.evidenz?.dagegen_spricht, 'dagegen_
                     </p>
                   </div>
                   
-                  <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-start">
+                  <div className="flex flex-col">
                     <Textarea
                       placeholder="Beschreibe in Worten was nicht stimmt..."
-                      className="flex-1 h-24 resize-none"
+                      className="h-24 resize-none"
                       value={metadata.kommentar ?? ""}
                       onChange={handleKommentarChange}
                     />
-                    <Button 
-                      onClick={handleAnalyzeClick}
-                      disabled={isAnalyzing}
-                      className="w-full md:w-auto md:min-w-[160px]"
-                    >
-                      {isAnalyzing ? "Analysiere..." : "Analyse neu starten"}
-                    </Button>
+                    <p className="text-gray-500 text-xs mt-2">
+                      Dein Kommentar wird gespeichert und bei der Überprüfung durch einen Experten berücksichtigt.
+                    </p>
                   </div>
                 </div>
               )}

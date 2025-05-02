@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import { Menu, Settings, TestTube2, MapPinCheckInside, Users, Code, MapPinPlusInside } from "lucide-react";
+import { Menu, Settings, TestTube2, MapPinCheckInside, Users, Code, MapPinPlusInside, Map } from "lucide-react";
 import { SignInButton, SignedIn, SignedOut, useUser } from "@clerk/nextjs";
 import { UserProfileButton } from "@/components/user-profile";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -118,6 +118,12 @@ export function Navbar() {
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex gap-8 justify-center items-center self-stretch my-auto">
+          <Link href="/unsere-habitate">
+            <Button variant="ghost" className="text-base">
+              <Map className="h-4 w-4 mr-2" />
+              Unsere Habitate
+            </Button>
+          </Link>
           <SignedIn>
             <Button variant="ghost" className="text-base" onClick={navigateToNewHabitat}>
               <MapPinPlusInside className="h-4 w-4 mr-2" />
@@ -137,12 +143,6 @@ export function Navbar() {
                   <Button variant="ghost" className="text-base">
                     <Users className="h-4 w-4 mr-2" />
                     Benutzer
-                  </Button>
-                </Link>
-                <Link href="/tests">
-                  <Button variant="ghost" className="text-base">
-                    <TestTube2 className="h-4 w-4 mr-2" />
-                    Tests
                   </Button>
                 </Link>
                 <Link href="/admin/config">
@@ -202,6 +202,14 @@ export function Navbar() {
               Navigation
             </SheetTitle>
             <div className="flex flex-col gap-4">
+              <Button 
+                variant="ghost" 
+                className="w-full text-base justify-start"
+                onClick={() => handleMobileNavigation('/unsere-habitate')}
+              >
+                <Map className="h-4 w-4 mr-2" />
+                Unsere Habitate
+              </Button>
               <SignedIn>
                 <Button variant="ghost" className="w-full text-base justify-start" onClick={navigateToNewHabitat}>
                   <MapPinPlusInside className="h-4 w-4 mr-2" />
@@ -224,14 +232,6 @@ export function Navbar() {
                     >
                       <Users className="h-4 w-4 mr-2" />
                       Benutzer
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      className="w-full text-base justify-start"
-                      onClick={() => handleMobileNavigation('/tests')}
-                    >
-                      <TestTube2 className="h-4 w-4 mr-2" />
-                      Tests
                     </Button>
                     <Button 
                       variant="ghost" 

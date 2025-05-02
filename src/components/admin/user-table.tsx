@@ -20,8 +20,10 @@ import { Button } from '@/components/ui/button';
 import { IUser } from '@/lib/services/user-service';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Trash2, RefreshCw, AlertCircle, Edit } from 'lucide-react';
+import { Trash2, RefreshCw, AlertCircle, Edit, X, Filter, Search } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -39,7 +41,6 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -54,12 +55,19 @@ const userFormSchema = z.object({
 type UserFormValues = z.infer<typeof userFormSchema>;
 
 export function UserTable() {
-  const [users, setUsers] = useState<IUser[]>([]);
+  const [allUsers, setAllUsers] = useState<IUser[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<IUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastAdminError, setLastAdminError] = useState<string | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<IUser | null>(null);
+  
+  // Filter-Status
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [registerDateFilter, setRegisterDateFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeFilters, setActiveFilters] = useState<{type: string; value: string}[]>([]);
 
   // React Hook Form initialisieren
   const form = useForm<UserFormValues>({
@@ -80,7 +88,7 @@ export function UserTable() {
         throw new Error('Fehler beim Laden der Benutzer');
       }
       const data = await response.json();
-      setUsers(data);
+      setAllUsers(data);
       setError(null);
     } catch (err) {
       setError('Fehler beim Laden der Benutzer');
@@ -89,6 +97,84 @@ export function UserTable() {
       setLoading(false);
     }
   };
+
+  // Benutzer filtern basierend auf den aktuellen Filtern
+  useEffect(() => {
+    let result = [...allUsers];
+    
+    // Filtern nach Rolle
+    if (roleFilter !== 'all') {
+      result = result.filter(user => user.role === roleFilter);
+    }
+    
+    // Filtern nach Registrierungsdatum
+    if (registerDateFilter !== 'all') {
+      const now = new Date();
+      const oneDay = 24 * 60 * 60 * 1000;
+      const oneWeek = 7 * oneDay;
+      const oneMonth = 30 * oneDay;
+      
+      result = result.filter(user => {
+        if (!user.createdAt) return false;
+        
+        const createdDate = new Date(user.createdAt);
+        const diffTime = now.getTime() - createdDate.getTime();
+        
+        switch (registerDateFilter) {
+          case 'today':
+            return diffTime < oneDay;
+          case 'week':
+            return diffTime < oneWeek;
+          case 'month':
+            return diffTime < oneMonth;
+          default:
+            return true;
+        }
+      });
+    }
+    
+    // Suche nach Name oder E-Mail
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(user => 
+        user.name.toLowerCase().includes(term) || 
+        (user.email && user.email.toLowerCase().includes(term))
+      );
+    }
+    
+    setFilteredUsers(result);
+    
+    // Aktive Filter aktualisieren
+    const newActiveFilters = [];
+    
+    if (roleFilter !== 'all') {
+      const roleName = {
+        'user': 'Benutzer',
+        'experte': 'Experte',
+        'admin': 'Admin',
+        'superadmin': 'Superadmin'
+      }[roleFilter] || roleFilter;
+      
+      newActiveFilters.push({ type: 'role', value: `Rolle: ${roleName}` });
+    }
+    
+    if (registerDateFilter !== 'all') {
+      const dateFilterName = {
+        'today': 'Heute',
+        'week': 'Letzte Woche',
+        'month': 'Letzter Monat'
+      }[registerDateFilter] || registerDateFilter;
+      
+      newActiveFilters.push({ type: 'date', value: `Registriert: ${dateFilterName}` });
+    }
+    
+    if (searchTerm.trim()) {
+      newActiveFilters.push({ type: 'search', value: `Suche: ${searchTerm}` });
+    }
+    
+    setActiveFilters(newActiveFilters);
+    
+  }, [allUsers, roleFilter, registerDateFilter, searchTerm]);
 
   // Dialog zum Bearbeiten eines Benutzers öffnen
   const openEditDialog = (user: IUser) => {
@@ -205,6 +291,28 @@ export function UserTable() {
       toast.error(err instanceof Error ? err.message : 'Fehler beim Löschen des Benutzers');
     }
   };
+  
+  // Filter entfernen
+  const removeFilter = (type: string) => {
+    switch (type) {
+      case 'role':
+        setRoleFilter('all');
+        break;
+      case 'date':
+        setRegisterDateFilter('all');
+        break;
+      case 'search':
+        setSearchTerm('');
+        break;
+    }
+  };
+  
+  // Alle Filter zurücksetzen
+  const resetAllFilters = () => {
+    setRoleFilter('all');
+    setRegisterDateFilter('all');
+    setSearchTerm('');
+  };
 
   useEffect(() => {
     fetchUsers();
@@ -245,6 +353,68 @@ export function UserTable() {
         </Button>
       </div>
 
+      {/* Filter-Steuerelemente */}
+      <div className="flex flex-col space-y-4">
+        {/* Aktive Filter-Anzeige */}
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            {activeFilters.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={resetAllFilters} className="h-8 text-xs">
+                Filter zurücksetzen
+              </Button>
+            )}
+            {activeFilters.map((filter, index) => (
+              <Badge key={index} variant="secondary" className="cursor-pointer px-3 py-1">
+                <span>{filter.value}</span>
+                <X 
+                  className="ml-2 h-3 w-3 text-gray-500 hover:text-red-500"
+                  onClick={() => removeFilter(filter.type)}
+                />
+              </Badge>
+            ))}
+          </div>
+        )}
+        
+        {/* Filter-Leiste */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger className="h-9 text-xs">
+              <SelectValue placeholder="Rolle filtern" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle Rollen</SelectItem>
+              <SelectItem value="user">Benutzer</SelectItem>
+              <SelectItem value="experte">Experte</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="superadmin">Superadmin</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Select value={registerDateFilter} onValueChange={setRegisterDateFilter}>
+            <SelectTrigger className="h-9 text-xs">
+              <SelectValue placeholder="Registrierungsdatum" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle Zeiträume</SelectItem>
+              <SelectItem value="today">Heute registriert</SelectItem>
+              <SelectItem value="week">Letzte Woche</SelectItem>
+              <SelectItem value="month">Letzter Monat</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <div className="relative">
+            <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Input 
+              type="text"
+              placeholder="Nach Name oder E-Mail suchen..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 h-9 text-xs"
+            />
+          </div>
+        </div>
+      </div>
+
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -277,14 +447,16 @@ export function UserTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {users.length === 0 ? (
+            {filteredUsers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center">
-                  Keine Benutzer gefunden
+                  {activeFilters.length > 0 
+                    ? 'Keine Benutzer mit diesen Filterkriterien gefunden' 
+                    : 'Keine Benutzer gefunden'}
                 </TableCell>
               </TableRow>
             ) : (
-              users.map((user) => (
+              filteredUsers.map((user) => (
                 <TableRow key={user.clerkId}>
                   <TableCell>{user.name}</TableCell>
                   <TableCell>{user.email}</TableCell>

@@ -80,7 +80,7 @@ function HabitatPageContent() {
   const selectedPerson = searchParams.get('person') || '';
   const selectedGemeinde = searchParams.get('gemeinde') || '';
   const selectedHabitat = searchParams.get('habitat') || '';
-  const selectedHabitatFamilie = searchParams.get('habitatFamilie') || '';
+  const selectedHabitatFamilie = searchParams.get('habitatfamilie') || '';
   const selectedSchutzstatus = searchParams.get('schutzstatus') || '';
   const selectedPruefstatus = searchParams.get('pruefstatus') || '';
   
@@ -161,7 +161,7 @@ function HabitatPageContent() {
     if (filterString.startsWith('Person:')) params.delete('person');
     if (filterString.startsWith('Gemeinde:')) params.delete('gemeinde');
     if (filterString.startsWith('Habitat:')) params.delete('habitat');
-    if (filterString.startsWith('Familie:')) params.delete('habitatFamilie');
+    if (filterString.startsWith('Familie:')) params.delete('habitatfamilie');
     if (filterString.startsWith('Schutz:')) params.delete('schutzstatus');
     if (filterString.startsWith('Status:')) params.delete('pruefstatus');
     
@@ -192,7 +192,7 @@ function HabitatPageContent() {
         if (selectedPerson) queryParams.set('person', selectedPerson);
         if (selectedGemeinde) queryParams.set('gemeinde', selectedGemeinde);
         if (selectedHabitat) queryParams.set('habitat', selectedHabitat);
-        if (selectedHabitatFamilie) queryParams.set('habitatFamilie', selectedHabitatFamilie);
+        if (selectedHabitatFamilie) queryParams.set('habitatfamilie', selectedHabitatFamilie);
         if (selectedSchutzstatus) queryParams.set('schutzstatus', selectedSchutzstatus);
         if (selectedPruefstatus) queryParams.set('pruefstatus', selectedPruefstatus);
         
@@ -482,7 +482,7 @@ function HabitatPageContent() {
           <FilterSelect
             type="familien"
             value={selectedHabitatFamilie || 'alle'}
-            onValueChange={(value) => applyFilter('habitatFamilie', value)}
+            onValueChange={(value) => applyFilter('habitatfamilie', value)}
             placeholder="Gruppe"
             allLabel="Alle Gruppen"
           />

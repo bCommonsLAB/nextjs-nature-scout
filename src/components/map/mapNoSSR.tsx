@@ -4,6 +4,7 @@
 import React, { useEffect, useRef, useCallback, useMemo, useImperativeHandle, forwardRef } from 'react';
 import L from 'leaflet';
 import 'leaflet-draw';
+import 'leaflet-geometryutil'; // Importiere das GeometryUtil-Modul für Flächenberechnungen
 
 // Typendefinitionen für die Leaflet Draw-Bibliothek
 // Diese Typen helfen TypeScript zu verstehen, welche Optionen für die Draw-Funktionalität verfügbar sind
@@ -75,6 +76,16 @@ declare module 'leaflet' {
   }
 }
 
+// Typdefinition für Habitate
+interface Habitat {
+  id: string;                          // Eindeutige ID des Habitats
+  name: string;                        // Name des Habitats
+  polygon?: Array<[number, number]>;   // Polygon-Punkte für die Darstellung
+  color?: string;                      // Optional: Individuelle Farbe für das Habitat
+  schutzstatus?: string;               // Optional: Schutzstatus (geschützt/hochwertig/niederwertig)
+  transparenz?: number;                // Optional: Transparenzwert (0.0 - 1.0)
+}
+
 // Methoden, die nach außen exponiert werden
 export interface MapNoSSRHandle {
   centerMap: (lat: number, lng: number, zoom?: number) => void;
@@ -94,6 +105,9 @@ interface MapNoSSRProps {
   hasPolygon?: boolean;                // Flag, ob bereits ein Polygon existiert
   showZoomControls?: boolean;          // Flag, ob Zoom-Steuerelemente angezeigt werden sollen
   showPositionMarker?: boolean;        // Flag, ob Positionsmarker angezeigt werden soll
+  habitats?: Habitat[];                // Liste der anzuzeigenden Habitate
+  onHabitatClick?: (habitatId: string) => void; // Callback, wenn auf ein Habitat geklickt wird
+  schutzstatus?: string;               // Optionaler Schutzstatus für das eigene Polygon (geschützt/hochwertig/niederwertig)
 }
 
 // Komponente mit forwardRef, um Ref-Funktionen nach außen zu exponieren
@@ -108,7 +122,10 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
   editMode = false,
   hasPolygon,
   showZoomControls = true,
-  showPositionMarker = true
+  showPositionMarker = true,
+  habitats = [],
+  onHabitatClick,
+  schutzstatus = 'niederwertig'  // Standardwert: niederwertig
 }, ref) => {
   // Debug-Log für Rendering und Zustandsänderungen
   console.log('MapNoSSR RENDER', { 
@@ -130,6 +147,7 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
   const drawnItemsRef = useRef<L.FeatureGroup | null>(null);    // Gruppe aller gezeichneten Elemente
   const activeDrawHandlerRef = useRef<any>(null);               // Aktiver Draw-Handler für Polygon-Zeichnung
   const positionMarkerRef = useRef<L.Marker | null>(null);      // Positionsmarker
+  const habitatPolygonsRef = useRef<L.LayerGroup | null>(null); // Layer-Gruppe für Habitat-Polygone
 
   // Exponiere Methoden nach außen über Ref
   useImperativeHandle(ref, () => ({
@@ -169,8 +187,8 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
         // Prüfen, ob das Polygon geschlossen ist
         const isPolygonClosed = 
           points.length > 2 && 
-          points[0][0] === points[points.length-1][0] && 
-          points[0][1] === points[points.length-1][1];
+          points[0]?.[0] === points[points.length-1]?.[0] && 
+          points[0]?.[1] === points[points.length-1]?.[1];
         
         console.log('Polygon ist geschlossen:', isPolygonClosed ? 'JA' : 'NEIN');
         
@@ -183,12 +201,109 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
   }));
 
   // Polygon-Styles für die visuelle Darstellung des Polygons mit useMemo
-  const polygonOptions = useMemo(() => ({
-    color: '#22c55e',    // Grüne Farbe für die Linien
-    weight: 2,           // Liniendicke
-    fillColor: '#22c55e', // Füllfarbe (grün)
-    fillOpacity: 0.7,    // Deckkraft der Füllung
-  }), []);
+  // Jetzt abhängig vom Schutzstatus
+  const polygonOptions = useMemo(() => {
+    let color: string;
+    
+    // Farbe basierend auf Schutzstatus bestimmen
+    if (schutzstatus === 'gesetzlich geschützt') {
+      color = '#ef4444'; // Rot für geschützte Flächen
+    } else if (schutzstatus === 'ökologisch hochwertig') {
+      color = '#eab308'; // Gelb für hochwertige Flächen
+    } else {
+      color = '#22c55e'; // Grün für niederwertige Flächen (Standard)
+    }
+    
+    return {
+      color: color,
+      weight: 2,
+      fillColor: color,
+      fillOpacity: 0.7,
+    };
+  }, [schutzstatus]);
+
+  // Habitat-Polygon erstellen
+  const createHabitatPolygon = useCallback((habitat: Habitat) => {
+    if (!habitat.polygon || habitat.polygon.length < 3) return null;
+
+    // Farbe basierend auf Schutzstatus bestimmen
+    let color = '#22c55e'; // Standard: Grün (niederwertig)
+    
+    if (habitat.schutzstatus === 'gesetzlich geschützt') {
+      color = '#ef4444'; // Rot
+    } else if (habitat.schutzstatus === 'ökologisch hochwertig') {
+      color = '#eab308'; // Gelb
+    } else if (habitat.color) {
+      // Wenn kein Schutzstatus, aber eine benutzerdefinierte Farbe vorhanden ist
+      color = habitat.color;
+    }
+
+    // Den Transparenzwert berücksichtigen oder Standardwert verwenden
+    const fillOpacity = habitat.transparenz !== undefined ? habitat.transparenz : 0.4;
+
+    // Polygon-Style für das Habitat
+    const options = {
+      color: color,
+      weight: 2,
+      fillColor: color,
+      fillOpacity: fillOpacity
+    };
+
+    // Polygon erstellen
+    const polygon = L.polygon(habitat.polygon, options);
+
+    // Popup mit Habitat-Name hinzufügen
+    polygon.bindPopup(`<strong>${habitat.name}</strong>${habitat.schutzstatus ? `<br><span style="color:${color}">Status: ${habitat.schutzstatus}</span>` : ''}`);
+
+    // Click-Handler für Interaktion
+    if (onHabitatClick) {
+      polygon.on('click', () => {
+        onHabitatClick(habitat.id);
+      });
+    }
+
+    return polygon;
+  }, [onHabitatClick]);
+
+  // Funktion zum Aktualisieren der Habitat-Anzeige
+  const updateHabitatDisplay = useCallback(() => {
+    if (!mapRef.current || habitats.length === 0) return;
+
+    console.log('Aktualisiere Habitat-Anzeige:', {
+      habitatsCount: habitats.length,
+      time: new Date().toISOString()
+    });
+
+    // Layer-Gruppe erstellen, falls noch nicht vorhanden
+    if (!habitatPolygonsRef.current) {
+      habitatPolygonsRef.current = L.layerGroup().addTo(mapRef.current);
+      console.log('Habitat-Polygon-Layer erstellt');
+    }
+
+    // Prüfen, ob Polygone bereits erstellt wurden
+    if (habitatPolygonsRef.current.getLayers().length === 0) {
+      
+      let polygonCount = 0;
+      
+      // Für jedes Habitat die Polygone erstellen
+      habitats.forEach(habitat => {
+        // Wenn ein Polygon verfügbar ist, dieses erstellen
+        if (habitat.polygon && habitat.polygon.length >= 3) {
+          try {
+            const polygon = createHabitatPolygon(habitat);
+            if (polygon && habitatPolygonsRef.current) {
+              habitatPolygonsRef.current.addLayer(polygon);
+              polygonCount++;
+            }
+          } catch (error) {
+            console.error(`Fehler beim Erstellen des Polygons für Habitat ${habitat.id}:`, error);
+          }
+        }
+      });
+      
+      console.log(`Habitat-Polygone erstellt: ${polygonCount} Polygone`);
+    }
+  }, [habitats, createHabitatPolygon]);
 
   // Funktion zur Berechnung der Fläche eines Polygons in Quadratmetern
   // Verwendet die Geodesic-Berechnung für genaue Ergebnisse auf der Erdkugel
@@ -213,7 +328,8 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
       console.log('Map wird initialisiert', {
         editMode,
         position,
-        zoom
+        zoom,
+        habitatsCount: habitats.length
       });
       
       // Leaflet-Map initialisieren mit Basisoptionen
@@ -231,6 +347,9 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
           currentZoom: mapRef.current?.getZoom(),
           time: new Date().toISOString()
         });
+        
+        // Habitat-Anzeige auch beim Zoom-Start aktualisieren
+        updateHabitatDisplay();
       });
       
       mapRef.current.on('zoom', () => {
@@ -238,6 +357,9 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
           currentZoom: mapRef.current?.getZoom(),
           time: new Date().toISOString()
         });
+        
+        // Habitat-Anzeige während des Zooms aktualisieren
+        updateHabitatDisplay();
       });
       
       mapRef.current.on('zoomend', () => {
@@ -245,6 +367,9 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
           finalZoom: mapRef.current?.getZoom(),
           time: new Date().toISOString()
         });
+        
+        // Habitat-Anzeige nach Zoom-Ende aktualisieren
+        updateHabitatDisplay();
       });
       
       // Basis OpenStreetMap Layer als Grundkarte hinzufügen
@@ -335,11 +460,44 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
       mapRef.current.on('zoomend', () => {
         if (mapRef.current && onZoomChange) {
           const newZoom = mapRef.current.getZoom();
+          console.log(`Zoom-Änderung erkannt: ${newZoom}`);
           onZoomChange(newZoom);
+          
+          // Habitat-Anzeige aktualisieren
+          updateHabitatDisplay();
+        }
+      });
+
+      // Zusätzlicher Event-Listener für Zoom-Start
+      mapRef.current.on('zoomstart', () => {
+        if (mapRef.current) {
+          const newZoom = mapRef.current.getZoom();
+          console.log(`Zoom-Start bei Level: ${newZoom}`);
+        }
+      });
+
+      // Zusätzlicher Event-Listener für Zoom währenddessen
+      mapRef.current.on('zoom', () => {
+        if (mapRef.current) {
+          const newZoom = mapRef.current.getZoom();
+          console.log(`Zoom während: ${newZoom}`);
+          
+          // Auch während des Zooms die Anzeige aktualisieren
+          updateHabitatDisplay();
         }
       });
 
       console.log('Map initialisiert');
+      
+      // Initial Habitate anzeigen, wenn vorhanden
+      if (habitats.length > 0) {
+        console.log('Initialisiere Habitats bei Kartenstart:', {
+          anzahl: habitats.length,
+          initialerZoom: zoom,
+          zeit: new Date().toISOString()
+        });
+        updateHabitatDisplay();
+      }
     }
 
     // Cleanup-Funktion: Entfernt die Karte, wenn die Komponente unmontiert wird
@@ -481,12 +639,14 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
       // ---- ZEICHENMODUS ----
       
       // Navigationsmöglichkeiten deaktivieren für präzises Zeichnen
-      mapRef.current.dragging.disable();
-      mapRef.current.touchZoom.disable();
-      mapRef.current.doubleClickZoom.disable();
-      mapRef.current.scrollWheelZoom.disable();
-      mapRef.current.boxZoom.disable();
-      mapRef.current.keyboard.disable();
+      if (mapRef.current) {
+        mapRef.current.dragging.disable();
+        mapRef.current.touchZoom.disable();
+        mapRef.current.doubleClickZoom.disable();
+        mapRef.current.scrollWheelZoom.disable();
+        mapRef.current.boxZoom.disable();
+        mapRef.current.keyboard.disable();
+      }
       
       // Cursor auf Fadenkreuz setzen
       if (mapContainerRef.current) {
@@ -514,8 +674,8 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
                   console.log('Polygon fertig gezeichnet mit', points.length, 'Punkten');
                   console.log('Polygon ist geschlossen:', 
                     points.length > 2 && 
-                    points[0][0] === points[points.length-1][0] && 
-                    points[0][1] === points[points.length-1][1] ? 'JA' : 'NEIN');
+                    points[0]?.[0] === points[points.length-1]?.[0] && 
+                    points[0]?.[1] === points[points.length-1]?.[1] ? 'JA' : 'NEIN');
                   
                   if (onPolygonChange) {
                     onPolygonChange(points);
@@ -643,12 +803,14 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
       // ---- NAVIGATIONSMODUS ----
       
       // Alle Navigationsmöglichkeiten aktivieren
-      mapRef.current.dragging.enable();
-      mapRef.current.touchZoom.enable();
-      mapRef.current.doubleClickZoom.enable();
-      mapRef.current.scrollWheelZoom.enable();
-      mapRef.current.boxZoom.enable();
-      mapRef.current.keyboard.enable();
+      if (mapRef.current) {
+        mapRef.current.dragging.enable();
+        mapRef.current.touchZoom.enable();
+        mapRef.current.doubleClickZoom.enable();
+        mapRef.current.scrollWheelZoom.enable();
+        mapRef.current.boxZoom.enable();
+        mapRef.current.keyboard.enable();
+      }
       
       // Cursor zurücksetzen
       if (mapContainerRef.current) {
@@ -694,8 +856,12 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
   useEffect(() => {
     if (mapRef.current) {
       const currentZoom = mapRef.current.getZoom();
+      console.log(`Position/Zoom-Update: aktueller Zoom=${currentZoom}, neuer Zoom=${zoom}`);
+      
       if (currentZoom !== zoom) {
         mapRef.current.setView(position, zoom);
+        // Nach Zoom-Änderung die Habitat-Anzeige aktualisieren
+        updateHabitatDisplay();
       }
       
       // Position des Markers aktualisieren
@@ -703,7 +869,7 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
         positionMarkerRef.current.setLatLng(position);
       }
     }
-  }, [position, zoom]);
+  }, [position, zoom, updateHabitatDisplay]);
 
   // Aktualisiere den Polygon, wenn sich initialPolygon ändert
   useEffect(() => {
@@ -738,7 +904,7 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
         // Vertexes mit Event-Listenern versehen
         if (mapRef.current) {
           // Event-Listener für alle möglichen Leaflet-Edit-Events registrieren
-          console.log('Registriere zusätzliche Editing-Event-Listener');
+          console.log('Registriere zusätzliche Editing-Event-Listeners');
           
           mapRef.current.on('draw:editvertex', (e) => {
             console.log('draw:editvertex Event ausgelöst', e);
@@ -765,6 +931,30 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
       }
     }
   }, [initialPolygon, editMode, polygonOptions, onAreaChange, calculateArea]);
+
+  // Habitat-Anzeige aktualisieren, wenn sich habitats ändert oder Map geladen ist
+  useEffect(() => {
+    if (mapRef.current && habitats.length > 0) {
+      console.log('Habitat-Daten geändert oder Map geladen:', {
+        habitatsAnzahl: habitats.length,
+        aktuellerZoom: mapRef.current.getZoom(),
+        zeitpunkt: new Date().toISOString(),
+        habitatDaten: habitats.slice(0, 3).map(h => ({  // Nur die ersten drei zur Protokollierung
+          id: h.id,
+          name: h.name,
+          polygonPunkte: h.polygon?.length || 0
+        }))
+      });
+      updateHabitatDisplay();
+    }
+    
+    // Cleanup-Funktion für Habitat-Layer
+    return () => {
+      if (habitatPolygonsRef.current) {
+        habitatPolygonsRef.current.clearLayers();
+      }
+    };
+  }, [habitats, updateHabitatDisplay]);
 
   return (
     <>

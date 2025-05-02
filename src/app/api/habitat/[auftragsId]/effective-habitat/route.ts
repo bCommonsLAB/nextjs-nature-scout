@@ -63,11 +63,11 @@ export async function PATCH(
     
     // Hole die habitatFamilie und schutzstatus vom gewählten Habitattyp
     const habitatType = await habitatTypesCollection.findOne({ name: effectiveHabitat });
-    let habitatFamilie = '';
+    let habitatfamilie = '';
     let schutzstatus = '';
     
     if (habitatType) {
-      habitatFamilie = habitatType.habitatFamilie || '';
+      habitatfamilie = habitatType.habitatFamilie || '';
       schutzstatus = habitatType.schutzstatus || entry.result?.schutzstatus || '';
     }
     
@@ -83,13 +83,13 @@ export async function PATCH(
       module: 'Habitat-Verifizierung',
       previousResult: {
         habitattyp: entry.verifiedResult?.habitattyp || entry.result?.habitattyp,
-        habitatFamilie: entry.verifiedResult?.habitatFamilie || entry.result?.habitatFamilie,
+        habitatfamilie: entry.verifiedResult?.habitatfamilie || entry.result?.habitatfamilie,
         schutzstatus: entry.verifiedResult?.schutzstatus || entry.result?.schutzstatus,
         kommentar: entry.verifiedResult?.kommentar || entry.result?.kommentar
       },
       changes: {
         habitattyp: effectiveHabitat,
-        habitatFamilie: habitatFamilie,
+        habitatfamilie: habitatfamilie,
         schutzstatus: schutzstatus,
         kommentar: kommentar
       }
@@ -107,7 +107,7 @@ export async function PATCH(
             // Aktualisiere die verifiedResult-Attribute statt result
             "verifiedResult": {
               habitattyp: effectiveHabitat,
-              habitatFamilie: habitatFamilie,
+              habitatfamilie: habitatfamilie,
               schutzstatus: schutzstatus,
               kommentar: kommentar
             },
@@ -144,7 +144,7 @@ export async function PATCH(
     return NextResponse.json({ 
       success: true, 
       habitattyp: effectiveHabitat,
-      habitatFamilie: habitatFamilie,
+      habitatfamilie: habitatfamilie,
       schutzstatus: schutzstatus,
       kommentar: kommentar,
       verified: true,

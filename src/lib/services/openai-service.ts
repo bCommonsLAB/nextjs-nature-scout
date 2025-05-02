@@ -409,7 +409,7 @@ async function performHabitatAnalysis(metadata: NatureScoutData, habitatTypes: H
       .replace('{randomId}', randomId.toString())
       .replace('{pflanzenarten}', pflanzenarten)
       .replace('{standortparameter}', standortParameter)
-      .replace('{kommentar}', metadata.kommentar ? `Beachte bitte folgende zusätzliche Hinweise: ${metadata.kommentar}` : '');
+      //.replace('{kommentar}', metadata.kommentar ? `Beachte bitte folgende zusätzliche Hinweise: ${metadata.kommentar}` : '');
 
     const messages: ChatCompletionMessageParam[] = [{ 
       role: "system", 
@@ -462,7 +462,8 @@ async function performHabitatAnalysis(metadata: NatureScoutData, habitatTypes: H
     // Füge den Schutzstatus aus dem Habitat-Typ hinzu
     parsedResult = {
       ...parsedResult,
-      schutzstatus: habitatType?.schutzstatus || 'unbekannt'
+      schutzstatus: habitatType?.schutzstatus || 'unbekannt',
+      habitatfamilie: habitatType?.habitatFamilie || 'unbekannt'
     };
 
 

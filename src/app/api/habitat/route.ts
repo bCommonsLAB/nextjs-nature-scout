@@ -39,6 +39,13 @@ interface MongoDocument extends Document {
     habitattyp?: string;
     schutzstatus?: string;
     zusammenfassung?: string;
+    habitatfamilie?: string;
+    [key: string]: unknown;
+  };
+  verifiedResult?: {
+    habitattyp?: string;
+    schutzstatus?: string;
+    habitatfamilie?: string;
     [key: string]: unknown;
   };
   error?: string;
@@ -119,11 +126,20 @@ export async function GET(request: Request) {
       filter['result.habitattyp'] = habitat;
     }
     
-    const habitatFamilie = searchParams.get('habitatFamilie');
-    if (habitatFamilie) {
-      // Für Habitat-Familie können wir einen Regex-Filter verwenden, um nach Habitaten 
-      // zu suchen, die mit der angegebenen Familie beginnen
-      filter['result.habitattyp'] = { $regex: `^${habitatFamilie}`, $options: 'i' };
+    const habitatfamilie = searchParams.get('habitatfamilie');
+    if (habitatfamilie) {
+      // Korrekter Filter für die Habitatfamilie
+      if (!filter['$or']) {
+        filter['$or'] = [];
+      }
+      
+      // Füge die Habitatfamilie-Bedingungen zum $or-Array hinzu
+      filter['$or'].push(
+        { 'result.habitatfamilie': { $regex: `^${habitatfamilie}$`, $options: 'i' } }
+      );
+      filter['$or'].push(
+        { 'verifiedResult.habitatfamilie': { $regex: `^${habitatfamilie}$`, $options: 'i' } }
+      );
     }
     
     const schutzstatus = searchParams.get('schutzstatus');
@@ -142,12 +158,17 @@ export async function GET(request: Request) {
     }
     
     if (searchTerm) {
-      filter['$or'] = [
-        { 'metadata.erfassungsperson': { $regex: searchTerm, $options: 'i' } },
-        { 'metadata.gemeinde': { $regex: searchTerm, $options: 'i' } },
-        { 'metadata.flurname': { $regex: searchTerm, $options: 'i' } },
-        { 'result.habitattyp': { $regex: searchTerm, $options: 'i' } }
-      ];
+      // Wenn $or bereits existiert, füge die Suchbedingungen hinzu,
+      // ansonsten erstelle einen neuen $or-Array
+      if (!filter['$or']) {
+        filter['$or'] = [];
+      }
+      
+      // Füge die Suchbedingungen zum $or-Array hinzu
+      filter['$or'].push({ 'metadata.erfassungsperson': { $regex: searchTerm, $options: 'i' } });
+      filter['$or'].push({ 'metadata.gemeinde': { $regex: searchTerm, $options: 'i' } });
+      filter['$or'].push({ 'metadata.flurname': { $regex: searchTerm, $options: 'i' } });
+      filter['$or'].push({ 'result.habitattyp': { $regex: searchTerm, $options: 'i' } });
     }
     
     // Hole alle eindeutigen Personen für das Dropdown - basierend auf Benutzerrechten
@@ -209,7 +230,11 @@ export async function GET(request: Request) {
         'metadata.standort': 1, // Standort hinzufügen
         'result.habitattyp': 1,
         'result.schutzstatus': 1,
+        'result.habitatfamilie': 1, // Habitatfamilie hinzufügen
         'result.zusammenfassung': 1,
+        'verifiedResult.habitattyp': 1,
+        'verifiedResult.schutzstatus': 1,
+        'verifiedResult.habitatfamilie': 1, // Verifizierte Habitatfamilie hinzufügen
         'metadata.kommentar': 1,
         error: 1
       })

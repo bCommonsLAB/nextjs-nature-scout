@@ -1,12 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { HabitatCard } from "./Landing/HabitatCard";
 import { FeatureCard } from "./Landing/FeatureCard";
 import { ProcessStep } from "./Landing/ProcessStep";
 import { Button } from "@/components/ui/button";
-import { ArrowDown, ArrowRight   } from "lucide-react";
+import { ArrowDown, ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Info, Sparkles } from "lucide-react";
 import Link from 'next/link';
@@ -40,8 +40,8 @@ const features = [
   }
 ];
 
-
-const habitats = [
+// Demohabitate, die durch echte Daten ersetzt werden
+const demoHabitats = [
   { 
     imageSrc: "/panoramasamples/magerwiese-artenreich.jpg", 
     title: "Magerwiese artenreich", 
@@ -95,11 +95,68 @@ const processSteps = [
   }
 ];
 
+interface HabitatEntry {
+  jobId: string;
+  metadata: {
+    erfassungsperson?: string;
+    gemeinde?: string;
+    flurname?: string;
+    bilder?: Array<{url: string}>;
+    [key: string]: unknown;
+  };
+  result?: {
+    habitattyp?: string;
+    schutzstatus?: string;
+  };
+}
+
 export function NatureScoutPage() {
   //console.log('NatureScoutPage Component wird gerendert');
 
   const [showAIInfo, setShowAIInfo] = useState(false);
   const { user, isLoaded } = useUser();
+  const [verifiedHabitats, setVerifiedHabitats] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Hilfsfunktion zum Umwandeln des Schutzstatus in ein lesbares Format für die HabitatCard
+  const mapSchutzstatusToStatus = (schutzstatus: string): string => {
+    switch (schutzstatus?.toLowerCase()) {
+      case 'gesetzlich geschützt':
+        return 'gesetzlich';
+      case 'nicht gesetzlich geschützt, aber schützenswert':
+        return 'hochwertig';
+      case 'standardvegetation':
+        return 'standard';
+      default:
+        return 'standard';
+    }
+  };
+
+  useEffect(() => {
+    const fetchVerifiedHabitats = async () => {
+      try {
+        const response = await fetch('/api/habitat/public?limit=4&sortBy=updatedAt&sortOrder=desc');
+        
+        if (!response.ok) {
+          throw new Error('Fehler beim Laden der Habitat-Daten');
+        }
+        
+        const data = await response.json();
+        
+        if (data.entries && data.entries.length > 0) {
+          setVerifiedHabitats(data.entries);
+        }
+      } catch (error) {
+        console.error('Fehler beim Laden der verifizierten Habitate:', error);
+        // Fallback zu Demo-Daten bei Fehler
+        setVerifiedHabitats([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchVerifiedHabitats();
+  }, []);
 
   return (
     <div className="flex overflow-hidden flex-col bg-black bg-opacity-20">
@@ -170,19 +227,36 @@ export function NatureScoutPage() {
               Diese Habitate wurden von engagierten Mitbürgern und Experten erfasst und verifiziert
             </div>
             <div className="flex flex-col mt-10 w-full max-md:max-w-full">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-8 w-full max-md:max-w-full">
-                {habitats.map((habitat, index) => (
-                  <React.Fragment key={index}>
-                    <div className="aspect-w-16 aspect-h-9 w-full">
-                      <HabitatCard {...habitat} />
-                    </div>
-                  </React.Fragment>
-                ))}
-              </div>
+              {isLoading ? (
+                <div className="flex justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <div className="max-w-[1400px] mx-auto w-full">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 w-full max-md:max-w-full">
+                    {verifiedHabitats.length > 0 && verifiedHabitats.map((habitat: HabitatEntry) => (
+                        <div key={habitat.jobId} className="aspect-w-16 aspect-h-9 w-full">
+                          <HabitatCard
+                            imageSrc={habitat.metadata.bilder?.[0]?.url || '/images/habitat-placeholder.jpg'}
+                            title={habitat.result?.habitattyp || 'Unbekanntes Habitat'}
+                            location={habitat.metadata.gemeinde || 'Unbekannter Ort'}
+                            recorder={habitat.metadata.erfassungsperson || 'Unbekannt'}
+                            status={mapSchutzstatusToStatus(habitat.result?.schutzstatus || '')}
+                            org=""
+                          />
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+              )}
             </div>
-            <button className="gap-2 self-center px-6 py-3 mt-8 text-base text-white border border-solid bg-stone-400 border-stone-400 max-md:px-5">
-              Weitere Habitate hier
-            </button>
+            <Link href="/unsere-habitate" className="self-center mt-8">
+              <Button variant="secondary" size="lg" className="gap-2">
+                Weitere Habitate hier
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
           </section>
 
           <section className="landing-section flex overflow-hidden flex-col px-16 pt-28 pb-16 w-full bg-[#E9F5DB] max-md:px-5 max-md:pt-24">

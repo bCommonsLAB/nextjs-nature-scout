@@ -65,14 +65,14 @@ interface HabitatData {
       dafür_spricht?: string[] | string;
       dagegen_spricht?: string[] | string;
     };
-    habitatFamilie?: string;
+    habitatfamilie?: string;
     typicalSpecies?: string[];
     kommentar?: string;
   };
   verifiedResult?: {
     habitattyp?: string;
     schutzstatus?: string;
-    habitatFamilie?: string;
+    habitatfamilie?: string;
     kommentar?: string;
   };
   error?: string;
@@ -259,14 +259,14 @@ export default function HabitateDetailPage() {
     }
   };
 
-  const handleEditorSaved = (updatedData: { habitattyp: string; habitatFamilie?: string; schutzstatus?: string; kommentar?: string; verified: boolean; verifiedAt: Date | string }) => {
+  const handleEditorSaved = (updatedData: { habitattyp: string; habitatfamilie?: string; schutzstatus?: string; kommentar?: string; verified: boolean; verifiedAt: Date | string }) => {
     if (data) {
       setData({
         ...data,
         result: {
           ...data.result,
           habitattyp: updatedData.habitattyp,
-          habitatFamilie: updatedData.habitatFamilie,
+          habitatfamilie: updatedData.habitatfamilie, 
           schutzstatus: updatedData.schutzstatus,
           kommentar: updatedData.kommentar
         },
@@ -411,7 +411,7 @@ export default function HabitateDetailPage() {
                     <EffektiverHabitatEditor
                       jobId={jobId as string}
                       detectedHabitat={data.result.habitattyp}
-                      detectedFamilie={data.result.habitatFamilie}
+                      detectedFamilie={data.result.habitatfamilie}
                       effectiveHabitat={data.verifiedResult?.habitattyp || data.result.habitattyp}
                       kommentar={data.verifiedResult?.kommentar || data.result.kommentar}
                       onSaved={handleEditorSaved}
@@ -443,8 +443,8 @@ export default function HabitateDetailPage() {
 
                       <div className="p-4 border rounded-lg bg-white">
                         <h3 className="font-medium text-lg mb-2">Habitat: {data.result.habitattyp}</h3>
-                        {data.result.habitatFamilie && (
-                          <p className="text-gray-500 mb-4">Habitat-Gruppe: {data.result.habitatFamilie}</p>
+                        {data.result.habitatfamilie && (
+                          <p className="text-gray-500 mb-4">Habitat-Gruppe: {data.result.habitatfamilie}</p>
                         )}
                         {data.result.zusammenfassung && (
                           <p className="mb-4">{data.result.zusammenfassung}</p>
@@ -482,8 +482,8 @@ export default function HabitateDetailPage() {
                         <div className="flex justify-between items-start">
                           <div>
                             <h3 className="font-medium text-lg mb-2">Habitat: {data.verifiedResult.habitattyp}</h3>
-                            {data.verifiedResult.habitatFamilie && (
-                              <p className="text-gray-500 mb-4">Habitatgruppe: {data.verifiedResult.habitatFamilie}</p>
+                            {data.verifiedResult.habitatfamilie && (
+                              <p className="text-gray-500 mb-4">Habitatgruppe: {data.verifiedResult.habitatfamilie}</p>
                             )}
                           </div>
                           {data.verifiedResult.schutzstatus && (

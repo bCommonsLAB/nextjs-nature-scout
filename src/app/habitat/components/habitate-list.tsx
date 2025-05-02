@@ -31,12 +31,12 @@ interface HabitateEntry {
   result?: {
     habitattyp?: string;
     schutzstatus?: string;
-    habitatFamilie?: string;
+    habitatfamilie?: string;
   };
   verifiedResult?: {
     habitattyp?: string;
     schutzstatus?: string;
-    habitatFamilie?: string;
+    habitatfamilie?: string;
     kommentar?: string;
     zusammenfassung?: string;
   };
@@ -99,10 +99,11 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
   
   // Hilfsfunktion, um vorrangig verifizierte Daten anzuzeigen
   const getHabitatData = (entry: HabitateEntry) => {
+    // Debug-Ausgaben
     return {
       habitattyp: entry.verifiedResult?.habitattyp || entry.result?.habitattyp || '',
       schutzstatus: entry.verifiedResult?.schutzstatus || entry.result?.schutzstatus || '',
-      habitatFamilie: entry.verifiedResult?.habitatFamilie || entry.result?.habitatFamilie || ''
+      habitatfamilie: entry.verifiedResult?.habitatfamilie || entry.result?.habitatfamilie || ''
     };
   };
   
@@ -147,6 +148,14 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
               </div>
             </th>
             <th 
+              className={`px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32 ${getSortableHeaderClass('result.habitatfamilie')}`}
+              onClick={() => onSort('result.habitatfamilie')}
+            >
+              <div className="flex items-center">
+                Habitatgruppe {renderSortIcon('result.habitatfamilie')}
+              </div>
+            </th>
+            <th 
               className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24"
             >
               Status
@@ -183,7 +192,8 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
                         <Image
                           src={entry.metadata.bilder[0].url}
                           alt="Vorschaubild"
-                          fill
+                          width={120}
+                          height={90}
                           className="object-cover rounded"
                         />
                       </div>
@@ -225,6 +235,15 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
                       <span className="text-red-500">
                         {entry.error ? 'Fehler' : 'Nicht analysiert'}
                       </span>
+                    )}
+                  </Link>
+                </td>
+                <td className="px-2 py-2 whitespace-nowrap">
+                  <Link href={`/habitat/${entry.jobId}`} className="block">
+                    {habitatData.habitatfamilie ? (
+                      <div className="text-gray-700 text-sm">{habitatData.habitatfamilie}</div>
+                    ) : (
+                      <span className="text-gray-400">-</span>
                     )}
                   </Link>
                 </td>

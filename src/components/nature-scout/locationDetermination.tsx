@@ -19,6 +19,174 @@ const MapNoSSR = dynamic(() => import('@/components/map/mapNoSSR'), {
 // Typen für den Map-Modus
 type MapMode = 'navigation' | 'polygon' | 'none';
 
+// Typdefinition für die Habitat-Daten aus der API
+interface HabitatFromAPI {
+  jobId: string;
+  metadata: {
+    latitude: number;
+    longitude: number;
+    erfassungsperson?: string;
+    gemeinde?: string;
+    flurname?: string;
+    standort?: string;
+    polygonPoints?: [number, number][];  // Polygon-Punkte sind hier gespeichert
+  };
+  result?: {
+    habitattyp: string;
+    habitatfamilie?: string;
+    schutzstatus?: string;
+  };
+  verifiedResult?: {
+    habitattyp?: string;
+    habitatfamilie?: string;
+  };
+  verified?: boolean;
+}
+
+// Typdefinition für anzeigbare Habitate auf der Karte
+interface MapHabitat {
+  id: string;
+  name: string;
+  position: [number, number];
+  polygon?: [number, number][];
+  color: string;
+  transparenz: number;
+  metadata?: {
+    gemeinde?: string;
+    erfasser?: string;
+    verifiziert?: boolean;
+  };
+}
+
+// Konvertierung von API-Habitat zu internem Habitat-Format
+function convertToMapHabitat(apiHabitat: HabitatFromAPI): MapHabitat | null {
+  console.log('convertToMapHabitat wird ausgeführt');
+
+  // Sicherstellen, dass wir gültige Koordinaten haben
+  if ((!apiHabitat.metadata?.latitude || !apiHabitat.metadata?.longitude) && 
+      (!apiHabitat.metadata?.polygonPoints || !Array.isArray(apiHabitat.metadata.polygonPoints) || apiHabitat.metadata.polygonPoints.length === 0)) {
+    return null;
+  }
+
+  // Priorität verwenden: verifizierte Daten, dann normale Ergebnisse
+  const habitatName = apiHabitat.verifiedResult?.habitattyp || apiHabitat.result?.habitattyp || 'Unbekanntes Habitat';
+  const habitatFamily = apiHabitat.verifiedResult?.habitatfamilie || apiHabitat.result?.habitatfamilie;
+
+  // Standardposition aus Lat/Lng
+  const position: [number, number] = [
+    Number(apiHabitat.metadata.latitude || 0), 
+    Number(apiHabitat.metadata.longitude || 0)
+  ];
+  
+  // Polygon als undefined initialisieren
+  let polygon: [number, number][] | undefined = undefined;
+
+  // Prüfen, ob wir gültige Polygondaten haben
+  if (apiHabitat.metadata.polygonPoints && 
+      Array.isArray(apiHabitat.metadata.polygonPoints) && 
+      apiHabitat.metadata.polygonPoints.length >= 3) {
+    
+    try {
+      // Vereinfachter Ansatz: Wir konvertieren die Punkte, unabhängig von ihrer Struktur
+      const points: [number, number][] = [];
+      
+      for (let i = 0; i < apiHabitat.metadata.polygonPoints.length; i++) {
+        const point = apiHabitat.metadata.polygonPoints[i];
+        
+        // Werte aus dem Punkt extrahieren und als Zahlen sicherstellen
+        let lat: number | null = null;
+        let lng: number | null = null;
+        
+        // Fall 1: Punkt ist ein Array
+        if (Array.isArray(point) && point.length >= 2) {
+          // Verwende die ersten beiden Werte als lat/lng
+          lat = Number(point[0]);
+          lng = Number(point[1]);
+        } 
+        // Fall 2: Versuche, es als ein Objekt zu behandeln und lat/lng zu extrahieren
+        else if (point && typeof point === 'object') {
+          // Sicherstellen, dass wir keine TypeScript-Fehler bekommen
+          const obj = point as any;
+          
+          if (typeof obj.lat === 'number' || typeof obj.lat === 'string') {
+            lat = Number(obj.lat);
+          } else if (typeof obj.latitude === 'number' || typeof obj.latitude === 'string') {
+            lat = Number(obj.latitude);
+          }
+          
+          if (typeof obj.lng === 'number' || typeof obj.lng === 'string') {
+            lng = Number(obj.lng);
+          } else if (typeof obj.longitude === 'number' || typeof obj.longitude === 'string') {
+            lng = Number(obj.longitude);
+          }
+        }
+        
+        // Nur gültige Koordinaten hinzufügen
+        if (lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng)) {
+          // Testen, ob wir die Koordinaten tauschen müssen (Leaflet erwartet [lat, lng])
+          if (Math.abs(lat) > 90) {
+            // Lat ist außerhalb des gültigen Bereichs, Koordinaten tauschen
+            points.push([lng, lat] as [number, number]);
+          } else {
+            points.push([lat, lng] as [number, number]);
+          }
+        }
+      }
+      
+      // Nur fortfahren, wenn wir genug gültige Punkte haben
+      if (points.length >= 3) {
+        // Prüfen, ob das Polygon geschlossen ist (erster und letzter Punkt identisch)
+        const firstPoint = points[0];
+        const lastPoint = points[points.length - 1];
+        
+        const isPolygonClosed = 
+          points.length >= 2 && 
+          firstPoint && lastPoint &&
+          firstPoint[0] === lastPoint[0] && 
+          firstPoint[1] === lastPoint[1];
+        
+        // Polygon schließen, wenn nötig
+        if (!isPolygonClosed && points.length >= 3 && firstPoint) {
+          // Ersten Punkt am Ende anhängen
+          points.push([firstPoint[0], firstPoint[1]]);
+        }
+        
+        // Polygon zuweisen
+        polygon = points;
+      }
+    } catch (error) {
+      console.error(`Fehler bei der Verarbeitung des Polygons für Habitat ${apiHabitat.jobId}:`, error);
+    }
+  }
+
+  let color = '#22c55e'; // Grün für niederwertige Flächen (Standard)
+  let transparenz = 0.5;
+  // Farbe basierend auf Schutzstatus bestimmen
+  if (apiHabitat.result?.schutzstatus === 'gesetzlich geschützt') {
+    color = '#ef4444'; // Rot für geschützte Flächen
+  } else if (apiHabitat.result?.schutzstatus === 'ökologisch hochwertig') {
+    color = '#eab308'; // Gelb für hochwertige Flächen
+  }
+  if (apiHabitat.verified) {
+    transparenz=0.9;
+  }  
+
+  return {
+    id: apiHabitat.jobId,
+    name: habitatName + (apiHabitat.metadata.flurname ? ` (${apiHabitat.metadata.flurname})` : ''),
+    position,
+    polygon,
+    color,
+    transparenz,
+    // Zusätzliche Metadaten für Popup/Details
+    metadata: {
+      gemeinde: apiHabitat.metadata.gemeinde,
+      erfasser: apiHabitat.metadata.erfassungsperson,
+      verifiziert: apiHabitat.verified
+    }
+  };
+}
+
 export function LocationDetermination({ 
   metadata, 
   setMetadata,
@@ -45,6 +213,12 @@ export function LocationDetermination({
     metadata.polygonPoints || []
   );
   
+  // Zustände für bestehende Habitate
+  const [existingHabitats, setExistingHabitats] = useState<MapHabitat[]>([]);
+  const [isLoadingHabitats, setIsLoadingHabitats] = useState<boolean>(false);
+  const [habitatLoadError, setHabitatLoadError] = useState<string | null>(null);
+  const [selectedHabitatId, setSelectedHabitatId] = useState<string | null>(null);
+  
   // Referenz auf die Map-Instanz für direkte Steuerung
   const mapRef = useRef<MapNoSSRHandle>(null);
   
@@ -70,16 +244,63 @@ export function LocationDetermination({
   const [showWelcomePopup, setShowWelcomePopup] = useState<boolean>(!dontShowWelcomeAgain);
   const [showPolygonPopup, setShowPolygonPopup] = useState<boolean>(false);
 
+  // Funktion zum Laden bestehender Habitate
+  const loadExistingHabitats = useCallback(async () => {
+    try {
+      setIsLoadingHabitats(true);
+      setHabitatLoadError(null);
+      
+      console.log('Lade Habitate - API-Aufruf wird gestartet...');
+      
+      // Erhöhtes Limit, um mehr Habitate für den aktuellen Bereich zu erhalten
+      const response = await fetch('/api/habitat/public?limit=100');
+      
+      if (!response.ok) {
+        throw new Error(`API-Fehler: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log(`${data.entries.length} Habitate vom Server geladen`);
+      
+      // Konvertiere API-Daten in das Format für die Karte
+      const validHabitats = data.entries
+        .filter((h: HabitatFromAPI) => 
+          // Filtere Habitate ohne gültige Geo-Koordinaten
+          (h.metadata?.latitude && h.metadata?.longitude) || 
+          (h.metadata?.polygonPoints && h.metadata.polygonPoints.length > 0)
+        )
+        .map(convertToMapHabitat)
+        .filter(Boolean); // Entferne null-Werte
+      
+      console.log(`${validHabitats.length} gültige Habitate für die Karte vorbereitet`);
+      setExistingHabitats(validHabitats);
+      
+    } catch (err) {
+      console.error('Fehler beim Laden der bestehenden Habitate:', err);
+      setHabitatLoadError('Bestehende Habitate konnten nicht geladen werden');
+    } finally {
+      setIsLoadingHabitats(false);
+    }
+  }, []);
+
+  // Handler für Klicks auf Habitate
+  const handleHabitatClick = useCallback((habitatId: string) => {
+    setSelectedHabitatId(habitatId);
+  }, []);
+
+  // Klick außerhalb eines Habitats schließt das Info-Panel
+  const handleMapClick = useCallback(() => {
+    if (selectedHabitatId) {
+      setSelectedHabitatId(null);
+    }
+  }, [selectedHabitatId]);
+
   // Funktion zum Zentrieren der Karte auf die gespeicherte Position
   const centerMapToCurrentPosition = useCallback(() => {
-    console.log('Zentriere Karte auf gespeicherte Position:', currentPosition);
-    
     // Direkte Methode aufrufen, um die Karte zu zentrieren
     if (mapRef.current) {
       mapRef.current.centerMap(currentPosition[0], currentPosition[1], 18);
     } else {
-      console.warn('Map-Referenz nicht verfügbar');
-      
       // Fallback: Nur Zoom ändern, falls keine direkte Methode verfügbar ist
       setZoom(18);
     }
@@ -93,9 +314,6 @@ export function LocationDetermination({
         (position) => {
           const { latitude, longitude } = position.coords;
           
-          // Debug-Ausgabe
-          console.log('GPS-Position ermittelt:', { latitude, longitude });
-          
           // Position aktualisieren
           setCurrentPosition([latitude, longitude]);
           
@@ -103,9 +321,35 @@ export function LocationDetermination({
           setZoom(18);
         },
         (error) => {
-          console.error("Fehler bei der Standortermittlung:", error);
+          // Ausführlichere Fehlerinformationen ausgeben
+          const errorMessages: Record<number, string> = {
+            1: "Der Zugriff auf den Standort wurde verweigert. Bitte überprüfen Sie Ihre Browser-Berechtigungen.",
+            2: "Die Standortinformationen sind nicht verfügbar. Bitte überprüfen Sie, ob GPS aktiviert ist.",
+            3: "Zeitüberschreitung bei der Standortermittlung. Bitte versuchen Sie es erneut."
+          };
+          
+          const errorCode = error.code || 0;
+          const errorMessage = errorMessages[errorCode] || `Unbekannter Fehler (${errorCode}): ${error.message}`;
+          
+          console.error("Fehler bei der Standortermittlung:", {
+            code: errorCode,
+            message: errorMessage,
+            originalError: error
+          });
+          
+          // Optional: Dem Benutzer eine Nachricht anzeigen
+          alert(`Standort konnte nicht ermittelt werden: ${errorMessage}\n\nBitte wählen Sie Ihren Standort manuell auf der Karte.`);
+        },
+        // Zusätzliche Optionen für die Standortermittlung
+        {
+          enableHighAccuracy: true,  // Hohe Genauigkeit anfordern
+          timeout: 10000,           // 10 Sekunden Timeout
+          maximumAge: 0             // Keinen Cache verwenden
         }
       );
+    } else {
+      console.error("Geolocation wird von diesem Browser nicht unterstützt.");
+      alert("Die Standortermittlung wird von Ihrem Browser nicht unterstützt. Bitte wählen Sie Ihren Standort manuell auf der Karte.");
     }
   };
 
@@ -139,8 +383,6 @@ export function LocationDetermination({
       if (!data) {
         throw new Error('Keine Geodaten gefunden');
       }
-      
-      console.log('Erhaltene Geodaten:', data);
       
       // Setze die geografischen Daten
       setMetadata(prev => ({
@@ -183,6 +425,11 @@ export function LocationDetermination({
     // Standortinformationen nur im 'none'-Modus anzeigen
     setShowLocationInfo(newMode === 'none');
     
+    // Habitat-Auswahl zurücksetzen beim Moduswechsel
+    if (selectedHabitatId) {
+      setSelectedHabitatId(null);
+    }
+    
     // Dialog für Polygon-Modus anzeigen, nur wenn "Nicht mehr anzeigen" nicht aktiviert ist
     if (newMode === 'polygon' && !dontShowPolygonAgain) {
       setShowPolygonPopup(true);
@@ -191,16 +438,10 @@ export function LocationDetermination({
 
   // Handler für Flächenänderungen
   const handleAreaChange = (newArea: number) => {
-    console.log('LocationDetermination: handleAreaChange aufgerufen mit Fläche:', newArea, 'm²');
-    
     // Zusätzliche Validierung
     if (newArea <= 0) {
-      console.warn('Ungültige Fläche erhalten:', newArea);
       return;
     }
-    
-    // Alte Fläche zur Debugging-Zwecken loggen
-    console.log('Alte Fläche war:', areaInSqMeters, 'm²');
     
     // Nur den lokalen State aktualisieren, NICHT die Metadaten
     // Die Metadaten werden erst beim Speichern aktualisiert
@@ -212,7 +453,6 @@ export function LocationDetermination({
 
   // Polygonpunkte aktualisieren
   const handlePolygonChange = (newPoints: Array<[number, number]>) => {
-    console.log('Polygon-Punkte aktualisiert:', newPoints.length, 'Punkte');
     setPolygonPoints(newPoints);
     
     // In den Metadaten speichern
@@ -230,7 +470,6 @@ export function LocationDetermination({
       
       // Im Bearbeitungsmodus die aktuellen Punkte direkt aus der Karte extrahieren
       const currentPoints = mapRef.current?.getCurrentPolygonPoints() || [];
-      console.log('Speichere Polygon mit', currentPoints.length, 'Punkten und Fläche:', areaInSqMeters, 'm²');
       
       const message = 
           "Der Habitat-Umriss ist noch nicht geschlossen.\n\n" +
@@ -244,13 +483,6 @@ export function LocationDetermination({
         return;
       }
       
-      // Sicherstellen, dass der Polygonzug geschlossen ist (erster und letzter Punkt identisch)
-      const firstPoint = currentPoints[0];
-      const lastPoint = currentPoints[currentPoints.length - 1];
-      
-      
-      console.log('Speichere Polygon mit Punkten:', currentPoints.length);
-      
       // Mittelpunkt berechnen
       const centerLat = currentPoints.reduce((sum, point) => sum + point[0], 0) / currentPoints.length;
       const centerLng = currentPoints.reduce((sum, point) => sum + point[1], 0) / currentPoints.length;
@@ -263,8 +495,6 @@ export function LocationDetermination({
         polygonPoints: currentPoints,
         plotsize: areaInSqMeters // Sicherstellen, dass die aktuelle Fläche verwendet wird
       };
-      
-      console.log('Finales Update der Metadaten mit Fläche:', updatedMetadata.plotsize);
       
       // Metadaten in einem Schritt aktualisieren
       setMetadata(updatedMetadata);
@@ -331,6 +561,33 @@ export function LocationDetermination({
     }
   }, [metadata.standort]);
   
+  // Einfacher Effekt zum einmaligen Laden der Habitate beim Komponenten-Mount
+  useEffect(() => {
+    let isMounted = true;
+    
+    // Habitate nur laden, wenn noch keine geladen wurden
+    if (existingHabitats.length === 0 && !isLoadingHabitats) {
+      console.log('Initialisiere Habitat-Ladung');
+      
+      // Async IIFE für sauberes Error-Handling
+      (async () => {
+        try {
+          // Wrapper um loadExistingHabitats, der prüft, ob die Komponente noch mounted ist
+          await loadExistingHabitats();
+        } catch (error) {
+          if (isMounted) {
+            console.error('Fehler beim Laden der Habitate im Mount-Effekt:', error);
+          }
+        }
+      })();
+    }
+    
+    // Cleanup-Funktion
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Leeres Dependency-Array für einmalige Ausführung beim Mount
+
   // Bei der ersten Initialisierung ohne gültige Position GPS verwenden
   useEffect(() => {
     if (!metadata.latitude && !metadata.longitude) {
@@ -374,7 +631,54 @@ export function LocationDetermination({
           hasPolygon={polygonPoints && polygonPoints.length > 0}
           showZoomControls={mapMode !== 'polygon'}
           showPositionMarker={mapMode === 'navigation'}
+          habitats={existingHabitats}
+          onHabitatClick={handleHabitatClick}
+          markerZoomThreshold={12} // Ab Zoom-Level 12 werden Polygone angezeigt
         />
+        
+        {/* Status-Anzeige während Habitate geladen werden */}
+        {isLoadingHabitats && (
+          <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-white/80 py-1 px-3 rounded shadow-md text-sm">
+            Lade bestehende Habitate...
+          </div>
+        )}
+        
+        {/* Fehleranzeige, falls Habitate nicht geladen werden konnten */}
+        {habitatLoadError && (
+          <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-red-50 py-1 px-3 rounded shadow-md text-sm text-red-500">
+            {habitatLoadError}
+          </div>
+        )}
+        
+        {/* Info-Panel für ausgewähltes Habitat aus der Datenbank */}
+        {selectedHabitatId && (
+          <div className="absolute top-14 right-3 z-[9999] bg-white p-3 rounded-lg shadow-lg max-w-xs">
+            {(() => {
+              const habitat = existingHabitats.find(h => h.id === selectedHabitatId);
+              if (!habitat) return 'Habitat-Details werden geladen...';
+              
+              return (
+                <div className="space-y-1">
+                  <h3 className="font-bold text-base">Bestehendes Habitat:</h3>
+                  <p className="text-sm">{habitat.name}</p>
+                  {habitat.metadata?.gemeinde && (
+                    <p className="text-xs">Gemeinde: {habitat.metadata.gemeinde}</p>
+                  )}
+                  {habitat.metadata?.erfasser && (
+                    <p className="text-xs">Erfasser: {habitat.metadata.erfasser}</p>
+                  )}
+                  <div className="flex items-center text-xs">
+                    <span className={`inline-block w-2 h-2 rounded-full mr-1 ${habitat.metadata?.verifiziert ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
+                    {habitat.metadata?.verifiziert ? 'Verifiziert' : 'Nicht verifiziert'}
+                  </div>
+                  <p className="text-xs italic text-red-500 mt-1">
+                    Achtung: Dieses Habitat wurde bereits erfasst. Bitte vermeiden Sie Doppelerfassungen.
+                  </p>
+                </div>
+              );
+            })()}
+          </div>
+        )}
         
         {/* Standortinformationen (unten rechts) */}
         {showLocationInfo && (

@@ -32,40 +32,42 @@ export const HabitatCard: React.FC<HabitatCardProps> = ({
   
     function getStatusText(status: string): string {
         switch (status) {
-            case 'standard': return 'standard';
-            case 'hochwertig': return 'schützenswert';
-            case 'gesetzlich': return 'gesetzlich';
+            case 'standard': return 'ökologisch niederwertig';
+            case 'hochwertig': return 'ökologisch hochwertig';
+            case 'gesetzlich': return 'gesetzlich geschützt';
             default: return 'Unbekannt';
         }
     }
   return (
-    <Card className="overflow-hidden relative min-h-[250px] flex flex-col justify-end">
-      <Image 
-        src={imageSrc} 
-        alt={title}
-        fill
-        sizes="(max-width: 768px) 100vw, 250px"
-        className="object-cover"
-        priority={false}
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-      <CardContent className="relative z-10 flex flex-col justify-end p-4 text-white" >
-        <div>
+    <Card className="overflow-hidden relative w-full h-full flex flex-col justify-end">
+      <div className="absolute inset-0">
+        <Image 
+          src={imageSrc} 
+          alt={title}
+          width={340}
+          height={240}
+          className="object-cover"
+          priority={false}
+        />
+      </div>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+      <CardContent className="relative z-10 flex flex-col justify-end p-4 text-white">
+        <div className="flex justify-between items-end">
+          <div className="space-y-1">
             <h3 className="font-medium text-lg mb-1">{title}</h3>
-            <div className="flex items-center text-sm mb-1">
-              <MapPin className="w-4 h-4 mr-1" />
-              {location}
+            <div className="flex items-center text-sm">
+              <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
+              <span className="truncate max-w-[150px]">{location}</span>
             </div>
-            <div className="flex items-center text-sm mb-2">
-              <User className="w-4 h-4 mr-1" />
-              {recorder}
+            <div className="flex items-center text-sm">
+              <User className="w-4 h-4 mr-1 flex-shrink-0" />
+              <span className="truncate max-w-[150px]">{recorder}</span>
             </div>
-            <div className="flex justify-between items-end">
-              <p className="text-sm">{org}</p>
-              <Badge variant="outline" className={`${getStatusStyle(status)} border whitespace-nowrap`}>
-                {getStatusText(status)}
-              </Badge>
-            </div>
+            {org && <p className="text-sm">{org}</p>}
+          </div>
+          <Badge variant="outline" className={`${getStatusStyle(status)} border whitespace-nowrap ml-2 self-end`}>
+            {getStatusText(status)}
+          </Badge>
         </div>
       </CardContent>
     </Card>

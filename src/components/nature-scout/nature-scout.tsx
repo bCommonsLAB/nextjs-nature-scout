@@ -114,7 +114,6 @@ export default function NatureScout() {
           
           // Setze die geladenen Daten in den State
           if (habitatData && habitatData.metadata) {
-            console.log("Geladene Habitat-Daten:", habitatData);
             
             // Extrahiere polygonPoints aus points oder polygonPoints
             const polygonPoints = habitatData.metadata.polygonPoints || 

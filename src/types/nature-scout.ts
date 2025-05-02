@@ -127,6 +127,7 @@ export interface AnalyseErgebnis {
     düngung: boolean;
   };
   habitattyp: string;
+  habitatfamilie: string;
   schutzstatus: string;
   bewertung: {
     artenreichtum: number;

@@ -257,12 +257,14 @@ export async function POST(
       module: newAnalysisModule,
       previousResult: entry.result ? {
         habitattyp: entry.result.habitattyp,
+        habitatfamilie: entry.result.habitatfamilie,
         schutzstatus: entry.result.schutzstatus,
         kommentar: entry.metadata?.kommentar
       } : null,
       changes: {
         bildCount: metadata.bilder?.length || 0,
         habitattyp: analysisResult.result?.habitattyp,
+        habitatfamilie: analysisResult.result?.habitatfamilie,
         schutzstatus: analysisResult.result?.schutzstatus,
         kommentar: metadata.kommentar
       }
