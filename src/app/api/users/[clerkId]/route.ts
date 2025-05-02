@@ -4,7 +4,7 @@ import { UserService } from '@/lib/services/user-service';
 
 // GET /api/users/[clerkId] - Holt einen bestimmten Benutzer
 export async function GET(
-  req: NextRequest,
+  req: Request,
   { params }: { params: { clerkId: string } }
 ) {
   try {
@@ -15,8 +15,8 @@ export async function GET(
       return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
     }
     
-    // Hole die clerkId mit await
-    const clerkId = await params.clerkId;
+    // Hole die clerkId
+    const clerkId = params.clerkId;
     
     // Benutzer dürfen nur ihre eigenen Daten abrufen, es sei denn, sie sind Admins
     if (userId !== clerkId) {
@@ -41,7 +41,7 @@ export async function GET(
 
 // PATCH /api/users/[clerkId] - Aktualisiert einen bestimmten Benutzer
 export async function PATCH(
-  req: NextRequest,
+  req: Request,
   { params }: { params: { clerkId: string } }
 ) {
   try {
@@ -52,8 +52,8 @@ export async function PATCH(
       return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
     }
     
-    // Hole die clerkId mit await
-    const clerkId = await params.clerkId;
+    // Hole die clerkId
+    const clerkId = params.clerkId;
     
     // Benutzer mit Admin-Rechten oder Benutzer, die ihre eigenen Daten aktualisieren
     const isAdmin = await UserService.isAdmin(userId);
@@ -64,7 +64,15 @@ export async function PATCH(
     }
     
     const body = await req.json();
-    const { name, email, role } = body;
+    const { 
+      name, 
+      email, 
+      role, 
+      organizationId, 
+      consent_data_processing, 
+      consent_image_ccby, 
+      habitat_name_visibility 
+    } = body;
     
     // Prüfen, ob dem aktuellen Benutzer die Admin-Rolle entzogen werden soll
     if (isAdmin && role && isSelf && role !== 'admin' && role !== 'superadmin') {
@@ -83,11 +91,16 @@ export async function PATCH(
       }
     }
     
-    // Normale Benutzer dürfen ihre Rolle nicht ändern
+    // Normale Benutzer dürfen ihre Rolle nicht ändern, aber ihre Consent-Einstellungen
     const updateData = {
       ...(name !== undefined ? { name } : {}), 
       ...(email !== undefined ? { email } : {}),
-      ...(isAdmin && role ? { role } : {})
+      ...(isAdmin && role ? { role } : {}),
+      ...(organizationId !== undefined ? { organizationId } : {}),
+      // Consent-Felder können vom Benutzer selbst aktualisiert werden
+      ...(consent_data_processing !== undefined ? { consent_data_processing } : {}),
+      ...(consent_image_ccby !== undefined ? { consent_image_ccby } : {}),
+      ...(habitat_name_visibility !== undefined ? { habitat_name_visibility } : {})
     };
     
     const updatedUser = await UserService.updateUser(clerkId, updateData);
@@ -105,7 +118,7 @@ export async function PATCH(
 
 // DELETE /api/users/[clerkId] - Löscht einen bestimmten Benutzer
 export async function DELETE(
-  req: NextRequest,
+  req: Request,
   { params }: { params: { clerkId: string } }
 ) {
   try {
@@ -116,8 +129,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
     }
     
-    // Hole die clerkId mit await
-    const clerkId = await params.clerkId;
+    // Hole die clerkId
+    const clerkId = params.clerkId;
     
     // Nur Admins dürfen Benutzer löschen
     const isAdmin = await UserService.isAdmin(userId);

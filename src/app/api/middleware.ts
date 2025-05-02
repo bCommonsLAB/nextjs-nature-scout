@@ -9,6 +9,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/habitat/search",
   "/api/habitat/categories",
   "/api/habitat/categoriesDict",
+  "/api/organizations",
   "/api/webhook/clerk",
   "/api/debug/log",
   "/favicon(.*)",

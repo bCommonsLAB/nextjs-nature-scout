@@ -50,6 +50,7 @@ const userFormSchema = z.object({
   name: z.string().min(2, { message: 'Name muss mindestens 2 Zeichen lang sein' }),
   email: z.string().email({ message: 'Ungültige E-Mail-Adresse' }).optional(),
   role: z.enum(['user', 'experte', 'admin', 'superadmin']),
+  organizationId: z.string().optional(),
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -62,11 +63,14 @@ export function UserTable() {
   const [lastAdminError, setLastAdminError] = useState<string | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<IUser | null>(null);
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [loadingOrganizations, setLoadingOrganizations] = useState(false);
   
   // Filter-Status
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [registerDateFilter, setRegisterDateFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [organizationFilter, setOrganizationFilter] = useState<string>('all');
   const [activeFilters, setActiveFilters] = useState<{type: string; value: string}[]>([]);
 
   // React Hook Form initialisieren
@@ -76,6 +80,7 @@ export function UserTable() {
       name: '',
       email: '',
       role: 'user',
+      organizationId: 'none',
     },
   });
 
@@ -95,6 +100,23 @@ export function UserTable() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Organisationen laden
+  const fetchOrganizations = async () => {
+    setLoadingOrganizations(true);
+    try {
+      const response = await fetch('/api/organizations');
+      if (!response.ok) {
+        throw new Error('Fehler beim Laden der Organisationen');
+      }
+      const data = await response.json();
+      setOrganizations(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingOrganizations(false);
     }
   };
 
@@ -133,6 +155,15 @@ export function UserTable() {
       });
     }
     
+    // Filtern nach Organisation
+    if (organizationFilter !== 'all') {
+      if (organizationFilter === 'none') {
+        result = result.filter(user => !user.organizationId);
+      } else {
+        result = result.filter(user => user.organizationId === organizationFilter);
+      }
+    }
+    
     // Suche nach Name oder E-Mail
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
@@ -168,13 +199,22 @@ export function UserTable() {
       newActiveFilters.push({ type: 'date', value: `Registriert: ${dateFilterName}` });
     }
     
+    if (organizationFilter !== 'all') {
+      if (organizationFilter === 'none') {
+        newActiveFilters.push({ type: 'organization', value: 'Organisation: Keine' });
+      } else {
+        const org = organizations.find(org => org._id === organizationFilter);
+        newActiveFilters.push({ type: 'organization', value: `Organisation: ${org ? org.name : organizationFilter}` });
+      }
+    }
+    
     if (searchTerm.trim()) {
       newActiveFilters.push({ type: 'search', value: `Suche: ${searchTerm}` });
     }
     
     setActiveFilters(newActiveFilters);
     
-  }, [allUsers, roleFilter, registerDateFilter, searchTerm]);
+  }, [allUsers, roleFilter, registerDateFilter, searchTerm, organizationFilter, organizations]);
 
   // Dialog zum Bearbeiten eines Benutzers öffnen
   const openEditDialog = (user: IUser) => {
@@ -183,6 +223,7 @@ export function UserTable() {
       name: user.name,
       email: user.email,
       role: user.role as 'user' | 'experte' | 'admin' | 'superadmin',
+      organizationId: user.organizationId || 'none',
     });
     setIsEditDialogOpen(true);
   };
@@ -191,6 +232,12 @@ export function UserTable() {
   const updateUser = async (values: UserFormValues) => {
     if (!selectedUser) return;
     
+    // "none" in null umwandeln für die Datenbank
+    const dataToSend = {
+      ...values,
+      organizationId: values.organizationId === 'none' ? null : values.organizationId
+    };
+    
     setLastAdminError(null);
     try {
       const response = await fetch(`/api/users/${selectedUser.clerkId}`, {
@@ -198,7 +245,7 @@ export function UserTable() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(values),
+        body: JSON.stringify(dataToSend),
       });
 
       if (!response.ok) {
@@ -258,6 +305,34 @@ export function UserTable() {
     }
   };
 
+  // Benutzerorganisation aktualisieren
+  const updateUserOrganization = async (clerkId: string, organizationId: string) => {
+    // "none" in null umwandeln für die Datenbank
+    const orgIdToSave = organizationId === 'none' ? null : organizationId;
+    
+    try {
+      const response = await fetch(`/api/users/${clerkId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ organizationId: orgIdToSave }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Fehler beim Aktualisieren der Organisation');
+      }
+
+      // Nach erfolgreicher Aktualisierung: Liste neu laden
+      await fetchUsers();
+      
+      toast.success('Organisation erfolgreich aktualisiert');
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : 'Fehler beim Aktualisieren der Organisation');
+    }
+  };
+
   // Benutzer löschen
   const deleteUser = async (clerkId: string) => {
     setLastAdminError(null);
@@ -301,6 +376,9 @@ export function UserTable() {
       case 'date':
         setRegisterDateFilter('all');
         break;
+      case 'organization':
+        setOrganizationFilter('all');
+        break;
       case 'search':
         setSearchTerm('');
         break;
@@ -311,11 +389,13 @@ export function UserTable() {
   const resetAllFilters = () => {
     setRoleFilter('all');
     setRegisterDateFilter('all');
+    setOrganizationFilter('all');
     setSearchTerm('');
   };
 
   useEffect(() => {
     fetchUsers();
+    fetchOrganizations();
   }, []);
 
   // Hilfstext zu den verschiedenen Rollen anzeigen
@@ -376,7 +456,7 @@ export function UserTable() {
         )}
         
         {/* Filter-Leiste */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
           <Select value={roleFilter} onValueChange={setRoleFilter}>
             <SelectTrigger className="h-9 text-xs">
               <SelectValue placeholder="Rolle filtern" />
@@ -399,6 +479,21 @@ export function UserTable() {
               <SelectItem value="today">Heute registriert</SelectItem>
               <SelectItem value="week">Letzte Woche</SelectItem>
               <SelectItem value="month">Letzter Monat</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Select value={organizationFilter} onValueChange={setOrganizationFilter}>
+            <SelectTrigger className="h-9 text-xs">
+              <SelectValue placeholder="Organisation filtern" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle Organisationen</SelectItem>
+              <SelectItem value="none">Keine Organisation</SelectItem>
+              {organizations.map((org) => (
+                <SelectItem key={org._id} value={org._id}>
+                  {org.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           
@@ -442,6 +537,7 @@ export function UserTable() {
               <TableHead>Name</TableHead>
               <TableHead>E-Mail</TableHead>
               <TableHead>Rolle</TableHead>
+              <TableHead>Organisation</TableHead>
               <TableHead>Registriert</TableHead>
               <TableHead>Aktionen</TableHead>
             </TableRow>
@@ -449,7 +545,7 @@ export function UserTable() {
           <TableBody>
             {filteredUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center">
+                <TableCell colSpan={6} className="text-center">
                   {activeFilters.length > 0 
                     ? 'Keine Benutzer mit diesen Filterkriterien gefunden' 
                     : 'Keine Benutzer gefunden'}
@@ -480,6 +576,24 @@ export function UserTable() {
                         {getRoleDescription(user.role)}
                       </span>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <Select 
+                      value={user.organizationId || 'none'} 
+                      onValueChange={(value) => updateUserOrganization(user.clerkId, value)}
+                    >
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Organisation wählen" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Keine Organisation</SelectItem>
+                        {organizations.map((org) => (
+                          <SelectItem key={org._id} value={org._id}>
+                            {org.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </TableCell>
                   <TableCell>
                     {user.createdAt ? formatDistanceToNow(new Date(user.createdAt), { 
@@ -576,6 +690,38 @@ export function UserTable() {
                     </Select>
                     <FormDescription>
                       {getRoleDescription(field.value)}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="organizationId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Organisation</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value || "none"}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Organisation auswählen" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Keine Organisation</SelectItem>
+                        {organizations.map((org) => (
+                          <SelectItem key={org._id} value={org._id}>
+                            {org.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Organisation des Benutzers
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
