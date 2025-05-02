@@ -8,9 +8,13 @@ export interface IUser {
   name: string;
   role: 'user' | 'experte' | 'admin' | 'superadmin';
   image?: string;
+  organizationId?: string;
   createdAt?: Date;
   updatedAt?: Date;
   lastAccess?: Date;
+  consent_data_processing?: boolean;
+  consent_image_ccby?: boolean;
+  habitat_name_visibility?: 'public' | 'members' | null;
 }
 
 export interface CreateUserData {
@@ -18,6 +22,10 @@ export interface CreateUserData {
   email: string;
   name: string;
   role?: 'user' | 'experte' | 'admin' | 'superadmin';
+  organizationId?: string;
+  consent_data_processing?: boolean;
+  consent_image_ccby?: boolean;
+  habitat_name_visibility?: 'public' | 'members' | null;
 }
 
 export interface UpdateUserData {
@@ -26,6 +34,10 @@ export interface UpdateUserData {
   name?: string;
   role?: 'user' | 'experte' | 'admin' | 'superadmin';
   image?: string;
+  organizationId?: string;
+  consent_data_processing?: boolean;
+  consent_image_ccby?: boolean;
+  habitat_name_visibility?: 'public' | 'members' | null;
 }
 
 export class UserService {
@@ -33,6 +45,34 @@ export class UserService {
   private static async getUsersCollection() {
     const db = await connectToDatabase();
     return db.collection<IUser>('users');
+  }
+  
+  /**
+   * Erstellt die benötigten Indizes für die users-Collection
+   */
+  static async createUserIndexes(): Promise<void> {
+    const collection = await this.getUsersCollection();
+    
+    // Index auf clerkId für schnelle Benutzerabfragen
+    await collection.createIndex({ clerkId: 1 }, { unique: true });
+    
+    // Index auf role für Filterung nach Benutzerrollen
+    await collection.createIndex({ role: 1 });
+    
+    // Kombinierter Index für isAdmin/isExpert Abfragen
+    await collection.createIndex({ clerkId: 1, role: 1 });
+    
+    // Index auf email für Suche nach E-Mail-Adressen
+    await collection.createIndex({ email: 1 }, { unique: true, sparse: true });
+    
+    // Index auf organizationId für Filterung nach Organisationen
+    await collection.createIndex({ organizationId: 1 });
+    
+    // Index auf lastAccess und createdAt für zeitbasierte Abfragen
+    await collection.createIndex({ lastAccess: -1 });
+    await collection.createIndex({ createdAt: -1 });
+    
+    console.log('User-Indizes erfolgreich erstellt');
   }
   
   /**
@@ -125,7 +165,9 @@ export class UserService {
    * Prüft, ob ein Benutzer Admin-Berechtigungen hat
    */
   static async isAdmin(clerkId: string): Promise<boolean> {
-    const user = await this.findByClerkId(clerkId);
+    const collection = await this.getUsersCollection();
+    // Projektion: Nur das role-Feld zurückgeben
+    const user = await collection.findOne({ clerkId }, { projection: { role: 1, _id: 0 } });
     return user?.role === 'admin' || user?.role === 'superadmin';
   }
   
@@ -133,7 +175,9 @@ export class UserService {
    * Prüft, ob ein Benutzer Experte ist
    */
   static async isExpert(clerkId: string): Promise<boolean> {
-    const user = await this.findByClerkId(clerkId);
+    const collection = await this.getUsersCollection();
+    // Projektion: Nur das role-Feld zurückgeben
+    const user = await collection.findOne({ clerkId }, { projection: { role: 1, _id: 0 } });
     return user?.role === 'experte' || user?.role === 'admin' || user?.role === 'superadmin';
   }
 } 

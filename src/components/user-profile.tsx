@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { UserButton } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
+import { UserMenu } from "@/components/user-menu";
 
 export function UserProfileButton() {
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -56,18 +56,7 @@ export function UserProfileButton() {
           {userRole}
         </Badge>
       )}
-      <UserButton
-        afterSignOutUrl="/"
-        appearance={{
-          elements: {
-            userButtonAvatarBox: "h-10 w-10",
-            userButtonTrigger: "focus:outline-none focus:ring-0",
-            userButtonPopoverCard: "!z-[9999] !pointer-events-auto",
-            userButtonPopoverActions: "",
-            userButtonPopoverActionButton: "!p-4 !text-base",
-          }
-        }}
-      />
+      <UserMenu />
     </div>
   );
 } 

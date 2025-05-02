@@ -145,6 +145,12 @@ export function Navbar() {
                     Benutzer
                   </Button>
                 </Link>
+                <Link href="/admin/organizations">
+                  <Button variant="ghost" className="text-base">
+                    <TestTube2 className="h-4 w-4 mr-2" />
+                    Organisationen
+                  </Button>
+                </Link>
                 <Link href="/admin/config">
                   <Button variant="ghost" className="text-base">
                     <Settings className="h-4 w-4 mr-2" />
@@ -232,6 +238,14 @@ export function Navbar() {
                     >
                       <Users className="h-4 w-4 mr-2" />
                       Benutzer
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      className="w-full text-base justify-start"
+                      onClick={() => handleMobileNavigation('/admin/organizations')}
+                    >
+                      <TestTube2 className="h-4 w-4 mr-2" />
+                      Organisationen
                     </Button>
                     <Button 
                       variant="ghost" 

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
 import { createHabitatTypeIndexes, createAnalyseJobsIndexes } from '@/lib/services/habitat-service';
+import { OrganizationService } from '@/lib/services/organization-service';
 
 export async function GET() {
   try {
@@ -24,6 +25,12 @@ export async function GET() {
         { status: 403 }
       );
     }
+    
+    // Indizes für users-Collection erstellen
+    await UserService.createUserIndexes();
+    
+    // Indizes für organizations-Collection erstellen
+    await OrganizationService.createOrganizationIndexes();
     
     // Indizes für habitatTypes-Collection erstellen
     await createHabitatTypeIndexes();
