@@ -37,7 +37,7 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: "Nature Scout",
   description: "Habitate finden und bewerten",
-  viewport: "width=device-width, initial-scale=1.0",
+  viewport: "width=device-width, initial-scale=1.0, maximum-scale=1.0",
 };
 
 export default function RootLayout({
@@ -49,11 +49,11 @@ export default function RootLayout({
     <ClerkProvider localization={customLocalization}>
       <html lang="de">
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col max-w-[100vw] overflow-x-hidden`}
+          className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
         >
           <NatureScoutProvider>
             <Navbar />
-            <main className="flex-1 w-full">
+            <main>
               {children}
             </main>
             <Footer />
