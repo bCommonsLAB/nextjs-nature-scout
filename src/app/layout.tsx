@@ -49,11 +49,11 @@ export default function RootLayout({
     <ClerkProvider localization={customLocalization}>
       <html lang="de">
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
+          className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col max-w-[100vw] overflow-x-hidden`}
         >
           <NatureScoutProvider>
             <Navbar />
-            <main>
+            <main className="flex-1 w-full">
               {children}
             </main>
             <Footer />
