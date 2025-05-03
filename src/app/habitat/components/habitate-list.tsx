@@ -27,6 +27,9 @@ interface HabitateEntry {
     flurname?: string;
     standort?: string;
     bilder?: Array<{url: string}>;
+    organizationId?: string;
+    organizationName?: string;
+    organizationLogo?: string;
   };
   result?: {
     habitattyp?: string;
@@ -132,6 +135,14 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
               </div>
             </th>
             <th 
+              className={`px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32 ${getSortableHeaderClass('metadata.organizationName')}`}
+              onClick={() => onSort('metadata.organizationName')}
+            >
+              <div className="flex items-center">
+                Organisation {renderSortIcon('metadata.organizationName')}
+              </div>
+            </th>
+            <th 
               className={`px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40 ${getSortableHeaderClass('metadata.gemeinde')}`}
               onClick={() => onSort('metadata.gemeinde')}
             >
@@ -212,6 +223,15 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
                 <td className="px-2 py-2 whitespace-nowrap">
                   <Link href={`/habitat/${entry.jobId}`} className="block">
                     <div className="font-medium">{entry.metadata?.erfassungsperson || '-'}</div>
+                  </Link>
+                </td>
+                <td className="px-2 py-2 whitespace-nowrap">
+                  <Link href={`/habitat/${entry.jobId}`} className="block">
+                    <div className="flex items-center">
+                      <div className="font-medium text-sm text-gray-700">
+                        {entry.metadata?.organizationName || 'Keine Organisation'}
+                      </div>
+                    </div>
                   </Link>
                 </td>
                 <td className="px-2 py-2 whitespace-nowrap">

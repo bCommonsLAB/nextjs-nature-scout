@@ -2,6 +2,9 @@ import { ObjectId } from 'mongodb';
 
 export interface NatureScoutData {
   erfassungsperson: string;
+  organizationId: string;
+  organizationName: string;
+  organizationLogo: string;
   email: string;
   gemeinde: string;
   flurname: string;

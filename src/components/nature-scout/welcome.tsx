@@ -55,17 +55,38 @@ export function Welcome({
     }
   }, [dontShowWelcomeGuideAgain]);
   
-  // Lade Benutzerdaten vom aktuellen angemeldeten Benutzer
+  // Lade Benutzerdaten aus der MongoDB über den API-Endpunkt
   useEffect(() => {
-    if (isLoaded && user) {
-      // Automatisch Daten vom angemeldeten Benutzer übernehmen
-      console.log("Benutzerdaten übernehmen:", user);
-      setMetadata(prev => ({
-        ...prev,
-        erfassungsperson: user.fullName || "",
-        email: user.primaryEmailAddress?.emailAddress || ""
-      }));
+    async function fetchUserData() {
+      if (isLoaded && user) {
+        try {
+          // API-Anfrage an unseren Endpunkt mit der Clerk-ID
+          const response = await fetch(`/api/users/${user.id}`);
+          
+          if (!response.ok) {
+            console.error("Fehler beim Abrufen der Benutzerdaten:", response.statusText);
+            return;
+          }
+          
+          const userData = await response.json();
+          console.log("Benutzerdaten aus MongoDB geladen:", userData);
+          
+          // Daten aus unserem MongoDB-Nutzerprofil übernehmen
+          setMetadata(prev => ({
+            ...prev,
+            erfassungsperson: userData.name || user.fullName || "",
+            organizationId: userData.organizationId || "",
+            organizationName: userData.organizationName || "",
+            organizationLogo: userData.organizationLogo || "",
+            email: userData.email || ""
+          }));
+        } catch (error) {
+          console.error("Fehler beim Abrufen der Benutzerdaten:", error);
+        }
+      }
     }
+    
+    fetchUserData();
   }, [setMetadata, isLoaded, user]);
 
   // Effekt für den Hilfe-Button

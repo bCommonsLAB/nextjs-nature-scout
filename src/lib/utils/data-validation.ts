@@ -114,6 +114,9 @@ export function validateNatureScoutData(data: unknown): NatureScoutData {
   
   // Sicherstellen, dass andere Pflichtfelder existieren
   if (!validatedData.erfassungsperson) validatedData.erfassungsperson = '';
+  if (!validatedData.organizationId) validatedData.organizationId = '';
+  if (!validatedData.organizationName) validatedData.organizationName = '';
+  if (!validatedData.organizationLogo) validatedData.organizationLogo = '';
   if (!validatedData.email) validatedData.email = '';
   if (!validatedData.gemeinde) validatedData.gemeinde = '';
   if (!validatedData.flurname) validatedData.flurname = '';
@@ -143,6 +146,9 @@ export function validateAnalysisJob(job: unknown): AnalysisJob {
       // Stelle sicher, dass mindestens eine leere Struktur vorhanden ist
       validatedJob.metadata = {
         erfassungsperson: '',
+        organizationId: '',
+        organizationName: '',
+        organizationLogo: '',
         email: '',
         gemeinde: '',
         flurname: '',

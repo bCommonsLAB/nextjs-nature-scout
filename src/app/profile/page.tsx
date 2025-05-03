@@ -32,6 +32,8 @@ function ProfileContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [selectedOrg, setSelectedOrg] = useState<string>('none');
+  const [selectedOrgName, setSelectedOrgName] = useState<string | null>(null);
+  const [selectedOrgLogo, setSelectedOrgLogo] = useState<string | null>(null);
   const [consentDialogOpen, setConsentDialogOpen] = useState(false);
   const [attemptedToSave, setAttemptedToSave] = useState(false);
   
@@ -119,6 +121,15 @@ function ProfileContent() {
         
         const data = await response.json();
         setOrganizations(data);
+        
+        // Wenn bereits eine Organisation ausgewählt ist, setze auch Name und Logo
+        if (userData?.organizationId) {
+          const userOrg = data.find((org: any) => org._id === userData.organizationId);
+          if (userOrg) {
+            setSelectedOrgName(userOrg.name || null);
+            setSelectedOrgLogo(userOrg.logo || null);
+          }
+        }
       } catch (err) {
         console.error('Error fetching organizations:', err);
         toast.error('Fehler beim Laden der Organisationen');
@@ -135,7 +146,20 @@ function ProfileContent() {
     if (selectedOrg === 'none' && habitatNameVisibility === 'members') {
       setHabitatNameVisibility('public');
     }
-  }, [selectedOrg, habitatNameVisibility]);
+    
+    // Update der Organisation: Name und Logo setzen, wenn eine Organisation ausgewählt ist
+    if (selectedOrg !== 'none') {
+      const selectedOrgData = organizations.find(org => org._id === selectedOrg);
+      if (selectedOrgData) {
+        setSelectedOrgName(selectedOrgData.name || null);
+        setSelectedOrgLogo(selectedOrgData.logo || null);
+      }
+    } else {
+      // Zurücksetzen, wenn keine Organisation ausgewählt ist
+      setSelectedOrgName(null);
+      setSelectedOrgLogo(null);
+    }
+  }, [selectedOrg, habitatNameVisibility, organizations]);
 
   // Alle Profileinstellungen speichern
   const saveProfile = async () => {
@@ -160,6 +184,8 @@ function ProfileContent() {
         },
         body: JSON.stringify({
           organizationId: orgIdToSave,
+          organizationName: selectedOrgName,
+          organizationLogo: selectedOrgLogo,
           consent_data_processing: consentDataProcessing,
           consent_image_ccby: consentImageCcby,
           habitat_name_visibility: habitatNameVisibility,
@@ -208,6 +234,8 @@ function ProfileContent() {
         },
         body: JSON.stringify({
           organizationId: selectedOrg === 'none' ? null : selectedOrg,
+          organizationName: selectedOrgName,
+          organizationLogo: selectedOrgLogo,
           consent_data_processing: consentDataProcessing,
           consent_image_ccby: consentImageCcby,
           habitat_name_visibility: habitatNameVisibility,

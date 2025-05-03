@@ -24,6 +24,9 @@ interface HabitateEntry {
   metadata: {
     erfassungsperson?: string;
     email?: string;
+    organizationId?: string;
+    organizationName?: string;
+    organizationLogo?: string;
     gemeinde?: string;
     flurname?: string;
     latitude?: number;
@@ -83,6 +86,7 @@ function HabitatPageContent() {
   const selectedHabitatFamilie = searchParams.get('habitatfamilie') || '';
   const selectedSchutzstatus = searchParams.get('schutzstatus') || '';
   const selectedPruefstatus = searchParams.get('pruefstatus') || '';
+  const selectedOrganization = searchParams.get('organization') || '';
   
   useEffect(() => {
     const checkPermissions = async () => {
@@ -123,6 +127,7 @@ function HabitatPageContent() {
         if (selectedHabitat) filters.push(`Habitat: ${selectedHabitat}`);
         if (selectedHabitatFamilie) filters.push(`Familie: ${selectedHabitatFamilie}`);
         if (selectedSchutzstatus) filters.push(`Schutz: ${selectedSchutzstatus}`);
+        if (selectedOrganization) filters.push(`Organisation: ${selectedOrganization}`);
         if (selectedPruefstatus) {
           const status = selectedPruefstatus === 'verified' ? 'Verifiziert' : 
                          (selectedPruefstatus === 'rejected' ? 'Abgelehnt' : 'Ungeprüft');
@@ -163,6 +168,7 @@ function HabitatPageContent() {
     if (filterString.startsWith('Habitat:')) params.delete('habitat');
     if (filterString.startsWith('Familie:')) params.delete('habitatfamilie');
     if (filterString.startsWith('Schutz:')) params.delete('schutzstatus');
+    if (filterString.startsWith('Organisation:')) params.delete('organization');
     if (filterString.startsWith('Status:')) params.delete('pruefstatus');
     
     params.set('page', '1');
@@ -195,6 +201,7 @@ function HabitatPageContent() {
         if (selectedHabitatFamilie) queryParams.set('habitatfamilie', selectedHabitatFamilie);
         if (selectedSchutzstatus) queryParams.set('schutzstatus', selectedSchutzstatus);
         if (selectedPruefstatus) queryParams.set('pruefstatus', selectedPruefstatus);
+        if (selectedOrganization) queryParams.set('organization', selectedOrganization);
         
         const response = await fetch(`/api/habitat?${queryParams.toString()}`);
         
@@ -263,7 +270,7 @@ function HabitatPageContent() {
     };
     
     fetchData();
-  }, [page, search, sortBy, sortOrder, selectedPerson, selectedGemeinde, selectedHabitat, selectedHabitatFamilie, selectedSchutzstatus, selectedPruefstatus]);
+  }, [page, search, sortBy, sortOrder, selectedPerson, selectedGemeinde, selectedHabitat, selectedHabitatFamilie, selectedSchutzstatus, selectedPruefstatus, selectedOrganization]);
   
   const handleSearch = (term: string) => {
     const params = new URLSearchParams(searchParams);
@@ -462,6 +469,14 @@ function HabitatPageContent() {
               allLabel="Alle Personen"
             />
           )}
+          
+          <FilterSelect
+            type="organizations"
+            value={selectedOrganization || 'alle'}
+            onValueChange={(value) => applyFilter('organization', value)}
+            placeholder="Organisation"
+            allLabel="Alle Organisationen"
+          />
           
           <FilterSelect
             type="gemeinden"

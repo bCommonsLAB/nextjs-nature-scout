@@ -26,17 +26,25 @@ export async function GET() {
       );
     }
     
+    console.time('Indizes erstellen');
+    
     // Indizes für users-Collection erstellen
     await UserService.createUserIndexes();
+    console.log('✅ User-Indizes erstellt');
     
     // Indizes für organizations-Collection erstellen
     await OrganizationService.createOrganizationIndexes();
+    console.log('✅ Organizations-Indizes erstellt');
     
     // Indizes für habitatTypes-Collection erstellen
     await createHabitatTypeIndexes();
+    console.log('✅ HabitatTypes-Indizes erstellt');
     
     // Indizes für analyseJobs-Collection erstellen
     await createAnalyseJobsIndexes();
+    console.log('✅ AnalyseJobs-Indizes erstellt');
+    
+    console.timeEnd('Indizes erstellen');
     
     return NextResponse.json({ 
       success: true, 

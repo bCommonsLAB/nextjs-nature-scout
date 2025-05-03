@@ -38,24 +38,41 @@ export async function createAnalyseJobsIndexes(): Promise<void> {
   const db = await connectToDatabase();
   const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
   
-  // Indizes für häufig verwendete Felder in Filters
+  // Grundlegende Indizes für Einzelfelder
   await collection.createIndex({ 'metadata.gemeinde': 1 });
   await collection.createIndex({ 'metadata.erfassungsperson': 1 });
   await collection.createIndex({ 'metadata.email': 1 });
+  await collection.createIndex({ 'metadata.organizationName': 1 });
   await collection.createIndex({ 'result.habitattyp': 1 });
   await collection.createIndex({ 'result.habitatfamilie': 1 });
   await collection.createIndex({ 'result.schutzstatus': 1 });
   await collection.createIndex({ 'verifiedResult.habitatfamilie': 1 });
   await collection.createIndex({ verified: 1 });
   await collection.createIndex({ deleted: 1 });
-  
-  // Zusammengesetzte Indizes für häufige Abfragekombinationen
-  await collection.createIndex({ 'metadata.email': 1, deleted: 1 });
-  await collection.createIndex({ deleted: 1, 'result.habitatfamilie': 1 });
-  await collection.createIndex({ deleted: 1, 'metadata.gemeinde': 1 });
-  
-  // Index für Sortierungen
   await collection.createIndex({ updatedAt: -1 });
+  
+  // Verbundindizes für häufige Abfragen in der öffentlichen Ansicht
+  await collection.createIndex({ deleted: 1, verified: 1 });
+  await collection.createIndex({ deleted: 1, verified: 1, 'metadata.organizationName': 1 });
+  await collection.createIndex({ deleted: 1, verified: 1, 'metadata.gemeinde': 1 });
+  await collection.createIndex({ deleted: 1, verified: 1, 'result.habitattyp': 1 });
+  await collection.createIndex({ deleted: 1, verified: 1, 'result.habitatfamilie': 1 });
+  await collection.createIndex({ deleted: 1, verified: 1, 'result.schutzstatus': 1 });
+  
+  // Verbundindizes für Sortierung und Filterung
+  await collection.createIndex({ deleted: 1, updatedAt: -1 });
+  await collection.createIndex({ deleted: 1, verified: 1, updatedAt: -1 });
+  
+  // Text-Index für die Suchfunktion (für Freitextsuche)
+  await collection.createIndex(
+    { 
+      'metadata.erfassungsperson': 'text', 
+      'metadata.gemeinde': 'text', 
+      'metadata.flurname': 'text',
+      'result.habitattyp': 'text'
+    },
+    { name: 'text_search_index' }
+  );
   
   console.log('AnalyseJobs-Indizes wurden erstellt oder aktualisiert');
 }

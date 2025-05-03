@@ -9,6 +9,8 @@ export interface IUser {
   role: 'user' | 'experte' | 'admin' | 'superadmin';
   image?: string;
   organizationId?: string;
+  organizationName?: string;
+  organizationLogo?: string;
   createdAt?: Date;
   updatedAt?: Date;
   lastAccess?: Date;
@@ -23,6 +25,8 @@ export interface CreateUserData {
   name: string;
   role?: 'user' | 'experte' | 'admin' | 'superadmin';
   organizationId?: string;
+  organizationName?: string;
+  organizationLogo?: string;
   consent_data_processing?: boolean;
   consent_image_ccby?: boolean;
   habitat_name_visibility?: 'public' | 'members' | null;
@@ -35,6 +39,8 @@ export interface UpdateUserData {
   role?: 'user' | 'experte' | 'admin' | 'superadmin';
   image?: string;
   organizationId?: string;
+  organizationName?: string;
+  organizationLogo?: string;
   consent_data_processing?: boolean;
   consent_image_ccby?: boolean;
   habitat_name_visibility?: 'public' | 'members' | null;
@@ -53,24 +59,22 @@ export class UserService {
   static async createUserIndexes(): Promise<void> {
     const collection = await this.getUsersCollection();
     
-    // Index auf clerkId für schnelle Benutzerabfragen
+    // Grundlegende Indizes für Einzelfelder
     await collection.createIndex({ clerkId: 1 }, { unique: true });
-    
-    // Index auf role für Filterung nach Benutzerrollen
-    await collection.createIndex({ role: 1 });
-    
-    // Kombinierter Index für isAdmin/isExpert Abfragen
-    await collection.createIndex({ clerkId: 1, role: 1 });
-    
-    // Index auf email für Suche nach E-Mail-Adressen
     await collection.createIndex({ email: 1 }, { unique: true, sparse: true });
-    
-    // Index auf organizationId für Filterung nach Organisationen
+    await collection.createIndex({ role: 1 });
     await collection.createIndex({ organizationId: 1 });
-    
-    // Index auf lastAccess und createdAt für zeitbasierte Abfragen
+    await collection.createIndex({ habitat_name_visibility: 1 });
     await collection.createIndex({ lastAccess: -1 });
     await collection.createIndex({ createdAt: -1 });
+    
+    // Verbundindizes für häufige Abfragen
+    await collection.createIndex({ clerkId: 1, role: 1 });
+    await collection.createIndex({ organizationId: 1, role: 1 });
+    await collection.createIndex({ organizationId: 1, habitat_name_visibility: 1 });
+    
+    // Für Namenssuche und Sortierung
+    await collection.createIndex({ name: 1 });
     
     console.log('User-Indizes erfolgreich erstellt');
   }

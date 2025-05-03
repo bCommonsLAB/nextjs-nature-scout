@@ -233,9 +233,25 @@ export function UserTable() {
     if (!selectedUser) return;
     
     // "none" in null umwandeln für die Datenbank
+    const orgIdToSave = values.organizationId === 'none' ? null : values.organizationId;
+    
+    // Organisationsnamen und -logo ermitteln
+    let orgNameToSave = null;
+    let orgLogoToSave = null;
+    
+    if (orgIdToSave) {
+      const selectedOrg = organizations.find(org => org._id === orgIdToSave);
+      if (selectedOrg) {
+        orgNameToSave = selectedOrg.name;
+        orgLogoToSave = selectedOrg.logo;
+      }
+    }
+    
     const dataToSend = {
       ...values,
-      organizationId: values.organizationId === 'none' ? null : values.organizationId
+      organizationId: orgIdToSave,
+      organizationName: orgNameToSave,
+      organizationLogo: orgLogoToSave
     };
     
     setLastAdminError(null);
@@ -310,13 +326,29 @@ export function UserTable() {
     // "none" in null umwandeln für die Datenbank
     const orgIdToSave = organizationId === 'none' ? null : organizationId;
     
+    // Organisationsnamen und -logo ermitteln
+    let orgNameToSave = null;
+    let orgLogoToSave = null;
+    
+    if (orgIdToSave) {
+      const selectedOrg = organizations.find(org => org._id === orgIdToSave);
+      if (selectedOrg) {
+        orgNameToSave = selectedOrg.name;
+        orgLogoToSave = selectedOrg.logo;
+      }
+    }
+    
     try {
       const response = await fetch(`/api/users/${clerkId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ organizationId: orgIdToSave }),
+        body: JSON.stringify({
+          organizationId: orgIdToSave,
+          organizationName: orgNameToSave,
+          organizationLogo: orgLogoToSave
+        }),
       });
 
       if (!response.ok) {
@@ -578,22 +610,36 @@ export function UserTable() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Select 
-                      value={user.organizationId || 'none'} 
-                      onValueChange={(value) => updateUserOrganization(user.clerkId, value)}
-                    >
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Organisation wählen" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Keine Organisation</SelectItem>
-                        {organizations.map((org) => (
-                          <SelectItem key={org._id} value={org._id}>
-                            {org.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex flex-col gap-1">
+                      <Select 
+                        value={user.organizationId || 'none'} 
+                        onValueChange={(value) => updateUserOrganization(user.clerkId, value)}
+                      >
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Organisation wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Keine Organisation</SelectItem>
+                          {organizations.map((org) => (
+                            <SelectItem key={org._id} value={org._id}>
+                              {org.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {user.organizationName && (
+                        <span className="text-xs text-gray-500 flex items-center">
+                          {user.organizationLogo && (
+                            <img 
+                              src={user.organizationLogo} 
+                              alt={user.organizationName} 
+                              className="w-4 h-4 mr-1 rounded-sm"
+                            />
+                          )}
+                          {user.organizationName}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {user.createdAt ? formatDistanceToNow(new Date(user.createdAt), { 

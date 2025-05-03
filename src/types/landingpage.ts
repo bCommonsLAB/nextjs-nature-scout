@@ -4,7 +4,8 @@ export interface HabitatCardProps {
     location: string;
     recorder: string;
     status: string,
-    org: string
+    org: string,
+    orgLogo?: string
 }
 
 export interface FeatureCardProps {

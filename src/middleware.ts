@@ -5,6 +5,8 @@ const isPublicRoute = createRouteMatcher([
   // Öffentliche Seiten
   "/",
   "/habitat/karte",
+  "/unsere-habitate",
+  "/api/public-filter-options",
   
   // API-Routen
   "/api/habitat/public",
@@ -12,6 +14,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/habitat/categories",
   "/api/habitat/categoriesDict",
   "/api/organizations",
+  "/api/init/db-indexes",
   
   // Webhook-Routen
   "/api/webhook/clerk",

@@ -40,41 +40,6 @@ const features = [
   }
 ];
 
-// Demohabitate, die durch echte Daten ersetzt werden
-const demoHabitats = [
-  { 
-    imageSrc: "/panoramasamples/magerwiese-artenreich.jpg", 
-    title: "Magerwiese artenreich", 
-    location: "Meran", 
-    recorder: "Anna Mayer",
-    status: "hochwertig",
-    org: "AVS Meran"
-  },
-  { 
-    imageSrc: "/panoramasamples/fettwiese-standard.jpg", 
-    title: "Fettwiese", 
-    location: "Brixen", 
-    recorder: "Thomas Hofer",
-    status: "standard",
-    org: "Heimatpflegeverband Südtirol"
-  },
-  { 
-    imageSrc: "/panoramasamples/verlandungsmoor.jpg", 
-    title: "Verlandungsmoor", 
-    location: "Bozen", 
-    recorder: "Lisa Pichler",
-    status: "gesetzlich",
-    org: "Klima Club Südtirol"
-  },
-  { 
-    imageSrc: "/panoramasamples/trockenrasen-kurzgrasig.jpg", 
-    title: "Trockenrasen kurzgrasig", 
-    location: "Schlanders", 
-    recorder: "Michael Gruber",
-    status: "gesetzlich",
-    org: "Umweltschutzgruppe Vinschgau"
-  }
-];
 
 const processSteps = [
   {
@@ -102,6 +67,8 @@ interface HabitatEntry {
     gemeinde?: string;
     flurname?: string;
     bilder?: Array<{url: string}>;
+    organizationName?: string;
+    organizationLogo?: string;
     [key: string]: unknown;
   };
   result?: {
@@ -109,6 +76,46 @@ interface HabitatEntry {
     schutzstatus?: string;
   };
 }
+
+// Demohabitate, die durch echte Daten ersetzt werden
+const demoHabitats = [
+  { 
+    imageSrc: "/panoramasamples/magerwiese-artenreich.jpg", 
+    title: "Magerwiese artenreich", 
+    location: "Meran", 
+    recorder: "Anna Mayer",
+    status: "hochwertig",
+    org: "AVS Meran",
+    orgLogo: "/images/habitat-placeholder.jpg"
+  },
+  { 
+    imageSrc: "/panoramasamples/fettwiese-standard.jpg", 
+    title: "Fettwiese", 
+    location: "Brixen", 
+    recorder: "Thomas Hofer",
+    status: "standard",
+    org: "Heimatpflegeverband Südtirol",
+    orgLogo: "/images/habitat-placeholder.jpg"
+  },
+  { 
+    imageSrc: "/panoramasamples/verlandungsmoor.jpg", 
+    title: "Verlandungsmoor", 
+    location: "Bozen", 
+    recorder: "Lisa Pichler",
+    status: "gesetzlich",
+    org: "Klima Club Südtirol",
+    orgLogo: "/images/habitat-placeholder.jpg"
+  },
+  { 
+    imageSrc: "/panoramasamples/trockenrasen-kurzgrasig.jpg", 
+    title: "Trockenrasen kurzgrasig", 
+    location: "Schlanders", 
+    recorder: "Michael Gruber",
+    status: "gesetzlich",
+    org: "Umweltschutzgruppe Vinschgau",
+    orgLogo: "/images/habitat-placeholder.jpg"
+  }
+];
 
 export function NatureScoutPage() {
   //console.log('NatureScoutPage Component wird gerendert');
@@ -240,9 +247,10 @@ export function NatureScoutPage() {
                             imageSrc={habitat.metadata.bilder?.[0]?.url || '/images/habitat-placeholder.jpg'}
                             title={habitat.result?.habitattyp || 'Unbekanntes Habitat'}
                             location={habitat.metadata.gemeinde || 'Unbekannter Ort'}
-                            recorder={habitat.metadata.erfassungsperson || 'Unbekannt'}
+                            recorder={habitat.metadata.erfassungsperson || ''}
                             status={mapSchutzstatusToStatus(habitat.result?.schutzstatus || '')}
-                            org=""
+                            org={habitat.metadata.organizationName || ''}
+                            orgLogo={habitat.metadata.organizationLogo || ''}
                           />
                         </div>
                       ))

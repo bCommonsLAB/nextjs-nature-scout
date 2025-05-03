@@ -11,7 +11,7 @@ import {
 import { Loader2 } from 'lucide-react';
 
 interface PublicFilterSelectProps {
-  type: 'gemeinden' | 'habitate' | 'familien' | 'schutzstati' | 'personen' | 'verifizierungsstatus';
+  type: 'gemeinden' | 'habitate' | 'familien' | 'schutzstati' | 'personen' | 'verifizierungsstatus' | 'organizations';
   value: string;
   onValueChange: (value: string) => void;
   placeholder: string;

@@ -63,6 +63,9 @@ export default function NatureScout() {
   const [aktiverSchritt, setAktiverSchritt] = useState(0);
   const [metadata, setMetadata] = useState<NatureScoutData>({
     erfassungsperson: "",
+    organizationId: "",
+    organizationName: "",
+    organizationLogo: "",
     email: "",
     gemeinde: "",
     flurname: "",
@@ -122,6 +125,9 @@ export default function NatureScout() {
             
             setMetadata({
               erfassungsperson: habitatData.metadata.erfassungsperson || "",
+              organizationId: habitatData.metadata.organizationId || "",
+              organizationName: habitatData.metadata.organizationName || "",
+              organizationLogo: habitatData.metadata.organizationLogo || "",
               email: habitatData.metadata.email || "",
               gemeinde: habitatData.metadata.gemeinde || "",
               flurname: habitatData.metadata.flurname || "",

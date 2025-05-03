@@ -69,6 +69,8 @@ export async function PATCH(
       email, 
       role, 
       organizationId, 
+      organizationName,
+      organizationLogo,
       consent_data_processing, 
       consent_image_ccby, 
       habitat_name_visibility 
@@ -97,6 +99,8 @@ export async function PATCH(
       ...(email !== undefined ? { email } : {}),
       ...(isAdmin && role ? { role } : {}),
       ...(organizationId !== undefined ? { organizationId } : {}),
+      ...(organizationName !== undefined ? { organizationName } : {}),
+      ...(organizationLogo !== undefined ? { organizationLogo } : {}),
       // Consent-Felder können vom Benutzer selbst aktualisiert werden
       ...(consent_data_processing !== undefined ? { consent_data_processing } : {}),
       ...(consent_image_ccby !== undefined ? { consent_image_ccby } : {}),

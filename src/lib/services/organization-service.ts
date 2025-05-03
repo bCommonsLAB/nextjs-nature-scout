@@ -27,14 +27,19 @@ export class OrganizationService {
   static async createOrganizationIndexes(): Promise<void> {
     const collection = await this.getOrganizationsCollection();
     
-    // Index auf name für schnellere Suche und Sortierung
-    await collection.createIndex({ name: 1 });
-    
-    // Index auf email für Suche nach E-Mail-Adressen
+    // Grundlegende Indizes
+    await collection.createIndex({ name: 1 }, { unique: true });
     await collection.createIndex({ email: 1 }, { sparse: true });
-    
-    // Index auf createdAt für zeitbasierte Abfragen
     await collection.createIndex({ createdAt: -1 });
+    
+    // Volltext-Index für Suche in Name und Beschreibung
+    await collection.createIndex(
+      { name: 'text', description: 'text' },
+      { name: 'org_text_search' }
+    );
+    
+    // Indizes für Sortierfelder
+    await collection.createIndex({ updatedAt: -1 });
     
     console.log('Organization-Indizes erfolgreich erstellt');
   }

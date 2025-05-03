@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { Sort as MongoSort } from 'mongodb';
 import { connectToDatabase } from '@/lib/services/db';
 import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
+import { auth } from '@clerk/nextjs/server';
 
 // Definiere die Typen
 interface MongoFilter {
@@ -23,8 +24,29 @@ export async function GET(request: Request) {
   const includeFilterOptions = searchParams.get('includeFilterOptions') === 'true';
   
   try {
+    // Hole aktuelle Session mit Clerk, um den aktuellen Benutzer und seine Organisation zu identifizieren
+    const { userId } = await auth();
+        
+    // Nutzerinformationen abrufen, falls angemeldet
+    let currentUserEmail: string | null = null;
+    let currentUserOrgId: string | null = null;
+
     const db = await connectToDatabase();
     const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
+    const usersCollection = db.collection('users');
+    
+    if (userId) {
+      // Benutzerinformationen aus der Datenbank holen
+      const currentUserData = await usersCollection.findOne(
+        { clerkId: userId },
+        { projection: { email: 1, organizationId: 1 } }
+      );
+      
+      if (currentUserData) {
+        currentUserEmail = currentUserData.email;
+        currentUserOrgId = currentUserData.organizationId;
+      }
+    }
     
     // Suchfilter erstellen
     const filter: MongoFilter = {
@@ -133,6 +155,22 @@ export async function GET(request: Request) {
       }
     }
     
+    const organization = searchParams.get('organization');
+    if (organization) {
+      // Prüfen, ob es mehrere Werte sind (durch Komma getrennt)
+      const organizationValues = organization.split(',');
+      if (organizationValues.length > 1) {
+        if (!filter['$or']) filter['$or'] = [];
+        // ODER-Verknüpfung für mehrere Organisationen
+        const organizationConditions = organizationValues.map(o => ({ 
+          'metadata.organizationName': { $regex: `^${o}$`, $options: 'i' }
+        }));
+        filter['$or'].push(...organizationConditions);
+      } else {
+        filter['metadata.organizationName'] = organization;
+      }
+    }
+    
     if (searchTerm) {
       if (!filter['$or']) {
         filter['$or'] = [];
@@ -190,6 +228,14 @@ export async function GET(request: Request) {
         { $sort: { _id: 1 } }
       ]).toArray();
       
+      // Alle Organisationen abrufen
+      const organisationen = await collection.aggregate([
+        { $match: baseFilter },
+        { $group: { _id: '$metadata.organizationName' } },
+        { $match: { _id: { $ne: null } } },
+        { $sort: { _id: 1 } }
+      ]).toArray();
+      
       filterOptions = {
         gemeinden: gemeindenAgg.map(item => item._id).filter(Boolean),
         habitattypen: habitattypenAgg.map(item => item._id).filter(Boolean),
@@ -197,7 +243,8 @@ export async function GET(request: Request) {
         schutzstatusList: schutzstatusList.map(item => item._id).filter(Boolean).map(status => 
           normalizeSchutzstatus(status)
         ),
-        personen: personen.map(item => item._id).filter(Boolean)
+        personen: personen.map(item => item._id).filter(Boolean),
+        organizations: organisationen.map(item => item._id).filter(Boolean)
       };
     }
     
@@ -221,6 +268,7 @@ export async function GET(request: Request) {
         updatedAt: 1,
         verified: 1,
         'metadata.erfassungsperson': 1,
+        'metadata.email': 1,  // Email des Erfassers hinzufügen, um später zu prüfen
         'metadata.gemeinde': 1,
         'metadata.flurname': 1,
         'metadata.bilder': 1,
@@ -228,6 +276,9 @@ export async function GET(request: Request) {
         'metadata.longitude': 1,
         'metadata.standort': 1,
         'metadata.polygonPoints': 1,
+        'metadata.organizationId': 1,
+        'metadata.organizationName': 1,
+        'metadata.organizationLogo': 1,
         'result.habitattyp': 1,
         'result.schutzstatus': 1,
         'result.habitatfamilie': 1,
@@ -239,16 +290,64 @@ export async function GET(request: Request) {
       })
       .toArray();
     
-    // Validiere die Einträge, insbesondere den schutzstatus
-    const validatedEntries = entries.map((entry) => {
+    // Sammle alle einzigartigen E-Mails aus den Einträgen
+    const emailsToCheck = Array.from(new Set<string>(
+      entries
+        .map(entry => entry.metadata?.email)
+        .filter(Boolean)
+    ));
+    
+    // Lade Benutzerinformationen für alle E-Mails in einem einzigen Aufruf
+    const usersData = await usersCollection.find(
+      { email: { $in: emailsToCheck } },
+      { projection: { email: 1, habitat_name_visibility: 1, organizationId: 1 } }
+    ).toArray();
+    
+    // Erstelle eine Map für schnellen Zugriff auf Benutzerinformationen
+    const userVisibilityMap = new Map<string, {
+      habitat_name_visibility: string;
+      organizationId: string | null;
+    }>();
+    
+    usersData.forEach(user => {
+      userVisibilityMap.set(user.email, {
+        habitat_name_visibility: user.habitat_name_visibility || 'private',
+        organizationId: user.organizationId
+      });
+    });
+    
+    // Anonymisiere Einträge basierend auf den Sichtbarkeitseinstellungen
+    const anonymizedEntries = entries.map(entry => {
+      // Prüfe, ob der Erfasser des Habitats angezeigt werden darf
+      const userEmail = entry.metadata?.email;
+      const userData = userEmail ? userVisibilityMap.get(userEmail) : null;
+      
+      // Wenn keine Benutzerinformationen gefunden wurden, vorsichtshalber anonymisieren
+      if (!userData) {
+        entry.metadata.erfassungsperson = '';
+      } 
+      // Anonymisieren, wenn keine öffentliche Sichtbarkeit UND nicht in derselben Organisation
+      else if (
+        userData.habitat_name_visibility !== 'public' &&
+        !(currentUserOrgId && userData.organizationId && 
+          userData.organizationId.toString() === currentUserOrgId.toString())
+      ) {
+        entry.metadata.erfassungsperson = '';
+      }
+      
+      // E-Mail-Adresse entfernen, da sie nur für die Prüfung benötigt wurde
+      delete entry.metadata.email;
+      
+      // Schutzstatus normalisieren
       if (entry.result?.schutzstatus) {
         entry.result.schutzstatus = normalizeSchutzstatus(entry.result.schutzstatus);
       }
+      
       return entry;
     });
     
     return NextResponse.json({
-      entries: validatedEntries,
+      entries: anonymizedEntries,
       filterOptions,
       pagination: {
         total,

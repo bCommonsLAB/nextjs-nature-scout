@@ -11,6 +11,7 @@ interface MongoFilter {
   'metadata.email'?: string;
   'metadata.erfassungsperson'?: string;
   'metadata.gemeinde'?: string;
+  'metadata.organizationName'?: string;
   'result.habitattyp'?: string | { $regex: string, $options: string };
   'result.schutzstatus'?: string;
   verified?: boolean | { $exists: boolean } | { $ne: boolean };
@@ -33,6 +34,9 @@ interface MongoDocument extends Document {
     longitude?: number;
     bilder?: Array<{url: string}>;
     kommentar?: string;
+    organizationId?: string;
+    organizationName?: string;
+    organizationLogo?: string;
     [key: string]: unknown;
   };
   result?: {
@@ -124,6 +128,11 @@ export async function GET(request: Request) {
     const habitat = searchParams.get('habitat');
     if (habitat) {
       filter['result.habitattyp'] = habitat;
+    }
+    
+    const organization = searchParams.get('organization');
+    if (organization) {
+      filter['metadata.organizationName'] = organization;
     }
     
     const habitatfamilie = searchParams.get('habitatfamilie');
@@ -228,6 +237,9 @@ export async function GET(request: Request) {
         'metadata.latitude': 1, // Koordinaten hinzufügen
         'metadata.longitude': 1,
         'metadata.standort': 1, // Standort hinzufügen
+        'metadata.organizationId': 1, // Organisationsdaten hinzufügen
+        'metadata.organizationName': 1,
+        'metadata.organizationLogo': 1,
         'result.habitattyp': 1,
         'result.schutzstatus': 1,
         'result.habitatfamilie': 1, // Habitatfamilie hinzufügen

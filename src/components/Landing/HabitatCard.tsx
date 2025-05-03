@@ -1,7 +1,8 @@
 import * as React from "react";
+import { useState } from "react";
 import { HabitatCardProps } from "../../types/landingpage";
 import { Card, CardContent } from "@/components/ui/card";
-import { MapPin, User } from "lucide-react";
+import { MapPin, User, Building } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 
@@ -11,10 +12,12 @@ export const HabitatCard: React.FC<HabitatCardProps> = ({
     location,
     recorder,
     status,
-    org
+    org,
+    orgLogo
 }) => {
+    // Logo-Verfügbarkeit überwachen
+    const [logoError, setLogoError] = useState(false);
 
-        
     function getStatusStyle(type: string): string {
       const baseStyle = "text-sm font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1";
   
@@ -51,6 +54,14 @@ export const HabitatCard: React.FC<HabitatCardProps> = ({
         />
       </div>
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+      
+      {/* Status Badge oben rechts */}
+      <div className="absolute top-4 right-4 z-20">
+        <Badge variant="outline" className={`${getStatusStyle(status)} border whitespace-nowrap`}>
+          {getStatusText(status)}
+        </Badge>
+      </div>
+      
       <CardContent className="relative z-10 flex flex-col justify-end p-4 text-white">
         <div className="flex justify-between items-end">
           <div className="space-y-1">
@@ -59,15 +70,33 @@ export const HabitatCard: React.FC<HabitatCardProps> = ({
               <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
               <span className="truncate max-w-[150px]">{location}</span>
             </div>
+            {recorder && (
             <div className="flex items-center text-sm">
               <User className="w-4 h-4 mr-1 flex-shrink-0" />
               <span className="truncate max-w-[150px]">{recorder}</span>
             </div>
-            {org && <p className="text-sm">{org}</p>}
+            )}
+            {org && (
+            <div className="flex items-center text-sm">
+              <Building className="w-4 h-4 mr-1 flex-shrink-0" />
+              <span className="truncate max-w-[150px]">{org}</span>
+            </div>
+            )}
           </div>
-          <Badge variant="outline" className={`${getStatusStyle(status)} border whitespace-nowrap ml-2 self-end`}>
-            {getStatusText(status)}
-          </Badge>
+          
+          {/* Organisationslogo unten rechts - nur anzeigen wenn ein gültiges Logo vorhanden ist */}
+          {orgLogo && !logoError && (
+            <div className="ml-2 self-end opacity-80">
+              <Image 
+                src={orgLogo}
+                alt={org || "Organisation"}
+                width={60}
+                height={60}
+                className="rounded-full bg-white p-1"
+                onError={() => setLogoError(true)}
+              />
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

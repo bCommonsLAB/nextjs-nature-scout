@@ -3,7 +3,7 @@ import { getAuth } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
 
 // GET /api/users - Holt alle Benutzer (nur für Admins)
-export async function GET(req: NextRequest) {
+export async function GET(req: Request) {
   try {
     const auth = getAuth(req);
     const userId = auth.userId;
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/users - Erstellt einen neuen Benutzer oder aktualisiert einen bestehenden
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
     const auth = getAuth(req);
     const userId = auth.userId;
@@ -45,7 +45,15 @@ export async function POST(req: NextRequest) {
     }
     
     const body = await req.json();
-    const { clerkId, email, name, role } = body;
+    const { 
+      clerkId, 
+      email, 
+      name, 
+      role, 
+      organizationId, 
+      organizationName, 
+      organizationLogo 
+    } = body;
     
     if (!clerkId || !email || !name) {
       return NextResponse.json({ error: 'clerkId, email und name sind erforderlich' }, { status: 400 });
@@ -56,11 +64,26 @@ export async function POST(req: NextRequest) {
     
     if (existingUser) {
       // Benutzer aktualisieren
-      const updatedUser = await UserService.updateUser(clerkId, { email, name, role });
+      const updatedUser = await UserService.updateUser(clerkId, { 
+        email, 
+        name, 
+        role, 
+        organizationId, 
+        organizationName, 
+        organizationLogo 
+      });
       return NextResponse.json(updatedUser);
     } else {
       // Neuen Benutzer erstellen
-      const newUser = await UserService.createUser({ clerkId, email, name, role });
+      const newUser = await UserService.createUser({ 
+        clerkId, 
+        email, 
+        name, 
+        role, 
+        organizationId, 
+        organizationName, 
+        organizationLogo 
+      });
       return NextResponse.json(newUser, { status: 201 });
     }
   } catch (error) {

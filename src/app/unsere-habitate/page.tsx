@@ -24,6 +24,8 @@ interface HabitatEntry {
     gemeinde?: string;
     flurname?: string;
     bilder?: Array<{url: string}>;
+    organizationName?: string;
+    organizationLogo?: string;
     [key: string]: unknown;
   };
   result?: {
@@ -63,6 +65,7 @@ function UnsereHabitateContent() {
   const habitatfamilieParam = searchParams.get('habitatfamilie') || '';
   const schutzstatusParam = searchParams.get('schutzstatus') || '';
   const personParam = searchParams.get('person') || '';
+  const organizationParam = searchParams.get('organization') || '';
   
   // Arrays für Mehrfachauswahl erstellen
   const [gemeindeValues, setGemeindeValues] = useState<string[]>(gemeindeParam ? gemeindeParam.split(',') : []);
@@ -70,6 +73,7 @@ function UnsereHabitateContent() {
   const [habitatfamilieValues, setHabitatfamilieValues] = useState<string[]>(habitatfamilieParam ? habitatfamilieParam.split(',') : []);
   const [schutzstatusValues, setSchutzstatusValues] = useState<string[]>(schutzstatusParam ? schutzstatusParam.split(',') : []);
   const [personValues, setPersonValues] = useState<string[]>(personParam ? personParam.split(',') : []);
+  const [organizationValues, setOrganizationValues] = useState<string[]>(organizationParam ? organizationParam.split(',') : []);
   const [verifizierungValues, setVerifizierungValues] = useState<string[]>(
     verifizierungsstatus !== 'alle' ? [verifizierungsstatus] : []
   );
@@ -81,6 +85,7 @@ function UnsereHabitateContent() {
     habitatfamilieValues.length > 0,
     schutzstatusValues.length > 0,
     personValues.length > 0,
+    organizationValues.length > 0,
     verifizierungValues.length > 0,
     search !== ''
   ].filter(Boolean).length;
@@ -104,6 +109,7 @@ function UnsereHabitateContent() {
         if (habitatfamilieValues.length > 0) queryParams.set('habitatfamilie', habitatfamilieValues.join(','));
         if (schutzstatusValues.length > 0) queryParams.set('schutzstatus', schutzstatusValues.join(','));
         if (personValues.length > 0) queryParams.set('person', personValues.join(','));
+        if (organizationValues.length > 0) queryParams.set('organization', organizationValues.join(','));
         if (verifizierungValues.length > 0) queryParams.set('verifizierungsstatus', verifizierungValues.join(','));
         
         const response = await fetch(`/api/habitat/public?${queryParams.toString()}`);
@@ -127,7 +133,7 @@ function UnsereHabitateContent() {
     };
     
     fetchData();
-  }, [page, sortBy, sortOrder, search, gemeindeValues, habitatValues, habitatfamilieValues, schutzstatusValues, personValues, verifizierungValues]);
+  }, [page, sortBy, sortOrder, search, gemeindeValues, habitatValues, habitatfamilieValues, schutzstatusValues, personValues, organizationValues, verifizierungValues]);
   
   // Seitenwechsel
   const handlePageChange = (newPage: number) => {
@@ -188,6 +194,7 @@ function UnsereHabitateContent() {
     setHabitatfamilieValues([]);
     setSchutzstatusValues([]);
     setPersonValues([]);
+    setOrganizationValues([]);
     setVerifizierungValues([]);
     setSearchInput('');
     
@@ -317,6 +324,17 @@ function UnsereHabitateContent() {
                   verifizierungsstatus={verifizierungValues.join(',')}
                 />
               </div>
+              
+              {/* Organisations Filter */}
+              <div className="space-y-2">
+                <MultiSelectFilter
+                  type="organizations"
+                  value={organizationValues}
+                  onValueChange={(value) => setOrganizationValues(value)}
+                  placeholder="Organisation"
+                  verifizierungsstatus={verifizierungValues.join(',')}
+                />
+              </div>
 
               {/* Verifizierungsstatus Filter */}
               <div className="space-y-2">
@@ -366,6 +384,11 @@ function UnsereHabitateContent() {
                   {personValues.length > 0 && (
                     <Badge variant="secondary" className="text-xs">
                       Erfasser: {personValues.join(', ')}
+                    </Badge>
+                  )}
+                  {organizationValues.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      Organisation: {organizationValues.join(', ')}
                     </Badge>
                   )}
                   {verifizierungValues.length > 0 && (
@@ -432,9 +455,10 @@ function UnsereHabitateContent() {
                       imageSrc={habitat.metadata.bilder?.[0]?.url || '/images/habitat-placeholder.jpg'}
                       title={habitat.result?.habitattyp || 'Unbekanntes Habitat'}
                       location={habitat.metadata.gemeinde || 'Unbekannter Ort'}
-                      recorder={habitat.metadata.erfassungsperson || 'Unbekannt'}
+                      recorder={habitat.metadata.erfassungsperson || ''}
                       status={mapSchutzstatusToStatus(habitat.result?.schutzstatus || '')}
-                      org=""
+                      org={habitat.metadata.organizationName || ''}
+                      orgLogo={habitat.metadata.organizationLogo || ''}
                     />
                   </div>
                 ))}

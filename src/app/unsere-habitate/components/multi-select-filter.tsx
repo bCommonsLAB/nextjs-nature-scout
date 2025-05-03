@@ -11,7 +11,7 @@ interface FilterOption {
 }
 
 interface MultiSelectFilterProps {
-  type: 'gemeinden' | 'habitate' | 'familien' | 'schutzstati' | 'personen' | 'verifizierungsstatus';
+  type: 'gemeinden' | 'habitate' | 'familien' | 'schutzstati' | 'personen' | 'verifizierungsstatus' | 'organizations';
   value: string[];
   onValueChange: (values: string[]) => void;
   placeholder: string;
