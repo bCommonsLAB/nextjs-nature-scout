@@ -107,6 +107,7 @@ interface MapNoSSRProps {
   showPositionMarker?: boolean;        // Flag, ob Positionsmarker angezeigt werden soll
   habitats?: Habitat[];                // Liste der anzuzeigenden Habitate
   onHabitatClick?: (habitatId: string) => void; // Callback, wenn auf ein Habitat geklickt wird
+  onClick?: () => void;                // Callback für Klick auf die Karte außerhalb eines Habitats
   schutzstatus?: string;               // Optionaler Schutzstatus für das eigene Polygon (geschützt/hochwertig/niederwertig)
 }
 
@@ -125,6 +126,7 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
   showPositionMarker = true,
   habitats = [],
   onHabitatClick,
+  onClick,
   schutzstatus = 'niederwertig'  // Standardwert: niederwertig
 }, ref) => {
   // Debug-Log für Rendering und Zustandsänderungen
@@ -454,6 +456,9 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
           onCenterChange([newCenter.lat, newCenter.lng]);
         }
       });
+      
+      // Event-Listener für Klicks auf die Karte werden bei der Initialisierung hinzugefügt
+      // Diese werden in einem separaten useEffect-Hook verwaltet, siehe unten
       
       // Event-Listener für Zoom-Änderungen
       // Wird ausgelöst, wenn der Nutzer den Zoom-Level ändert
@@ -931,6 +936,39 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
       }
     }
   }, [initialPolygon, editMode, polygonOptions, onAreaChange, calculateArea]);
+
+  // Klick-Handler für die Karte aktualisieren, wenn sich onClick ändert
+  useEffect(() => {
+    if (!mapRef.current) return;
+    
+    // Handler-Funktion, die wir für Cleanup wiederverwenden können
+    const clickHandler = (e: any) => {
+      // Prüfen, ob ein Klick auf ein Element des Habitat-Layers erfolgt ist
+      // Wenn nicht, den allgemeinen onClick-Handler aufrufen
+      console.log('Map-Click erkannt:', e.latlng);
+      
+      // Verzögerung hinzufügen, um sicherzustellen, dass der Event nicht von einem Habitat-Klick stammt
+      // (Leaflet löst den Event für beide aus, aber der Habitat-Click-Handler wird zuerst ausgeführt)
+      setTimeout(() => {
+        if (onClick) onClick();
+      }, 10);
+    };
+    
+    // Bestehende Click-Listener entfernen (ohne spezifischen Parameter)
+    mapRef.current.off('click');
+    
+    // Nur wenn onClick definiert ist, den neuen Handler hinzufügen
+    if (onClick) {
+      console.log('Registriere Map-Click-Handler:', new Date().toISOString());
+      mapRef.current.on('click', clickHandler);
+    }
+    
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.off('click', clickHandler);
+      }
+    };
+  }, [onClick]);
 
   // Habitat-Anzeige aktualisieren, wenn sich habitats ändert oder Map geladen ist
   useEffect(() => {

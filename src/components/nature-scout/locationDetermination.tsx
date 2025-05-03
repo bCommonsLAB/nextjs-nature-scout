@@ -392,7 +392,8 @@ export function LocationDetermination({
         flurname: data.flurname || 'unbekannt',
         elevation: data.elevation || 'unbekannt',
         exposition: data.exposition || 'unbekannt',
-        slope: data.slope || 'unbekannt'
+        slope: data.slope || 'unbekannt',
+        kataster: data.kataster // Katasterdaten speichern, wenn vorhanden
       }));
       
       // Anzeige der Standortinformationen aktivieren
@@ -408,7 +409,8 @@ export function LocationDetermination({
         flurname: 'unbekannt',
         elevation: 'unbekannt',
         exposition: 'unbekannt',
-        slope: 'unbekannt'
+        slope: 'unbekannt',
+        kataster: undefined // Katasterdaten zurücksetzen
       }));
     } finally {
       setIsLoadingGeodata(false);
@@ -633,6 +635,7 @@ export function LocationDetermination({
           showPositionMarker={mapMode === 'navigation'}
           habitats={existingHabitats}
           onHabitatClick={handleHabitatClick}
+          onClick={handleMapClick}
         />
         
         {/* Status-Anzeige während Habitate geladen werden */}
@@ -658,7 +661,31 @@ export function LocationDetermination({
               
               return (
                 <div className="space-y-1">
-                  <h3 className="font-bold text-base">Bestehendes Habitat:</h3>
+                  <div className="flex justify-between items-start">
+                    <h3 className="font-bold text-base">Bestehendes Habitat:</h3>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 -mr-1 -mt-1"
+                      onClick={() => setSelectedHabitatId(null)}
+                    >
+                      <span className="sr-only">Schließen</span>
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        width="16" 
+                        height="16" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                      >
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </Button>
+                  </div>
                   <p className="text-sm">{habitat.name}</p>
                   {habitat.metadata?.gemeinde && (
                     <p className="text-xs">Gemeinde: {habitat.metadata.gemeinde}</p>
@@ -710,6 +737,39 @@ export function LocationDetermination({
                 <div className="font-medium">{metadata.exposition && metadata.exposition !== 'unbekannt' ? metadata.exposition : '-'}</div>
                 <div className="text-gray-200">Fläche:</div>
                 <div className="font-medium">{metadata.plotsize ? `${metadata.plotsize.toLocaleString('de-DE')} m²` : '-'}</div>
+                
+                {/* Katasterdaten */}
+                {metadata.kataster && (
+                  <>
+                    <div className="col-span-2 mt-1 border-t border-gray-600 pt-1">
+                      <div className="font-semibold mb-0.5">Kataster</div>
+                    </div>
+                    {metadata.kataster.parzellennummer && (
+                      <>
+                        <div className="text-gray-200">Parzelle:</div>
+                        <div className="font-medium">{metadata.kataster.parzellennummer}</div>
+                      </>
+                    )}
+                    {metadata.kataster.flaeche && (
+                      <>
+                        <div className="text-gray-200">Katasterfläche:</div>
+                        <div className="font-medium">{metadata.kataster.flaeche.toLocaleString('de-DE')} m²</div>
+                      </>
+                    )}
+                    {metadata.kataster.katastralgemeinde && (
+                      <>
+                        <div className="text-gray-200">Katastralgemeinde:</div>
+                        <div className="font-medium">{metadata.kataster.katastralgemeinde}</div>
+                      </>
+                    )}
+                    {metadata.kataster.katastralgemeindeKodex && (
+                      <>
+                        <div className="text-gray-200">K.G. Kodex:</div>
+                        <div className="font-medium">{metadata.kataster.katastralgemeindeKodex}</div>
+                      </>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>

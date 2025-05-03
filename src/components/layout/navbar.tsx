@@ -254,9 +254,9 @@ export function Navbar() {
   const showOnlyLogo = inConsentFlow;
 
   return (
-    <header className="flex flex-col justify-center px-16 w-full bg-stone-50 min-h-[72px] max-md:px-5">
-      <nav className="flex flex-wrap gap-10 justify-between items-center w-full">
-        <div className="flex justify-center items-center self-stretch my-auto max-w-[198px]">
+    <header className="flex flex-col justify-center px-4 md:px-16 w-full bg-stone-50 min-h-[72px]">
+      <nav className="flex flex-wrap gap-5 md:gap-10 justify-between items-center w-full">
+        <div className="flex justify-center items-center self-stretch my-auto max-w-[160px] md:max-w-[198px]">
           <Link href="/">
             <Image
               src="/images/naturescout-normal.svg"
@@ -264,7 +264,7 @@ export function Navbar() {
               width={213}
               height={36}
               priority
-              className="h-[36px] object-contain"
+              className="h-[32px] md:h-[36px] object-contain"
               style={{ width: 'auto' }}
             />
           </Link>

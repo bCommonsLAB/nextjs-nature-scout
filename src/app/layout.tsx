@@ -37,6 +37,7 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: "Nature Scout",
   description: "Habitate finden und bewerten",
+  viewport: "width=device-width, initial-scale=1.0",
 };
 
 export default function RootLayout({

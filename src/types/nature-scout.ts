@@ -16,6 +16,14 @@ export interface NatureScoutData {
   slope?: string;
   plotsize?: number;
   polygonPoints?: Array<[number, number]>;
+  kataster?: {
+    parzellennummer?: string;
+    flaeche?: number;
+    katastralgemeinde?: string;
+    katastralgemeindeKodex?: string;
+    gemeinde?: string;
+    istatKodex?: string;
+  };
   bilder: Bild[];
   analyseErgebnis?: AnalyseErgebnis;
   llmInfo?: llmInfo;
@@ -29,6 +37,14 @@ export interface GeocodingResult {
   elevation?: string;
   exposition?: string;
   slope?: string;
+  kataster?: {
+    parzellennummer?: string;
+    flaeche?: number;
+    katastralgemeinde?: string;
+    katastralgemeindeKodex?: string;
+    gemeinde?: string;
+    istatKodex?: string;
+  };
 }
 
 
