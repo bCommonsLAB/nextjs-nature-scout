@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import Image from 'next/image';
 import { Button } from "../ui/button";
 
-const SAMPLE_IMAGES = [
+let SAMPLE_IMAGES = [
   {
     src: '/habitatsamples/trockenrasen-kurzgrasig.jpg',
     title: 'Trockenrasen kurzgrasig',
@@ -59,7 +59,8 @@ interface GetImageProps {
     filename: string,
     url: string,
     bestMatch: string,
-    result?: PlantNetResult
+    result?: PlantNetResult,
+    lowResUrl?: string
   ) => void;
   onDeleteImage: (imageKey: string) => void;
   existingImage: Bild | undefined;
@@ -78,6 +79,7 @@ export function GetImage({
   isUploading,
   setIsUploading 
 }: GetImageProps) {
+  SAMPLE_IMAGES=[]
   const [localUploadProgress, setLocalUploadProgress] = useState(0);
   const [uploadedImage, setUploadedImage] = useState<string | null>(existingImage?.url || null);
   const [progressPhase, setProgressPhase] = useState<'upload' | 'analyze' | 'complete'>('upload');
@@ -95,7 +97,7 @@ export function GetImage({
     if (existingImage?.url) {
       setUploadedImage(existingImage.url);
       setBackgroundImageStyle({
-        backgroundImage: `url("${existingImage.url}")`,
+        backgroundImage: `url("${existingImage.url.replace('.jpg', '_low.jpg')}")`,
         backgroundSize: 'contain',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
@@ -136,7 +138,7 @@ export function GetImage({
     };
   }, [isUploading, localUploadProgress, progressPhase]);
 
-  async function uploadImage(imageUrl: string, filename: string): Promise<{ url: string; filename: string }> {
+  async function uploadImage(imageUrl: string, filename: string): Promise<{ url: string; lowResUrl: string; filename: string }> {
     const response = await fetch(imageUrl);
     const blob = await response.blob();
     const file = new File([blob], filename, { type: blob.type });
@@ -159,6 +161,7 @@ export function GetImage({
     doAnalyzePlant: boolean
   ): Promise<{
     url: string;
+    lowResUrl: string;
     filename: string;
     analysis: PlantNetResponse | null;
   }> {
@@ -190,7 +193,8 @@ export function GetImage({
 
     setProgressPhase('complete');
     return { 
-      url: uploadResult.url, 
+      url: uploadResult.url,
+      lowResUrl: uploadResult.lowResUrl, 
       filename: uploadResult.filename, 
       analysis 
     };
@@ -205,7 +209,7 @@ export function GetImage({
     setLocalUploadProgress(5);
 
     try {
-      const { url, filename, analysis } = await processImage(
+      const { url, lowResUrl, filename, analysis } = await processImage(
         file,
         file.name,
         doAnalyzePlant
@@ -214,6 +218,7 @@ export function GetImage({
       updateUIWithImage(url, {
         imageTitle,
         filename,
+        lowResUrl,
         bestMatch: analysis?.bestMatch || "",
         result: analysis?.results[0]
       });
@@ -241,7 +246,7 @@ export function GetImage({
       const pathParts = sampleSrc.split('/');
       const originalFileName = pathParts[pathParts.length - 1];
 
-      const { url, filename, analysis } = await processImage(
+      const { url, lowResUrl, filename, analysis } = await processImage(
         sampleSrc,
         originalFileName || '',
         doAnalyzePlant
@@ -250,6 +255,7 @@ export function GetImage({
       updateUIWithImage(url, {
         imageTitle,
         filename,
+        lowResUrl,
         bestMatch: analysis?.bestMatch || "",
         result: analysis?.results[0]
       });
@@ -273,6 +279,7 @@ export function GetImage({
     data: { 
       imageTitle: string;
       filename: string;
+      lowResUrl: string;
       bestMatch: string;
       result?: PlantNetResult;
     }
@@ -291,7 +298,8 @@ export function GetImage({
       data.filename,
       url,
       data.bestMatch,
-      data.result
+      data.result,
+      data.lowResUrl
     );
   }
 
@@ -347,37 +355,38 @@ export function GetImage({
                 <p className="text-xs text-center text-gray-500">{anweisung}</p>
                 <Upload className="w-8 h-8 my-1 text-gray-400" />
                 <p className="text-xs text-gray-500">Klicken zum Hochladen</p>
-                
-                <div className="mt-1">
-                  <p className="text-xs text-gray-600">Beispielbilder:</p>
-                  <div className="grid grid-cols-4 gap-1 mt-1">
-                  {SAMPLE_IMAGES
-                    .filter(sample => 
-                      doAnalyzePlant ? sample.type === 'plant' 
-                        : sample.type === 'habitat'
-                    )
-                    .map((sample, index) => (
-                      <button
-                        key={index}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          handleSampleImageClick(sample.src);
-                        }}
-                        className="relative w-[30px] h-[30px] rounded overflow-hidden hover:opacity-90 transition-opacity"
-                        title={sample.title}
-                      >
-                        <Image
-                          src={sample.src}
-                          alt={sample.title}
-                          width={30}
-                          height={30}
-                          className="object-cover"
-                        />
-                      </button>
-                    ))}
+                {SAMPLE_IMAGES.length > 0 && (
+                  <div className="mt-1">
+                    <p className="text-xs text-gray-600">Beispielbilder:</p>
+                    <div className="grid grid-cols-4 gap-1 mt-1">
+                    {SAMPLE_IMAGES
+                      .filter(sample => 
+                        doAnalyzePlant ? sample.type === 'plant' 
+                          : sample.type === 'habitat'
+                      )
+                      .map((sample, index) => (
+                        <button
+                          key={index}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            handleSampleImageClick(sample.src);
+                          }}
+                          className="relative w-[30px] h-[30px] rounded overflow-hidden hover:opacity-90 transition-opacity"
+                          title={sample.title}
+                        >
+                          <Image
+                            src={sample.src.replace('.jpg', '_low.jpg')}
+                            alt={sample.title}
+                            width={30}
+                            height={30}
+                            className="object-cover"
+                          />
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </>
             ) : null}
             <input 

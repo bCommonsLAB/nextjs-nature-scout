@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { NatureScoutData, GeocodingResult } from "@/types/nature-scout";
 import dynamic from 'next/dynamic';
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import 'leaflet-draw/dist/leaflet.draw.css';
 import { InstructionDialog } from "@/components/ui/instruction-dialog";
 import type { MapNoSSRHandle } from "@/components/map/mapNoSSR";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useRouter, useSearchParams } from "next/navigation";
 
 // Dynamisch geladene Karte ohne SSR
 const MapNoSSR = dynamic(() => import('@/components/map/mapNoSSR'), {
@@ -19,6 +20,42 @@ const MapNoSSR = dynamic(() => import('@/components/map/mapNoSSR'), {
 
 // Typen für den Map-Modus
 type MapMode = 'navigation' | 'polygon' | 'none';
+
+// Hilfsfunktion zur Flächenberechnung für Polygone (vereinfachte Version)
+function calculateAreaFromPoints(points: [number, number][]): number {
+  // Stellen wir sicher, dass wir genug Punkte haben
+  if (!points || points.length < 3) {
+    return 0;
+  }
+  
+  try {
+    // Vereinfachte Flächenberechnung (ungefähre Schätzung) für ebene Koordinaten
+    let area = 0;
+    
+    // Gaußsche Flächenformel implementieren (für Polygone im ebenen Koordinatensystem)
+    for (let i = 0; i < points.length; i++) {
+      const j = (i + 1) % points.length;
+      const point1 = points[i];
+      const point2 = points[j];
+      
+      if (point1 && point2 && Array.isArray(point1) && Array.isArray(point2) && 
+          point1.length >= 2 && point2.length >= 2) {
+        area += point1[0] * point2[1];
+        area -= point2[0] * point1[1];
+      }
+    }
+    
+    // Umrechnung auf Quadratmeter (grobe Näherung)
+    area = Math.abs(area) / 2.0;
+    // Anpassungsfaktor für geographische Koordinaten
+    const scaleFactor = 10000; // grobe Schätzung, abhängig von der Nähe zum Äquator
+    
+    return Math.round(area * scaleFactor);
+  } catch (error) {
+    console.error("Fehler bei der Flächenberechnung:", error);
+    return 0;
+  }
+}
 
 // Typdefinition für die Habitat-Daten aus der API
 interface HabitatFromAPI {
@@ -208,7 +245,19 @@ export function LocationDetermination({
     // Fallback-Wert für longitude verwenden, wenn undefined oder 0
     metadata.longitude && metadata.longitude !== 0 ? metadata.longitude : 11.65555
   ]);
-  const [zoom, setZoom] = useState<number>(13);
+  
+  // Initialen Zoom-Level höher setzen, wenn ein existierendes Habitat bearbeitet wird
+  const [zoom, setZoom] = useState<number>(() => {
+    // Prüfen, ob ein bestehendes Habitat mit Koordinaten vorliegt
+    const hasExistingCoordinates = metadata.latitude && metadata.longitude && 
+                                  metadata.latitude !== 0 && metadata.longitude !== 0;
+    // Bei existierendem Habitat direkter hoher Zoom (20), sonst niedriger Zoom (13)
+    return hasExistingCoordinates ? 20 : 13;
+  });
+  
+  // Initialisierungsstatus, um mehrfache Map-Initialisierungen zu verhindern
+  const [isMapInitialized, setIsMapInitialized] = useState<boolean>(false);
+  
   const [mapMode, setMapMode] = useState<MapMode>('navigation');
   const [polygonPoints, setPolygonPoints] = useState<Array<[number, number]>>(
     metadata.polygonPoints || []
@@ -244,6 +293,40 @@ export function LocationDetermination({
   // Dialog-Zustände - initial auf false setzen, wenn "Nicht mehr anzeigen" aktiviert ist
   const [showWelcomePopup, setShowWelcomePopup] = useState<boolean>(!dontShowWelcomeAgain);
   const [showPolygonPopup, setShowPolygonPopup] = useState<boolean>(false);
+
+  const [isExpert, setIsExpert] = useState<boolean>(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // Experten-Status prüfen
+  useEffect(() => {
+    async function checkExpertStatus() {
+      try {
+        const expertResponse = await fetch('/api/users/isExpert');
+        const expertData = await expertResponse.json();
+        setIsExpert(expertData.isExpert);
+      } catch (error) {
+        console.error('Fehler beim Überprüfen des Experten-Status:', error);
+        setIsExpert(false);
+      }
+    }
+    
+    checkExpertStatus();
+  }, []);
+  
+  // Effekt für die initiale Zoom-Einstellung bei Bearbeitung eines bestehenden Habitats
+  // Dieser Effekt wird nur einmal ausgeführt und befasst sich nur mit der Anzeige der Informationen
+  useEffect(() => {
+    // Prüfen, ob wir ein bestehendes Habitat bearbeiten (mit Koordinaten)
+    const editJobId = searchParams.get('editJobId');
+    const activeStep = searchParams.get('activeStep');
+    
+    if (editJobId && activeStep === 'location' && Array.isArray(metadata.polygonPoints) && metadata.polygonPoints.length > 0) {
+      // Standortinformationen anzeigen für bestehende Habitate
+      setShowLocationInfo(true);
+    }
+  }, [searchParams, metadata.polygonPoints]);
+  
 
   // Funktion zum Laden bestehender Habitate
   const loadExistingHabitats = useCallback(async () => {
@@ -287,12 +370,53 @@ export function LocationDetermination({
   // Handler für Klicks auf Habitate
   const handleHabitatClick = useCallback((habitatId: string) => {
     setSelectedHabitatId(habitatId);
+    setShowLocationInfo(true); // Informationsanzeige aktivieren
   }, []);
 
-  // Klick außerhalb eines Habitats schließt das Info-Panel
+  // Memoized Map-Position, um unnötige Re-Renderings zu verhindern
+  const memoizedPosition = useMemo(() => {
+    return currentPosition;
+  }, [currentPosition[0], currentPosition[1]]);
+  
+  // Memoized hasPolygon-Wert für stabile Referenz
+  const hasPolygon = useMemo(() => {
+    return Boolean(polygonPoints && polygonPoints.length > 0);
+  }, [polygonPoints]);
+  
+  // Weitere memoized Callbacks
+  const handlePolygonChange = useCallback((newPoints: Array<[number, number]>) => {
+    setPolygonPoints(newPoints);
+    
+    // In den Metadaten speichern
+    setMetadata(prevMetadata => ({
+      ...prevMetadata,
+      polygonPoints: newPoints
+    }));
+  }, [setMetadata]);
+  
+  const handleAreaChange = useCallback((newArea: number) => {
+    // Zusätzliche Validierung
+    if (newArea <= 0) {
+      return;
+    }
+    
+    // Nur den lokalen State aktualisieren, NICHT die Metadaten
+    // Die Metadaten werden erst beim Speichern aktualisiert
+    setAreaInSqMeters(newArea);
+  }, []);
+  
+  const handleCenterChange = useCallback((newCenter: [number, number]) => {
+    // Nur für Drag-Events, keine Auswirkung auf die gespeicherte Position
+  }, []);
+  
+  const handleZoomChange = useCallback((newZoom: number) => {
+    setZoom(newZoom);
+  }, []);
+  
   const handleMapClick = useCallback(() => {
     if (selectedHabitatId) {
       setSelectedHabitatId(null);
+      // Nur die Habitat-Auswahl zurücksetzen, aber Standortinfos weiterhin anzeigen wenn vorhanden
     }
   }, [selectedHabitatId]);
 
@@ -425,8 +549,10 @@ export function LocationDetermination({
     
     setMapMode(newMode);
     
-    // Standortinformationen nur im 'none'-Modus anzeigen
-    setShowLocationInfo(newMode === 'none');
+    // Standortinformationen im 'none'-Modus immer anzeigen
+    if (newMode === 'none') {
+      setShowLocationInfo(true);
+    }
     
     // Habitat-Auswahl zurücksetzen beim Moduswechsel
     if (selectedHabitatId) {
@@ -437,32 +563,6 @@ export function LocationDetermination({
     if (newMode === 'polygon' && !dontShowPolygonAgain) {
       setShowPolygonPopup(true);
     }
-  };
-
-  // Handler für Flächenänderungen
-  const handleAreaChange = (newArea: number) => {
-    // Zusätzliche Validierung
-    if (newArea <= 0) {
-      return;
-    }
-    
-    // Nur den lokalen State aktualisieren, NICHT die Metadaten
-    // Die Metadaten werden erst beim Speichern aktualisiert
-    setAreaInSqMeters(newArea);
-    
-    // WICHTIG: Keine Aktualisierung der Metadaten hier, um Endlosschleifen zu vermeiden
-    // setMetadata ruft einen Re-Render hervor, der wieder zu handleAreaChange führt
-  };
-
-  // Polygonpunkte aktualisieren
-  const handlePolygonChange = (newPoints: Array<[number, number]>) => {
-    setPolygonPoints(newPoints);
-    
-    // In den Metadaten speichern
-    setMetadata(prevMetadata => ({
-      ...prevMetadata,
-      polygonPoints: newPoints
-    }));
   };
 
   // Polygon abschließen
@@ -564,6 +664,69 @@ export function LocationDetermination({
     }
   }, [metadata.standort]);
   
+  // Ein einzelner Effekt für alle Map-Initialisierungs- und Positionierungslogik
+  useEffect(() => {
+    // Wenn die Karte bereits initialisiert wurde, nichts tun
+    if (isMapInitialized) {
+      console.log('Karte bereits initialisiert, überspringe wiederholte Initialisierung');
+      return;
+    }
+    
+    // Lokale Referenz auf die Karte speichern
+    const mapInstance = mapRef.current;
+    
+    // Flag zum Tracking, ob wir bereits ein Habitat geladen haben
+    const hasExistingCoordinates = metadata.latitude && metadata.longitude && 
+                                  metadata.latitude !== 0 && metadata.longitude !== 0;
+    
+    // Polygon vorhanden? Mit sicherem Zugriff auf length
+    const hasPolygon = metadata.polygonPoints && 
+                       Array.isArray(metadata.polygonPoints) && 
+                       metadata.polygonPoints.length > 0;
+    
+    // 1. Bei bestehendem Habitat: Standortinfos anzeigen
+    if (hasExistingCoordinates && hasPolygon) {
+      setShowLocationInfo(true);
+    }
+    
+    // 2. Keine Koordinaten: GPS verwenden (für neue Habitate)
+    if (!hasExistingCoordinates) {
+      console.log('Keine Koordinaten vorhanden, verwende getCurrentLocation');
+      // getCurrentLocation als Funktion direkt aufrufen, nicht als Dependency verwenden
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        getCurrentLocation();
+      }
+      // Karte als initialisiert markieren
+      setIsMapInitialized(true);
+      return; // Frühzeitiger Return, andere Positionierungslogik nicht ausführen
+    }
+    
+    // 3. Bestehende Koordinaten: Karte zentrieren (wenn Karte bereits geladen)
+    if (mapInstance && hasExistingCoordinates) {
+      // Verzögerung hinzufügen, um sicherzustellen, dass die Map vollständig geladen ist
+      const timer = setTimeout(() => {
+        console.log('Zentriere Karte auf bestehende Koordinaten:', {
+          lat: metadata.latitude,
+          lng: metadata.longitude
+        });
+        
+        // Wichtig: Zentrieren ohne Zoom-Änderung
+        if (mapInstance && metadata.latitude && metadata.longitude) {
+          mapInstance.centerMap(metadata.latitude, metadata.longitude);
+        }
+        
+        // Karte als initialisiert markieren, nachdem die Initialisierung abgeschlossen ist
+        setIsMapInitialized(true);
+      }, 100);
+      
+      // Cleanup für Timer
+      return () => clearTimeout(timer);
+    } else {
+      // Karte ohne Zentrierung als initialisiert markieren
+      setIsMapInitialized(true);
+    }
+  }, [metadata.latitude, metadata.longitude, metadata.polygonPoints, isMapInitialized]);
+  
   // Einfacher Effekt zum einmaligen Laden der Habitate beim Komponenten-Mount
   useEffect(() => {
     let isMounted = true;
@@ -591,14 +754,6 @@ export function LocationDetermination({
     };
   }, []); // Leeres Dependency-Array für einmalige Ausführung beim Mount
 
-  // Bei der ersten Initialisierung ohne gültige Position GPS verwenden
-  useEffect(() => {
-    if (!metadata.latitude && !metadata.longitude) {
-      // Nur bei der Initialisierung ohne gültige Position die GPS-Position abrufen
-      getCurrentLocation();
-    }
-  }, [metadata.latitude, metadata.longitude]);
-
   // Effekt für den Hilfe-Button
   useEffect(() => {
     if (showHelp) {
@@ -615,23 +770,20 @@ export function LocationDetermination({
   }, [showHelp, mapMode]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-9rem)]">
+    <div className="flex flex-col h-[calc(100vh-12rem)]">
       {/* Map-Container mit relativer Positionierung für überlagerte UI-Elemente */}
       <div className="relative w-full flex-grow">
         <MapNoSSR
           ref={mapRef}
-          position={currentPosition}
+          position={memoizedPosition}
           zoom={zoom}
-          onCenterChange={(newCenter) => {
-            // Diese Funktion setzt die currentPosition nur bei Drag der Karte
-            // Soll keine Auswirkung auf die gespeicherte Position haben
-          }}
-          onZoomChange={setZoom}
+          onCenterChange={handleCenterChange}
+          onZoomChange={handleZoomChange}
           onPolygonChange={handlePolygonChange}
           onAreaChange={handleAreaChange}
           editMode={mapMode === 'polygon'}
           initialPolygon={polygonPoints}
-          hasPolygon={polygonPoints && polygonPoints.length > 0}
+          hasPolygon={hasPolygon}
           showZoomControls={mapMode !== 'polygon'}
           showPositionMarker={mapMode === 'navigation'}
           habitats={existingHabitats}
@@ -653,70 +805,157 @@ export function LocationDetermination({
           </div>
         )}
         
-        {/* Info-Panel für ausgewähltes Habitat aus der Datenbank */}
-        {selectedHabitatId && (
-          <div className="absolute top-14 right-3 z-[9999] bg-white p-3 rounded-lg shadow-lg max-w-xs">
-            {(() => {
-              const habitat = existingHabitats.find(h => h.id === selectedHabitatId);
-              if (!habitat) return 'Habitat-Details werden geladen...';
-              
-              return (
-                <div className="space-y-1">
-                  <div className="flex justify-between items-start">
-                    <h3 className="font-bold text-base">Bestehendes Habitat:</h3>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6 -mr-1 -mt-1"
-                      onClick={() => setSelectedHabitatId(null)}
-                    >
-                      <span className="sr-only">Schließen</span>
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        width="16" 
-                        height="16" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round"
-                      >
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                      </svg>
-                    </Button>
-                  </div>
-                  <p className="text-sm">{habitat.name}</p>
-                  {habitat.metadata?.gemeinde && (
-                    <p className="text-xs">Gemeinde: {habitat.metadata.gemeinde}</p>
-                  )}
-                  {habitat.metadata?.erfasser && (
-                    <p className="text-xs">Erfasser: {habitat.metadata.erfasser}</p>
-                  )}
-                  <div className="flex items-center text-xs">
-                    <span className={`inline-block w-2 h-2 rounded-full mr-1 ${habitat.metadata?.verifiziert ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
-                    {habitat.metadata?.verifiziert ? 'Verifiziert' : 'Nicht verifiziert'}
-                  </div>
-                  <p className="text-xs italic text-red-500 mt-1">
-                    Achtung: Dieses Habitat wurde bereits erfasst. Bitte vermeiden Sie Doppelerfassungen.
-                  </p>
-                </div>
-              );
-            })()}
-          </div>
-        )}
-        
-        {/* Standortinformationen (unten rechts) */}
+        {/* Standortinformationen/Habitat-Info (unten rechts) */}
         {showLocationInfo && (
           <div className="absolute bottom-11 right-3 z-[10000] bg-gray-800/30 backdrop-blur-sm rounded-lg shadow-lg p-3 max-w-[70vw]">
-            <h3 className="text-[12px] font-semibold mb-1 text-white">Standortinformationen</h3>
-            {isLoadingGeodata ? (
+            <div className="flex justify-between items-start">
+              <h3 className="text-[12px] font-semibold mb-1 text-white">
+                {selectedHabitatId ? "Bestehendes Habitat" : "Standortinformationen"}
+              </h3>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-6 w-6 -mr-1 -mt-1 text-white/70 hover:text-white hover:bg-transparent"
+                onClick={() => {
+                  if (selectedHabitatId) {
+                    setSelectedHabitatId(null);
+                  } 
+                  setShowLocationInfo(false);
+                }}
+              >
+                <span className="sr-only">Schließen</span>
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </Button>
+            </div>
+
+            {selectedHabitatId ? (
+              // Anzeige der Habitat-Details
+              (() => {
+                const habitat = existingHabitats.find(h => h.id === selectedHabitatId);
+                if (!habitat) return (
+                  <div className="flex items-center justify-center py-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary"></div>
+                    <span className="ml-2 text-[12px] text-white">Habitat-Details werden geladen...</span>
+                  </div>
+                );
+                
+                return (
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[12px] text-white">
+                    <div className="text-gray-200">Name:</div>
+                    <div className="font-medium">{habitat.name}</div>
+                    
+                    {habitat.metadata?.gemeinde && (
+                      <>
+                        <div className="text-gray-200">Gemeinde:</div>
+                        <div className="font-medium">{habitat.metadata.gemeinde}</div>
+                      </>
+                    )}
+                    
+                    {habitat.metadata?.erfasser && (
+                      <>
+                        <div className="text-gray-200">Erfasser:</div>
+                        <div className="font-medium">{habitat.metadata.erfasser}</div>
+                      </>
+                    )}
+                    
+                    <div className="text-gray-200">Status:</div>
+                    <div className="font-medium flex items-center">
+                      <span className={`inline-block w-2 h-2 rounded-full mr-1 ${habitat.metadata?.verifiziert ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
+                      {habitat.metadata?.verifiziert ? 'Verifiziert' : 'Nicht verifiziert'}
+                    </div>
+                    
+                    {/* Standortdaten, wenn verfügbar */}
+                    <div className="col-span-2 mt-2 border-t border-gray-600 pt-1">
+                      <div className="font-semibold mb-1">Standortdaten</div>
+                    </div>
+                    
+                    {/* Anzeige von Höhe, falls vorhanden */}
+                    <div className="text-gray-200">Höhe:</div>
+                    <div className="font-medium">
+                      {habitat.position ? `~${Math.round(habitat.position[0])} m` : '-'}
+                    </div>
+                    
+                    {/* Falls ein Polygon existiert, Flächenberechnung anzeigen */}
+                    {habitat.polygon && habitat.polygon.length > 0 && (
+                      <>
+                        <div className="text-gray-200">Fläche:</div>
+                        <div className="font-medium">
+                          {/* Schätzung der Fläche basierend auf Polygon-Punkten */}
+                          {calculateAreaFromPoints(habitat.polygon).toLocaleString('de-DE')} m²
+                        </div>
+                      </>
+                    )}
+                    
+                    {/* Falls ein Polygon existiert, Visualisierung anzeigen */}
+                    {habitat.polygon && habitat.polygon.length > 0 && (
+                      <div className="col-span-2 text-xs text-gray-300 mt-1">
+                        <span className="inline-block w-2 h-2 rounded-full mr-1" style={{backgroundColor: habitat.color}}></span>
+                        Das Habitat ist auf der Karte eingezeichnet
+                      </div>
+                    )}
+                    
+                    <div className="col-span-2 mt-2 text-red-300 italic">
+                      Achtung: Dieses Habitat wurde bereits erfasst. Bitte vermeiden Sie Doppelerfassungen.
+                    </div>
+                    
+                    {/* Verifizieren-Button für Experten */}
+                    {isExpert && selectedHabitatId && (
+                      <div className="col-span-2 mt-3 flex justify-left gap-2">
+                        <Button 
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-8 text-white bg-transparent border-white/40 hover:bg-white/10 hover:text-white"
+                          onClick={() => {
+                            // Navigation zum Bearbeitungs-Modus mit editJobId
+                            const params = new URLSearchParams({
+                              editJobId: selectedHabitatId,
+                              activeStep: 'location' // Zum Standort-Modul wechseln
+                            });
+                            
+                            router.push(`/naturescout?${params.toString()}`);
+                          }}
+                        >
+                          <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            viewBox="0 0 24 24" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            strokeWidth="2" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round" 
+                            className="w-3 h-3 mr-1"
+                          >
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                          </svg>
+                          Bearbeiten
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()
+            ) : isLoadingGeodata ? (
+              // Ladeanzeige für Geodaten
               <div className="flex items-center justify-center py-2">
                 <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary"></div>
                 <span className="ml-2 text-[12px] text-white">Daten werden geladen...</span>
               </div>
             ) : (
+              // Standortinformationen
               <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[12px] text-white">
                 {metadata.gemeinde && metadata.gemeinde !== 'unbekannt' && (
                   <>

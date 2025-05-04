@@ -374,22 +374,34 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
         updateHabitatDisplay();
       });
       
-      // Basis OpenStreetMap Layer als Grundkarte hinzufügen
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      }).addTo(mapRef.current);
+      // Basis OpenStreetMap Layer als Grundkarte definieren
+      const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      });
+      // Wichtig: OSM-Layer noch nicht hinzufügen! (addTo wird erst später aufgerufen)
 
-      // Südtiroler WMS-Layer hinzufügen für aktuelle Orthofotos
-      // Dies ermöglicht eine hochauflösende Ansicht der lokalen Umgebung
+      // Südtiroler WMS-Layer für aktuelle Orthofotos
+      let wmsLayer = null;
       try {
-        wmsLayerRef.current = L.tileLayer.wms('https://geoservices.buergernetz.bz.it/mapproxy/ows', {
+        wmsLayer = L.tileLayer.wms('https://geoservices.buergernetz.bz.it/mapproxy/ows', {
           layers: 'p_bz-Orthoimagery:Aerial-2023-RGB',
           format: 'image/png',
           transparent: true,
           version: '1.3.0',
           opacity: 1,
-        }).addTo(mapRef.current);
+        });
+        // Wichtig: WMS-Layer noch nicht hinzufügen!
+        wmsLayerRef.current = wmsLayer;
       } catch (error) {
         console.error("Fehler beim Laden des WMS-Layers:", error);
+      }
+
+      // Initial WMS-Layer (Satellitenbild) als Standard hinzufügen, wenn verfügbar
+      // Ansonsten OSM als Fallback verwenden
+      if (wmsLayerRef.current) {
+        wmsLayerRef.current.addTo(mapRef.current);
+      } else {
+        // Fallback zu OSM, wenn WMS nicht geladen werden kann
+        osmLayer.addTo(mapRef.current);
       }
 
       // FeatureGroup für gezeichnete Elemente erstellen
@@ -426,19 +438,17 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
       }
 
       // Layer Control hinzufügen für das Umschalten zwischen verschiedenen Kartentypen
-      const baseMaps = {
-        "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
+      const baseMaps: Record<string, L.Layer> = {
+        "OpenStreetMap": osmLayer,
       };
 
-      // WMS-Layer als Overlay hinzufügen, wenn er erfolgreich geladen wurde
+      // WMS-Layer als eigene Basiskarte hinzufügen (nicht als Overlay), wenn er erfolgreich geladen wurde
       if (wmsLayerRef.current) {
-        const overlayMaps = {
-          "Südtiroler Orthofoto 2023": wmsLayerRef.current
-        };
-        L.control.layers(baseMaps, overlayMaps).addTo(mapRef.current);
-      } else {
-        L.control.layers(baseMaps).addTo(mapRef.current);
+        baseMaps["Südtiroler Orthofoto 2023"] = wmsLayerRef.current;
       }
+      
+      // Layer-Control mit den Basiskarten hinzufügen
+      L.control.layers(baseMaps, {}).addTo(mapRef.current);
 
       // Event-Listener für Positionsänderungen
       // Wird ausgelöst, wenn der Nutzer die Karte verschiebt

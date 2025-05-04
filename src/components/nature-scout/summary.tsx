@@ -134,7 +134,7 @@ export function Summary({ metadata }: SummaryProps) {
                 <div key={index} className="bg-gray-50 p-3 rounded">
                   <div className="relative h-64 w-full">
                     <Image
-                      src={bild.url}
+                      src={bild.url.replace('.jpg', '_low.jpg')}
                       alt={`Bild ${index + 1}`}
                       fill
                       className="object-contain"
@@ -336,7 +336,7 @@ export function Summary({ metadata }: SummaryProps) {
               <div key={index} className="bg-gray-50 p-3 rounded">
                 <div className="relative h-64 w-full">
                   <Image
-                    src={bild.url}
+                    src={bild.url.replace('.jpg', '_low.jpg')}
                     alt={`Bild ${index + 1}`}
                     fill
                     className="object-contain"

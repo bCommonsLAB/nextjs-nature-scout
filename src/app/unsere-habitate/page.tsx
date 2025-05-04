@@ -452,7 +452,7 @@ function UnsereHabitateContent() {
                 {data.entries.map((habitat) => (
                   <div key={habitat.jobId} className="aspect-[16/9] w-full">
                     <HabitatCard
-                      imageSrc={habitat.metadata.bilder?.[0]?.url || '/images/habitat-placeholder.jpg'}
+                      imageSrc={habitat.metadata.bilder?.[0]?.url.replace('.jpg', '_low.jpg') || '/images/habitat-placeholder.jpg'}
                       title={habitat.result?.habitattyp || 'Unbekanntes Habitat'}
                       location={habitat.metadata.gemeinde || 'Unbekannter Ort'}
                       recorder={habitat.metadata.erfassungsperson || ''}

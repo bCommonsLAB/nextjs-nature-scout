@@ -201,7 +201,7 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
                     {entry.metadata?.bilder && entry.metadata.bilder.length > 0 && entry.metadata.bilder[0]?.url ? (
                       <div className="relative h-14 w-16">
                         <Image
-                          src={entry.metadata.bilder[0].url}
+                          src={entry.metadata.bilder[0].url.replace('.jpg', '_low.jpg')}
                           alt="Vorschaubild"
                           width={120}
                           height={90}

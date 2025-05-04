@@ -52,6 +52,7 @@ export interface Bild {
   imageKey: string;
   filename: string;
   url: string;
+  lowResUrl?: string;
   analyse: string | null;
   plantnetResult?: PlantNetResult;
 }

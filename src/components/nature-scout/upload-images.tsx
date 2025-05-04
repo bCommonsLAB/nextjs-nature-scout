@@ -75,11 +75,12 @@ export function UploadImages({
     }
   }, [activeUploads, onUploadActiveChange]);
 
-  const handleBildUpload = (imageKey: string, filename: string, url: string, analysis: string, plantnetResult?: PlantNetResult) => {
+  const handleBildUpload = (imageKey: string, filename: string, url: string, analysis: string, plantnetResult?: PlantNetResult, lowResUrl?: string) => {
     const neuesBild: Bild = {
       imageKey,
       filename,
       url,
+      lowResUrl,
       analyse: analysis,
       plantnetResult
     };
