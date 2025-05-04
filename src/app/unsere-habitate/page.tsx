@@ -277,7 +277,6 @@ function UnsereHabitateContent() {
                   value={gemeindeValues}
                   onValueChange={(value) => setGemeindeValues(value)}
                   placeholder="Gemeinden"
-                  verifizierungsstatus={verifizierungValues.join(',')}
                 />
               </div>
               
@@ -288,7 +287,6 @@ function UnsereHabitateContent() {
                   value={habitatValues}
                   onValueChange={(value) => setHabitatValues(value)}
                   placeholder="Habitattyp"
-                  verifizierungsstatus={verifizierungValues.join(',')}
                 />
               </div>
               
@@ -299,7 +297,6 @@ function UnsereHabitateContent() {
                   value={habitatfamilieValues}
                   onValueChange={(value) => setHabitatfamilieValues(value)}
                   placeholder="Habitat Gruppe"
-                  verifizierungsstatus={verifizierungValues.join(',')}
                 />
               </div>
               
@@ -310,7 +307,6 @@ function UnsereHabitateContent() {
                   value={schutzstatusValues}
                   onValueChange={(value) => setSchutzstatusValues(value)}
                   placeholder="Schutzstatus"
-                  verifizierungsstatus={verifizierungValues.join(',')}
                 />
               </div>
               
@@ -321,7 +317,6 @@ function UnsereHabitateContent() {
                   value={personValues}
                   onValueChange={(value) => setPersonValues(value)}
                   placeholder="Erfasser"
-                  verifizierungsstatus={verifizierungValues.join(',')}
                 />
               </div>
               
@@ -332,17 +327,6 @@ function UnsereHabitateContent() {
                   value={organizationValues}
                   onValueChange={(value) => setOrganizationValues(value)}
                   placeholder="Organisation"
-                  verifizierungsstatus={verifizierungValues.join(',')}
-                />
-              </div>
-
-              {/* Verifizierungsstatus Filter */}
-              <div className="space-y-2">
-                <MultiSelectFilter
-                  type="verifizierungsstatus"
-                  value={verifizierungValues}
-                  onValueChange={(value) => setVerifizierungValues(value)}
-                  placeholder="Verifizierungsstatus"
                 />
               </div>
             </div>
@@ -389,11 +373,6 @@ function UnsereHabitateContent() {
                   {organizationValues.length > 0 && (
                     <Badge variant="secondary" className="text-xs">
                       Organisation: {organizationValues.join(', ')}
-                    </Badge>
-                  )}
-                  {verifizierungValues.length > 0 && (
-                    <Badge variant="secondary" className="text-xs">
-                      Status: {verifizierungValues.join(', ')}
                     </Badge>
                   )}
                 </div>

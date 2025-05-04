@@ -12,8 +12,11 @@ import {
   CheckCircle, 
   XCircle, 
   HelpCircle,
-  Trash2 
+  Trash2,
+  SearchIcon,
+  XIcon
 } from 'lucide-react';
+import { useState } from 'react';
 
 interface HabitateEntry {
   jobId: string;
@@ -55,6 +58,8 @@ interface HabitateListProps {
 }
 
 export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder, onDelete }: HabitateListProps) {
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
   if (!entries || entries.length === 0) {
     return <div className="text-center py-12 text-gray-500">Keine Einträge gefunden</div>;
   }
@@ -197,23 +202,37 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
                 className="hover:bg-gray-50 transition-colors cursor-pointer"
               >
                 <td className="px-2 py-2 whitespace-nowrap">
-                  <Link href={`/habitat/${entry.jobId}`}>
-                    {entry.metadata?.bilder && entry.metadata.bilder.length > 0 && entry.metadata.bilder[0]?.url ? (
-                      <div className="relative h-14 w-16">
-                        <Image
-                          src={entry.metadata.bilder[0].url.replace('.jpg', '_low.jpg')}
-                          alt="Vorschaubild"
-                          width={120}
-                          height={90}
-                          className="object-cover rounded"
-                        />
-                      </div>
-                    ) : (
-                      <div className="h-14 w-16 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">
-                        Kein Bild
-                      </div>
-                    )}
-                  </Link>
+                  <div className="relative group">
+                    <Link href={`/habitat/${entry.jobId}`} className="block">
+                      {entry.metadata?.bilder && entry.metadata.bilder.length > 0 && entry.metadata.bilder[0]?.url ? (
+                        <div className="relative h-14 w-16">
+                          <Image
+                            src={entry.metadata.bilder[0].url.replace('.jpg', '_low.jpg')}
+                            alt="Vorschaubild"
+                            width={120}
+                            height={90}
+                            className="object-cover rounded"
+                          />
+                          <button 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (entry.metadata?.bilder?.[0]?.url) {
+                                setPreviewImage(entry.metadata.bilder[0].url);
+                              }
+                            }}
+                            className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity"
+                          >
+                            <SearchIcon className="h-4 w-4 text-white opacity-0 group-hover:opacity-100" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="h-14 w-16 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">
+                          Kein Bild
+                        </div>
+                      )}
+                    </Link>
+                  </div>
                 </td>
                 <td className="px-2 py-2 whitespace-nowrap">
                   <Link href={`/habitat/${entry.jobId}`} className="block">
@@ -304,6 +323,29 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
           })}
         </tbody>
       </table>
+      {/* Bild-Vorschau-Popup */}
+      {previewImage && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh]">
+            <button 
+              className="absolute -top-10 right-0 bg-white rounded-full p-2"
+              onClick={() => setPreviewImage(null)}
+            >
+              <XIcon className="h-5 w-5" />
+            </button>
+            <Image
+              src={previewImage}
+              alt="Große Vorschau"
+              width={1200}
+              height={800}
+              className="max-h-[85vh] object-contain"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

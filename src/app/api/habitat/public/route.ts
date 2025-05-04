@@ -55,14 +55,8 @@ export async function GET(request: Request) {
     };
     
     // Filter für Verifizierungsstatus hinzufügen
-    if (verifizierungsstatus !== 'alle') {
-      if (verifizierungsstatus === 'verifiziert') {
-        filter.verified = true;
-      } else if (verifizierungsstatus === 'nicht verifiziert') {
-        filter.verified = { $ne: true };
-      }
-    }
-    
+    filter.verified = true;
+
     // Füge weitere Filter hinzu
     const gemeinde = searchParams.get('gemeinde');
     if (gemeinde) {

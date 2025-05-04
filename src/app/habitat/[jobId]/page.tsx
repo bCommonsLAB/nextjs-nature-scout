@@ -10,7 +10,9 @@ import {
   Trash2,
   RefreshCw,
   Edit,
-  CheckCircle
+  CheckCircle,
+  SearchIcon,
+  XIcon
 } from 'lucide-react';
 import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
 import { EffektiverHabitatEditor } from '@/components/habitat/EffektiverHabitatEditor';
@@ -109,6 +111,7 @@ export default function HabitateDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [isExpert, setIsExpert] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   
   useEffect(() => {
     const checkPermissions = async () => {
@@ -371,13 +374,19 @@ export default function HabitateDetailPage() {
               <div className="space-y-4">
                 {data.metadata?.bilder?.map((bild: HabitatBild, index: number) => (
                   <div key={index} className="bg-gray-50 p-3 rounded">
-                    <div className="relative h-64 w-full">
+                    <div 
+                      className="relative h-64 w-full cursor-pointer"
+                      onClick={() => setPreviewImage(bild.url)}
+                    >
                       <Image
-                        src={bild.url}
+                        src={bild.url.replace('.jpg', '_low.jpg')}
                         alt={`Bild ${index + 1}`}
                         fill
                         className="object-contain"
                       />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-20 transition-opacity">
+                        <SearchIcon className="h-6 w-6 text-white opacity-0 hover:opacity-100" />
+                      </div>
                     </div>
                     <p className="mt-2 text-sm text-gray-600">
                       {index === 0 ? 'Panoramabild' : `Detailbild ${index}`}
@@ -714,6 +723,33 @@ export default function HabitateDetailPage() {
             jobId: {data.jobId}
         </p>
       </div>
+
+      {/* Bild-Vorschau-Popup */}
+      {previewImage && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[9999]"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="relative max-w-5xl max-h-[90vh] p-2">
+            <button 
+              className="absolute -top-12 right-0 bg-white rounded-full p-2 z-10"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPreviewImage(null);
+              }}
+            >
+              <XIcon className="h-5 w-5" />
+            </button>
+            <Image
+              src={previewImage}
+              alt="Große Vorschau"
+              width={1800}
+              height={1200}
+              className="max-h-[85vh] w-auto object-contain rounded-lg"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

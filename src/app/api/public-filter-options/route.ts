@@ -10,12 +10,11 @@ interface FilterOption {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const filterType = searchParams.get('type'); // 'gemeinden', 'habitate', 'familien', 'schutzstati', 'personen', 'verifizierungsstatus'
-  const verifizierungsstatus = searchParams.get('verifizierungsstatus') || 'alle';
+  const filterType = searchParams.get('type'); // 'gemeinden', 'habitate', 'familien', 'schutzstati', 'personen', 'verifizierungsstatus', 'organizations'
   
   try {
     // Prüfe, ob das angeforderte Filtertyp gültig ist
-    if (!filterType || !['gemeinden', 'habitate', 'familien', 'schutzstati', 'personen', 'verifizierungsstatus', 'organizations'].includes(filterType)) {
+    if (!filterType || !['gemeinden', 'habitate', 'familien', 'schutzstati', 'personen', 'organizations'].includes(filterType)) {
       return NextResponse.json(
         { error: 'Ungültiger Filter-Typ' },
         { status: 400 }
@@ -25,33 +24,21 @@ export async function GET(request: Request) {
     const db = await connectToDatabase();
     const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
     
-    // Basisfilter - abhängig vom Verifizierungsstatus
-    const baseFilter: any = { deleted: { $ne: true } };
-    
-    // Wenn der Filtertyp selbst nicht "verifizierungsstatus" ist, dann berücksichtige den Parameter
-    if (filterType !== 'verifizierungsstatus' && verifizierungsstatus !== 'alle') {
-      baseFilter.verified = verifizierungsstatus === 'verifiziert';
-    }
+    // Basisfilter - bei öffentlicher Route immer nur verifizierte Habitate
+    const baseFilter: any = { 
+      deleted: { $ne: true },
+      verified: true 
+    };
     
     let results: FilterOption[] = [];
     
     // Je nach Filtertyp, hole die entsprechenden Daten
     switch(filterType) {
       case 'verifizierungsstatus':
-        // Für Verifizierungsstatus müssen wir die Anzahl der Dokumente manuell zählen
-        const verifiedCount = await collection.countDocuments({
-          ...baseFilter,
-          verified: true
-        });
-        
-        const unverifiedCount = await collection.countDocuments({
-          ...baseFilter,
-          verified: { $ne: true }
-        });
-        
+        // Bei öffentlicher Route gibt es nur verifizierte Habitate
         results = [
-          { value: 'verifiziert', count: verifiedCount },
-          { value: 'nicht verifiziert', count: unverifiedCount }
+          { value: 'verifiziert', count: await collection.countDocuments(baseFilter) },
+          { value: 'nicht verifiziert', count: 0 }
         ];
         break;
         

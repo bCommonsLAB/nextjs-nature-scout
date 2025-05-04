@@ -30,9 +30,6 @@ export function Navbar() {
   const [profilePageLoaded, setProfilePageLoaded] = useState(false);
   const [needsConsent, setNeedsConsent] = useState(false);
   
-  // State für den Bestätigungs-Dialog
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  
   // State für das mobile Menü
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
@@ -176,42 +173,21 @@ export function Navbar() {
 
   // Funktion, die prüft, ob ungespeicherte Änderungen vorhanden sind
   const hasUnsavedChanges = () => {
-    // Wenn metadata existiert und mindestens ein Feld ausgefüllt ist, aber kein editJobId,
-    // dann gibt es wahrscheinlich ungespeicherte Änderungen
-    return metadata && !editJobId && (
-      metadata.standort || 
-      metadata.gemeinde || 
-      metadata.latitude !== 0 || 
-      metadata.longitude !== 0 ||
-      (metadata.polygonPoints && metadata.polygonPoints.length > 0) ||
-      (metadata.bilder && metadata.bilder.length > 0)
-    );
+    // Da die Daten immer gespeichert sind, gibt es keine ungespeicherten Änderungen mehr
+    return false;
   };
 
   // Funktion zum Navigieren zu neuem Habitat
   const navigateToNewHabitat = () => {
-    if (hasUnsavedChanges()) {
-      // Wenn ungespeicherte Änderungen vorhanden sind, Dialog öffnen
-      setConfirmDialogOpen(true);
-    } else {
-      // Sonst direkt navigieren
-      router.push('/naturescout');
-      // Mobile Menü schließen nach Navigation
-      setIsMobileMenuOpen(false);
-    }
+    // Direkt navigieren, da keine ungespeicherten Änderungen mehr berücksichtigt werden müssen
+    router.push('/naturescout');
+    // Mobile Menü schließen nach Navigation
+    setIsMobileMenuOpen(false);
   };
 
   // Funktion für die Navigation mit Link-Elementen
   const handleMobileNavigation = (path: string) => {
     router.push(path);
-    setIsMobileMenuOpen(false);
-  };
-
-  // Bestätigung zum Fortfahren
-  const confirmNavigation = () => {
-    setConfirmDialogOpen(false);
-    router.push('/naturescout');
-    // Mobile Menü schließen nach Navigation
     setIsMobileMenuOpen(false);
   };
 
@@ -516,33 +492,6 @@ export function Navbar() {
           </Sheet>
         )}
       </nav>
-      
-      {/* Bestätigungsdialog für ungespeicherte Änderungen */}
-      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Ungespeicherte Änderungen</DialogTitle>
-            <DialogDescription>
-              Bestehendes Habitat ist noch nicht gespeichert. Trotzdem fortfahren? Alle eingegebenen Daten gehen verloren!
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="sm:justify-between">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => setConfirmDialogOpen(false)}
-            >
-              Nein
-            </Button>
-            <Button 
-              type="button" 
-              onClick={confirmNavigation}
-            >
-              JA
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </header>
   );
 }

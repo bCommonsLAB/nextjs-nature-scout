@@ -11,11 +11,10 @@ interface FilterOption {
 }
 
 interface MultiSelectFilterProps {
-  type: 'gemeinden' | 'habitate' | 'familien' | 'schutzstati' | 'personen' | 'verifizierungsstatus' | 'organizations';
+  type: 'gemeinden' | 'habitate' | 'familien' | 'schutzstati' | 'personen' | 'organizations';
   value: string[];
   onValueChange: (values: string[]) => void;
   placeholder: string;
-  verifizierungsstatus?: string;
 }
 
 export function MultiSelectFilter({
@@ -23,7 +22,6 @@ export function MultiSelectFilter({
   value,
   onValueChange,
   placeholder,
-  verifizierungsstatus = 'alle'
 }: MultiSelectFilterProps) {
   const [options, setOptions] = useState<FilterOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -39,14 +37,9 @@ export function MultiSelectFilter({
       setError(null);
 
       try {
-        // URL mit verifizierungsstatus Parameter, wenn dieser vorhanden ist
+        // URL erstellen
         const url = new URL('/api/public-filter-options', window.location.origin);
         url.searchParams.append('type', type);
-        
-        // Nur hinzufügen, wenn wir nicht selbst der Verifizierungsstatus-Filter sind
-        if (type !== 'verifizierungsstatus' && verifizierungsstatus !== 'alle') {
-          url.searchParams.append('verifizierungsstatus', verifizierungsstatus);
-        }
         
         const response = await fetch(url.toString());
         
@@ -78,7 +71,7 @@ export function MultiSelectFilter({
     };
 
     fetchOptions();
-  }, [type, verifizierungsstatus, options.length]);
+  }, [type, options.length]);
 
   // Prüfen, ob ein Wert ausgewählt ist
   const isSelected = (val: string) => value.includes(val);
