@@ -57,29 +57,38 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isParametersOpen, setIsParametersOpen] = useState(false);
-  const hasInitiatedAnalysis = useRef(false);
-  const { setJobId } = useNatureScoutState();
+  const { setJobId, jobId } = useNatureScoutState();
+  const analysisStarted = useRef(false);
   
   useEffect(() => {
     // Analyse immer starten, wenn die Komponente geladen wird
-    if (!isAnalyzing) {
+    if (!isAnalyzing && !analysisStarted.current) {
       console.log('Starte Habitat-Analyse automatisch');
+      analysisStarted.current = true;
       handleAnalyzeClick();
     }
-  }, []); // Leeres Dependency-Array: wird nur beim Mounten ausgeführt
+  }, [isAnalyzing]); // Nur von isAnalyzing abhängig machen
 
   const handleAnalyzeClick = async () => {
     setIsAnalyzing(true);
     setAnalysisError(null);
+    
+    // Bestehende Analyse-Ergebnisse zurücksetzen
     metadata.analyseErgebnis = undefined;
     metadata.llmInfo = undefined;
+    
     try {
+      // API-Anfrage zum Starten der Analyse
       const startResponse = await fetch('/api/analyze/start', {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ metadata })
+        body: JSON.stringify({ 
+          metadata,
+          // Wenn eine bestehende jobId vorhanden ist, diese weitergeben
+          ...(jobId ? { existingJobId: jobId } : {})
+        })
       });
 
       const responseData = await startResponse.json();
@@ -88,49 +97,51 @@ export function HabitatAnalysis({ metadata, onAnalysisComplete, onKommentarChang
         throw new Error(responseData.error || 'Ein Fehler ist bei der Analyse aufgetreten');
       }
 
-      const { jobId } = responseData;
-      console.log("Analyse gestartet mit jobId:", jobId);
-      // Speichere die jobId im NatureScoutState
-      setJobId(jobId);
+      // Verwende entweder die bestehende oder die neue JobId
+      const currentJobId = jobId || responseData.jobId;
+      console.log("Analyse gestartet mit jobId:", currentJobId);
+      
+      // Speichere die jobId im NatureScoutState, falls sie noch nicht gesetzt ist
+      if (!jobId) {
+        setJobId(currentJobId);
+      }
 
-      const checkStatus = async () => {
-        try {
-          const statusResponse = await fetch(`/api/analyze/status?jobId=${jobId}`, {
-            method: "GET"
-          });
-
-          const statusData = await statusResponse.json();
-
-          if (!statusResponse.ok) {
-            throw new Error(statusData.error || 'Fehler beim Abrufen des Analyse-Status');
-          }
-
-          const { status, result, llmInfo } = statusData;
-
-          if (status === 'completed' && result) {
-            // Speichere die JobId im NatureScoutState wenn Analyse erfolgreich war
-            setJobId(jobId);
-            onAnalysisComplete({
-              ...metadata.analyseErgebnis,
-              ...result,
-            }, llmInfo);
-            setIsAnalyzing(false);
-          } else if (status === 'failed') {
-            throw new Error(statusData.error || 'Analyse fehlgeschlagen');
-          } else {
-            setTimeout(checkStatus, 2000);
-          }
-        } catch (statusError) {
-          throw new Error(statusError instanceof Error ? statusError.message : 'Fehler bei der Statusabfrage');
-        }
-      };
-
-      await checkStatus();
-
+      // Status der Analyse abfragen
+      await checkStatus(currentJobId);
     } catch (error) {
       console.error("Fehler bei der Analyse:", error);
       setAnalysisError(error instanceof Error ? error.message : 'Ein unerwarteter Fehler ist aufgetreten');
       setIsAnalyzing(false);
+    }
+  };
+
+  const checkStatus = async (statusJobId: string) => {
+    try {
+      const statusResponse = await fetch(`/api/analyze/status?jobId=${statusJobId}`, {
+        method: "GET"
+      });
+
+      const statusData = await statusResponse.json();
+
+      if (!statusResponse.ok) {
+        throw new Error(statusData.error || 'Fehler beim Abrufen des Analyse-Status');
+      }
+
+      const { status, result, llmInfo } = statusData;
+
+      if (status === 'completed' && result) {
+        onAnalysisComplete({
+          ...metadata.analyseErgebnis,
+          ...result,
+        }, llmInfo);
+        setIsAnalyzing(false);
+      } else if (status === 'failed') {
+        throw new Error(statusData.error || 'Analyse fehlgeschlagen');
+      } else {
+        setTimeout(() => checkStatus(statusJobId), 2000);
+      }
+    } catch (statusError) {
+      throw new Error(statusError instanceof Error ? statusError.message : 'Fehler bei der Statusabfrage');
     }
   };
 

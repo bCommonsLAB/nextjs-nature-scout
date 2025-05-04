@@ -54,8 +54,13 @@ export async function GET(request: Request) {
       deleted: { $ne: true }
     };
     
-    // Filter für Verifizierungsstatus hinzufügen
-    filter.verified = true;
+    // Filter für Verifizierungsstatus hinzufügen, abhängig vom Parameter
+    if (verifizierungsstatus === 'verifiziert') {
+      filter.verified = true;
+    } else if (verifizierungsstatus === 'unbestaetigt') {
+      filter.verified = { $ne: true };
+    }
+    // Bei 'alle' wird kein Verifizierungsfilter hinzugefügt
 
     // Füge weitere Filter hinzu
     const gemeinde = searchParams.get('gemeinde');
@@ -179,8 +184,16 @@ export async function GET(request: Request) {
     // Filteroptionen abrufen, wenn gewünscht
     let filterOptions = null;
     if (includeFilterOptions) {
-      // Basisfilter nur für verifizierte Einträge
-      const baseFilter = { deleted: { $ne: true }, verified: true };
+      // Basisfilter je nach gewähltem Verifizierungsstatus
+      const baseFilter: MongoFilter = { deleted: { $ne: true } };
+      
+      // Filter für Verifizierungsstatus hinzufügen
+      if (verifizierungsstatus === 'verifiziert') {
+        baseFilter.verified = true;
+      } else if (verifizierungsstatus === 'unbestaetigt') {
+        baseFilter.verified = { $ne: true };
+      }
+      // Bei 'alle' wird kein Verifizierungsfilter hinzugefügt
       
       // Gemeinden abrufen
       const gemeindenAgg = await collection.aggregate([

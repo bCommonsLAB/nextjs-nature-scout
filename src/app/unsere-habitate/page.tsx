@@ -110,7 +110,8 @@ function UnsereHabitateContent() {
         if (schutzstatusValues.length > 0) queryParams.set('schutzstatus', schutzstatusValues.join(','));
         if (personValues.length > 0) queryParams.set('person', personValues.join(','));
         if (organizationValues.length > 0) queryParams.set('organization', organizationValues.join(','));
-        if (verifizierungValues.length > 0) queryParams.set('verifizierungsstatus', verifizierungValues.join(','));
+        
+        queryParams.set('verifizierungsstatus', 'verifiziert');
         
         const response = await fetch(`/api/habitat/public?${queryParams.toString()}`);
         

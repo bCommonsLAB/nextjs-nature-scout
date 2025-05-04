@@ -113,7 +113,7 @@ const Map: React.FC<MapProps> = ({ position, zoom, onCenterChange }) => {
     const fetchHabitats = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch('/api/habitat/public?limit=100');
+        const response = await fetch('/api/habitat/public?limit=100&verifizierungsstatus=alle');
         
         if (!response.ok) {
           throw new Error(`API-Fehler: ${response.status}`);
@@ -167,7 +167,6 @@ const Map: React.FC<MapProps> = ({ position, zoom, onCenterChange }) => {
         onCenterChange={onCenterChange}
         habitats={habitats}
         onHabitatClick={handleHabitatClick}
-        markerZoomThreshold={12}
       />
       
       {isLoading && (

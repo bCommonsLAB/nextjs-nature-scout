@@ -142,7 +142,7 @@ export function NatureScoutPage() {
   useEffect(() => {
     const fetchVerifiedHabitats = async () => {
       try {
-        const response = await fetch('/api/habitat/public?limit=4&sortBy=updatedAt&sortOrder=desc');
+        const response = await fetch('/api/habitat/public?limit=4&sortBy=updatedAt&sortOrder=desc&verifizierungsstatus=verifiziert');
         
         if (!response.ok) {
           throw new Error('Fehler beim Laden der Habitat-Daten');

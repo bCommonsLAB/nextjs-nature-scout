@@ -178,7 +178,15 @@ export function GetImage({
         method: 'POST',
         body: formData,
       });
-      if (!uploadResponse.ok) throw new Error('Upload fehlgeschlagen');
+      
+      if (!uploadResponse.ok) {
+        // Verbesserte Fehlerbehandlung
+        const errorData = await uploadResponse.json().catch(() => null);
+        throw new Error(
+          errorData?.error || 
+          `Upload fehlgeschlagen mit Status ${uploadResponse.status}`
+        );
+      }
       uploadResult = await uploadResponse.json();
     }
 
@@ -231,7 +239,12 @@ export function GetImage({
       );
     } catch (error) {
       console.error("❌ Fehler beim Hochladen oder Analysieren:", error);
-      toast.error('Fehler beim Hochladen oder Analysieren des Bildes');
+      // Detaillierte Fehlermeldung anzeigen
+      toast.error(
+        error instanceof Error 
+          ? `Fehler: ${error.message}`
+          : 'Fehler beim Hochladen oder Analysieren des Bildes'
+      );
     } finally {
       setIsUploading(false);
     }
@@ -268,7 +281,12 @@ export function GetImage({
       );
     } catch (error) {
       console.error("Fehler beim Verarbeiten des Beispielbildes:", error);
-      toast.error('Fehler beim Verarbeiten des Beispielbildes');
+      // Detaillierte Fehlermeldung anzeigen
+      toast.error(
+        error instanceof Error 
+          ? `Fehler: ${error.message}`
+          : 'Fehler beim Verarbeiten des Beispielbildes'
+      );
     } finally {
       setIsUploading(false);
     }

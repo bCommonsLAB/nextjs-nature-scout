@@ -16,71 +16,137 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     
-    // Bild-Metadaten ermitteln und verarbeiten
-    const metadata = await sharp(buffer).metadata();
-    const width = metadata.width || 0;
-    const height = metadata.height || 0;
-    let newWidth = width;
-    let newHeight = height;
+    try {
+      // Bild-Metadaten ermitteln und verarbeiten
+      const metadata = await sharp(buffer).metadata();
+      const width = metadata.width || 0;
+      const height = metadata.height || 0;
+      let newWidth = width;
+      let newHeight = height;
 
-    if (width > height) {
-      if (width > maxWidth) {
-        newHeight = Math.round((height * maxWidth) / width);
-        newWidth = maxWidth;
+      if (width > height) {
+        if (width > maxWidth) {
+          newHeight = Math.round((height * maxWidth) / width);
+          newWidth = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          newWidth = Math.round((width * maxHeight) / height);
+          newHeight = maxHeight;
+        }
       }
-    } else {
-      if (height > maxHeight) {
-        newWidth = Math.round((width * maxHeight) / height);
-        newHeight = maxHeight;
+
+      // Bestimme das Ausgabeformat basierend auf dem Eingabeformat (oder nutze JPEG als Fallback)
+      const outputFormat = (metadata.format === 'jpeg' || metadata.format === 'jpg') ? 'jpeg' : 
+                          (metadata.format === 'png') ? 'png' : 'jpeg';
+      
+      // Bild optimieren mit verbesserter Fehlerbehandlung
+      let processedBuffer;
+      if (outputFormat === 'jpeg') {
+        processedBuffer = await sharp(buffer, { failOnError: false })
+          .resize(newWidth, newHeight)
+          .jpeg({ quality: Math.round(quality * 100) })
+          .toBuffer();
+      } else if (outputFormat === 'png') {
+        processedBuffer = await sharp(buffer, { failOnError: false })
+          .resize(newWidth, newHeight)
+          .png({ quality: Math.round(quality * 100) })
+          .toBuffer();
+      } else {
+        // Fallback zu JPEG
+        processedBuffer = await sharp(buffer, { failOnError: false })
+          .resize(newWidth, newHeight)
+          .jpeg({ quality: Math.round(quality * 100) })
+          .toBuffer();
+      }
+
+      // Low-Resolution Version erstellen (max 360px)
+      let lowResWidth = width;
+      let lowResHeight = height;
+      
+      if (width > height) {
+        if (width > LOW_RES_MAX_SIZE) {
+          lowResHeight = Math.round((height * LOW_RES_MAX_SIZE) / width);
+          lowResWidth = LOW_RES_MAX_SIZE;
+        }
+      } else {
+        if (height > LOW_RES_MAX_SIZE) {
+          lowResWidth = Math.round((width * LOW_RES_MAX_SIZE) / height);
+          lowResHeight = LOW_RES_MAX_SIZE;
+        }
+      }
+      
+      // Low-Res Version mit gleichem Format wie Original
+      let lowResBuffer;
+      if (outputFormat === 'jpeg') {
+        lowResBuffer = await sharp(buffer, { failOnError: false })
+          .resize(lowResWidth, lowResHeight)
+          .jpeg({ quality: Math.round(quality * 80) })
+          .toBuffer();
+      } else if (outputFormat === 'png') {
+        lowResBuffer = await sharp(buffer, { failOnError: false })
+          .resize(lowResWidth, lowResHeight)
+          .png({ quality: Math.round(quality * 80) })
+          .toBuffer();
+      } else {
+        // Fallback zu JPEG
+        lowResBuffer = await sharp(buffer, { failOnError: false })
+          .resize(lowResWidth, lowResHeight)
+          .jpeg({ quality: Math.round(quality * 80) })
+          .toBuffer();
+      }
+
+      // Optimiertes Bild direkt in Azure Storage hochladen
+      const timestamp = Date.now();
+      const extension = outputFormat === 'png' ? 'png' : 'jpg';
+      const filename = `${timestamp}.${extension}`;
+      const lowResFilename = `${timestamp}_low.${extension}`;
+
+      const azureStorage = new AzureStorageService();
+      const url = await azureStorage.uploadImage(filename, processedBuffer);
+      const lowResUrl = await azureStorage.uploadImage(lowResFilename, lowResBuffer);
+
+      return Response.json({ 
+        filename,
+        url,
+        lowResFilename,
+        lowResUrl,
+        success: true 
+      });
+    } catch (imageError: unknown) {
+      console.error('Fehler bei der Bildverarbeitung:', imageError);
+      
+      // Versuche, das Bild ohne Verarbeitung hochzuladen
+      try {
+        const timestamp = Date.now();
+        const filename = `${timestamp}_original.jpg`;
+        
+        const azureStorage = new AzureStorageService();
+        const url = await azureStorage.uploadImage(filename, buffer);
+        
+        return Response.json({ 
+          filename,
+          url,
+          success: true,
+          message: 'Bild ohne Optimierung hochgeladen aufgrund eines Verarbeitungsfehlers'
+        });
+      } catch (uploadError: unknown) {
+        throw new Error(`Bildverarbeitung fehlgeschlagen: ${imageError instanceof Error ? imageError.message : 'Unbekannter Fehler'}. Upload-Versuch fehlgeschlagen: ${uploadError instanceof Error ? uploadError.message : 'Unbekannter Fehler'}`);
       }
     }
-
-    // Bild optimieren
-    const processedBuffer = await sharp(buffer)
-      .resize(newWidth, newHeight)
-      .jpeg({ quality: Math.round(quality * 100) })
-      .toBuffer();
-
-    // Low-Resolution Version erstellen (max 360px)
-    let lowResWidth = width;
-    let lowResHeight = height;
-    
-    if (width > height) {
-      if (width > LOW_RES_MAX_SIZE) {
-        lowResHeight = Math.round((height * LOW_RES_MAX_SIZE) / width);
-        lowResWidth = LOW_RES_MAX_SIZE;
-      }
-    } else {
-      if (height > LOW_RES_MAX_SIZE) {
-        lowResWidth = Math.round((width * LOW_RES_MAX_SIZE) / height);
-        lowResHeight = LOW_RES_MAX_SIZE;
-      }
-    }
-    
-    const lowResBuffer = await sharp(buffer)
-      .resize(lowResWidth, lowResHeight)
-      .jpeg({ quality: Math.round(quality * 80) }) // Etwas niedrigere Qualität für kleine Vorschau
-      .toBuffer();
-
-    // Optimiertes Bild direkt in Azure Storage hochladen
-    const timestamp = Date.now();
-    const filename = `${timestamp}.jpg`;
-    const lowResFilename = `${timestamp}_low.jpg`;
-
-    const azureStorage = new AzureStorageService();
-    const url = await azureStorage.uploadImage(filename, processedBuffer);
-    const lowResUrl = await azureStorage.uploadImage(lowResFilename, lowResBuffer);
-
-    return Response.json({ 
-      filename,
-      url,
-      lowResFilename,
-      lowResUrl,
-      success: true 
-    });
-
   } catch (error) {
     console.error('Fehler beim Upload:', error);
-    return new Response('Upload fehlgeschlagen', { status: 500 });
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unbekannter Fehler beim Upload'
+      }), 
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
   }
 } 

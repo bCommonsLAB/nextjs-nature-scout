@@ -1,15 +1,15 @@
-import { NextResponse, NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createAnalysisJob, updateAnalysisJob, getAnalysisJob } from '@/lib/services/analysis-service';
 import { analyzeImageStructured } from '@/lib/services/openai-service';
 import { openAiResult } from '@/types/nature-scout';
 import { ObjectId } from 'mongodb';
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   const startTime = performance.now();
   //console.log('[Start-Route] Neue Analyse-Anfrage empfangen');
 
   try {
-    const { metadata } = await request.json();
+    const { metadata, existingJobId } = await request.json();
     
     if (!metadata) {
       //console.warn('[Start-Route] Keine Metadaten in der Anfrage');
@@ -19,12 +19,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const jobId = new ObjectId().toString();
-    //console.log(`[Start-Route] Erstelle neuen Job mit ID: ${jobId}`);
+    // Verwende die existierende JobId, wenn vorhanden, sonst generiere eine neue
+    const jobId = existingJobId || new ObjectId().toString();
+    console.log(`[Start-Route] ${existingJobId ? 'Verwende bestehende' : 'Erstelle neue'} Job ID: ${jobId}`);
+    
+    // Wenn es eine existierende JobId ist, prüfe ob sie gültig ist
+    if (existingJobId) {
+      const existingJob = await getAnalysisJob(existingJobId);
+      if (!existingJob) {
+        console.warn(`[Start-Route] Existierende JobId ${existingJobId} nicht gefunden, erstelle neue`);
+        // Wenn die bestehende JobId nicht gefunden wird, den Flow mit der neuen JobId fortsetzen
+      } else {
+        // Update des bestehenden Jobs mit neuen Metadaten
+        await updateAnalysisJob(existingJobId, {
+          status: 'pending',
+          metadata: metadata
+        });
+      }
+    }
+
+    // Job erstellen/aktualisieren
     const createJob = true;
     if (createJob) {
       try {
-        await createAnalysisJob(jobId, metadata, 'pending');
+        // Wenn existierende JobId, aktualisiere bestehenden Job, sonst erstelle neuen
+        if (!existingJobId) {
+          await createAnalysisJob(jobId, metadata, 'pending');
+        }
       } catch (dbError) {
         console.error('[Start-Route] Datenbankfehler:', dbError);
         return NextResponse.json(
@@ -36,16 +57,18 @@ export async function POST(request: NextRequest) {
           { status: 503 }
         );
       }
+      
       const job = await getAnalysisJob(jobId);
       
       if (!job) {
-        console.error(`[Start-Route] Job ${jobId} wurde nicht erfolgreich erstellt`);
+        console.error(`[Start-Route] Job ${jobId} wurde nicht erfolgreich erstellt/aktualisiert`);
         return NextResponse.json(
-          { error: 'Fehler beim Erstellen des Analyse-Jobs' },
+          { error: 'Fehler beim Erstellen/Aktualisieren des Analyse-Jobs' },
           { status: 500 }
         );
       }
     }
+    
     // Starte die Analyse asynchron
     (async () => {
       try {

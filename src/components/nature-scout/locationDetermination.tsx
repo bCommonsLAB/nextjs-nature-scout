@@ -337,7 +337,7 @@ export function LocationDetermination({
       console.log('Lade Habitate - API-Aufruf wird gestartet...');
       
       // Erhöhtes Limit, um mehr Habitate für den aktuellen Bereich zu erhalten
-      const response = await fetch('/api/habitat/public?limit=100');
+      const response = await fetch('/api/habitat/public?limit=100&verifizierungsstatus=alle');
       
       if (!response.ok) {
         throw new Error(`API-Fehler: ${response.status}`);
