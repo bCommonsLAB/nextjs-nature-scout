@@ -319,7 +319,7 @@ export function Navbar() {
                         Debug
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
+                    <DialogContent className="max-w-5xl max-h-[80vh] overflow-auto">
                       <DialogHeader>
                         <DialogTitle>
                           Analysierte Daten
@@ -330,9 +330,39 @@ export function Navbar() {
                           )}
                         </DialogTitle>
                       </DialogHeader>
-                      <pre className="bg-gray-100 p-4 rounded-md overflow-x-auto">
-                        {JSON.stringify(metadata, null, 2)}
-                      </pre>
+                      <div className="relative">
+                        <pre className="bg-gray-100 p-4 rounded-md text-sm font-mono whitespace-pre-wrap overflow-x-auto border border-gray-200">
+                          {JSON.stringify(metadata, null, 2)}
+                        </pre>
+                        <div className="absolute bottom-2 right-2 flex space-x-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => {
+                              const jsonText = JSON.stringify(metadata, null, 2);
+                              navigator.clipboard.writeText(jsonText);
+                            }}
+                          >
+                            Kopieren
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => {
+                              const jsonData = metadata;
+                              const jsonBlob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+                              const url = URL.createObjectURL(jsonBlob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = 'debug-data.json';
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                          >
+                            Herunterladen
+                          </Button>
+                        </div>
+                      </div>
                     </DialogContent>
                   </Dialog>
                 </>
@@ -420,7 +450,7 @@ export function Navbar() {
                             Debug
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
+                        <DialogContent className="max-w-5xl max-h-[80vh] overflow-auto">
                           <DialogHeader>
                             <DialogTitle>
                               Analysierte Daten
@@ -431,9 +461,39 @@ export function Navbar() {
                               )}
                             </DialogTitle>
                           </DialogHeader>
-                          <pre className="bg-gray-100 p-4 rounded-md overflow-x-auto">
-                            {JSON.stringify(metadata, null, 2)}
-                          </pre>
+                          <div className="relative">
+                            <pre className="bg-gray-100 p-4 rounded-md text-sm font-mono whitespace-pre-wrap overflow-x-auto border border-gray-200">
+                              {JSON.stringify(metadata, null, 2)}
+                            </pre>
+                            <div className="absolute bottom-2 right-2 flex space-x-2">
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={() => {
+                                  const jsonText = JSON.stringify(metadata, null, 2);
+                                  navigator.clipboard.writeText(jsonText);
+                                }}
+                              >
+                                Kopieren
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={() => {
+                                  const jsonData = metadata;
+                                  const jsonBlob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+                                  const url = URL.createObjectURL(jsonBlob);
+                                  const a = document.createElement('a');
+                                  a.href = url;
+                                  a.download = 'debug-data.json';
+                                  a.click();
+                                  URL.revokeObjectURL(url);
+                                }}
+                              >
+                                Herunterladen
+                              </Button>
+                            </div>
+                          </div>
                         </DialogContent>
                       </Dialog>
                     </>

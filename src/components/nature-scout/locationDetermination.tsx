@@ -9,6 +9,7 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import { InstructionDialog } from "@/components/ui/instruction-dialog";
 import type { MapNoSSRHandle } from "@/components/map/mapNoSSR";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 // Dynamisch geladene Karte ohne SSR
 const MapNoSSR = dynamic(() => import('@/components/map/mapNoSSR'), {
@@ -708,15 +709,15 @@ export function LocationDetermination({
         
         {/* Standortinformationen (unten rechts) */}
         {showLocationInfo && (
-          <div className="absolute bottom-11 right-3 z-[9999] bg-gray-800/30 backdrop-blur-sm rounded-lg shadow-lg p-3 max-w-[60vw]">
-            <h3 className="text-[10px] font-semibold mb-1 text-white">Standortinformationen</h3>
+          <div className="absolute bottom-11 right-3 z-[10000] bg-gray-800/30 backdrop-blur-sm rounded-lg shadow-lg p-3 max-w-[70vw]">
+            <h3 className="text-[12px] font-semibold mb-1 text-white">Standortinformationen</h3>
             {isLoadingGeodata ? (
               <div className="flex items-center justify-center py-2">
                 <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary"></div>
-                <span className="ml-2 text-[10px] text-white">Daten werden geladen...</span>
+                <span className="ml-2 text-[12px] text-white">Daten werden geladen...</span>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-white">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[12px] text-white">
                 {metadata.gemeinde && metadata.gemeinde !== 'unbekannt' && (
                   <>
                     <div className="text-gray-200">Gemeinde:</div>
@@ -775,32 +776,69 @@ export function LocationDetermination({
           </div>
         )}
         
-        {/* UI-Overlay: Modus-Buttons (unten links) */}
-        <div className="absolute bottom-11 left-3 z-[9999] flex flex-row gap-2">
-          <Button 
-            variant={mapMode === 'navigation' ? 'outline' : 'default'} 
-            size="icon"
-            onClick={() => toggleMapMode('navigation')}
-            className="h-8 w-8 shadow-lg"
-          >
-            <MoveIcon className="h-6 w-6" />
-          </Button>
-          
-          <Button 
-            variant={mapMode === 'polygon' ? 'outline' : 'default'} 
-            size="icon"
-            onClick={() => toggleMapMode('polygon')}
-            className="h-8 w-8 shadow-lg"
-          >
-            <CircleDashed className="h-6 w-6" />
-          </Button>
+        {/* UI-Overlay: Modus-Buttons (unten links) mit Aktions-Buttons */}
+        <div className="absolute bottom-0 left-0 right-0 z-[9999] bg-white/20 backdrop-blur-sm p-1 shadow-lg">
+          <div className="text-sm font-medium mb-0 px-3">Modus</div>
+          <div className="flex items-center justify-between px-3 p-2">
+            <div className="flex items-center">
+              <ToggleGroup type="single" value={mapMode === 'none' ? undefined : mapMode} className="bg-muted/30 p-1 rounded-md">
+                <ToggleGroupItem 
+                  value="navigation"
+                  onClick={() => toggleMapMode('navigation')}
+                  size="icon"
+                  className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=off]:bg-secondary data-[state=off]:text-secondary-foreground hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                  aria-label="Navigation"
+                >
+                  <MoveIcon className="h-4 w-4" />
+                </ToggleGroupItem>
+                
+                <ToggleGroupItem 
+                  value="polygon"
+                  onClick={() => toggleMapMode('polygon')}
+                  size="icon"
+                  className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=off]:bg-secondary data-[state=off]:text-secondary-foreground hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                  aria-label="Polygon"
+                >
+                  <CircleDashed className="h-4 w-4" />
+                </ToggleGroupItem>
+              </ToggleGroup>
+
+              {/* Speichern und Neu als normale Buttons auf der gleichen Höhe */}
+              {mapMode === 'polygon' && (
+                <>
+                  <div className="mx-2" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={savePolygon}
+                    disabled={isSavingPolygon}
+                    className="h-8 text-xs"
+                  >
+                    {isSavingPolygon ? 'Speichern...' : 'Speichern'}
+                  </Button>
+                  
+                  <div className="ml-1" />
+                  
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={restartPolygon}
+                    disabled={isSavingPolygon}
+                    className="h-8 text-xs"
+                  >
+                    Neu
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
         
         {/* UI-Overlay: Aktions-Buttons (oben links) */}
         {mapMode !== 'polygon' && (
         <div className="absolute z-[9999] flex flex-row gap-2 items-center" style={{left: 10, top: 75}}>
             <Button 
-              variant="outline" 
+              variant="secondary" 
               size="icon" 
               onClick={centerMapToCurrentPosition} 
               className="h-7 w-7 shadow-lg"
@@ -810,43 +848,9 @@ export function LocationDetermination({
             </Button>
           </div>
         )}
+        {/* Entferne alte Buttons für Speichern/Neu (wurden nach oben verschoben) */}
         {!showLocationInfo && (
-          <>
-            
-            {mapMode === 'polygon' && (
-              <div className="absolute bottom-11 right-3 z-[9999] flex flex-row gap-2 items-center">
-                <Button 
-                  variant="default" 
-                  size="sm" 
-                  onClick={savePolygon}
-                  className="shadow-lg flex items-center gap-1 h-8"
-                  disabled={isSavingPolygon}
-                >
-                  {isSavingPolygon ? (
-                    <div className="flex items-center gap-1">
-                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary-foreground"></div>
-                      <span>Speichern...</span>
-                    </div>
-                  ) : (
-                    <>
-                      <MapPinCheck className="h-8 w-8" />
-                      <span>Speichern</span>
-                    </>
-                  )}
-                </Button>
-                <Button 
-                  variant="default" 
-                  size="sm" 
-                  onClick={restartPolygon}
-                  className="shadow-lg flex items-center gap-1 h-8"
-                  disabled={isSavingPolygon}
-                >
-                  <RefreshCw className="h-8 w-8" />
-                  <span>Neu</span>
-                </Button>
-              </div>
-            )}
-          </>
+          <></>
         )}
       </div>
       

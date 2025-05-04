@@ -309,6 +309,25 @@ export function Summary({ metadata }: SummaryProps) {
             {metadata.elevation && <p>Höhe: {metadata.elevation}</p>}
             {metadata.exposition && <p>Exposition: {metadata.exposition}</p>}
             {metadata.slope && <p>Hangneigung: {metadata.slope}</p>}
+            {metadata.plotsize && <p>Fläche: {metadata.plotsize.toLocaleString('de-DE')} m²</p>}  
+            
+            {/* Katasterdaten */}
+            {metadata.kataster && (
+              <>
+                {metadata.kataster.parzellennummer && (
+                  <p>Parzelle: {metadata.kataster.parzellennummer}</p>
+                )}
+                {metadata.kataster.flaeche && (
+                  <p>Katasterfläche: {metadata.kataster.flaeche.toLocaleString('de-DE')} m²</p>
+                )}
+                {metadata.kataster.katastralgemeinde && (
+                  <p>Katastralgemeinde: {metadata.kataster.katastralgemeinde}</p>
+                )}
+                {metadata.kataster.katastralgemeindeKodex && (
+                  <p>K.G. Kodex: {metadata.kataster.katastralgemeindeKodex}</p>
+                )}
+              </>
+            )}
           </div>
 
           <h2 className="text-xl font-semibold mb-4">Bilder</h2>

@@ -152,7 +152,8 @@ export default function NatureScout() {
               exposition: habitatData.metadata.exposition || "",
               elevation: habitatData.metadata.elevation || "",
               slope: habitatData.metadata.slope || "",
-              plotsize: habitatData.metadata.plotsize || 0
+              plotsize: habitatData.metadata.plotsize || 0,
+              kataster: habitatData.metadata.kataster || undefined
             });
             
             // Direkt zum zweiten Schritt springen, wenn wir ein bestehendes Habitat bearbeiten

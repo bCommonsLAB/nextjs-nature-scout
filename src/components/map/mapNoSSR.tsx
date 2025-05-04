@@ -376,13 +376,6 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
       
       // Basis OpenStreetMap Layer als Grundkarte hinzufügen
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
-      }).addTo(mapRef.current);
-
-      // Mapbox Satellite Layer für höhere Zoom-Level als zusätzliche Option
-      L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4M29iazA2Z2gycXA4N2pmbDZmangifQ.-g_vE53SD2WrJ6tFX7QHmA', {
-        attribution: '&copy; Mapbox',
-        maxZoom: 18
       }).addTo(mapRef.current);
 
       // Südtiroler WMS-Layer hinzufügen für aktuelle Orthofotos
@@ -394,7 +387,6 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
           transparent: true,
           version: '1.3.0',
           opacity: 1,
-          attribution: '&copy; Autonome Provinz Bozen - Südtirol'
         }).addTo(mapRef.current);
       } catch (error) {
         console.error("Fehler beim Laden des WMS-Layers:", error);
