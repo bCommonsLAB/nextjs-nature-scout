@@ -5,13 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import { Menu, Settings, TestTube2, MapPinCheckInside, Users, Code, MapPinPlusInside, Map } from "lucide-react";
+import { Menu, Settings, TestTube2, MapPinCheckInside, Users, MapPinPlusInside, Map } from "lucide-react";
 import { SignInButton, SignedIn, SignedOut, useUser, useClerk } from "@clerk/nextjs";
-import { UserOrganisationButton } from "@/components/user-organisation";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { useNatureScoutState } from "@/context/nature-scout-context";
+import { UserOrganisationButton } from "@/components/UserOrganisation";
 import { useRouter, usePathname } from "next/navigation";
-import { useUserConsent } from "@/hooks/use-user-consent";
 import { toast } from "sonner";
 
 export function Navbar() {
@@ -19,14 +16,12 @@ export function Navbar() {
   const { signOut } = useClerk();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isExpert, setIsExpert] = useState(false);
-  const { metadata, editJobId } = useNatureScoutState();
   const router = useRouter();
   const pathname = usePathname();
   
   // State für Consent-Prüfung
   const [consentChecked, setConsentChecked] = useState(false);
   const [redirectingToConsent, setRedirectingToConsent] = useState(false);
-  const [redirectedAt, setRedirectedAt] = useState<number | null>(null);
   const [profilePageLoaded, setProfilePageLoaded] = useState(false);
   const [needsConsent, setNeedsConsent] = useState(false);
   
@@ -49,26 +44,8 @@ export function Navbar() {
   };
   
   // Logger-Funktion für Consent-Workflow
-  const logConsentWorkflow = (message: string, data?: any) => {
+  const logConsentWorkflow = (message: string, data?: unknown): void => {
     console.log(`[CONSENT WORKFLOW] ${message}`, data || '');
-    
-    // Optional: Server-seitiges Logging über API
-    try {
-      fetch('/api/debug/log', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          level: 'info',
-          source: 'consent-workflow',
-          message,
-          data
-        }),
-      }).catch(e => console.error('Logging API error:', e));
-    } catch (error) {
-      console.error('Failed to log consent workflow:', error);
-    }
   };
   
   // Überwache den Pathname, um zu erkennen, ob die Profilseite geladen wurde
@@ -97,7 +74,6 @@ export function Navbar() {
             
             // Setze Flags für die Weiterleitung
             setRedirectingToConsent(true);
-            setRedirectedAt(Date.now());
             
             // Zur Profilseite weiterleiten
             router.push('/profile?consent_required=true');
@@ -146,7 +122,6 @@ export function Navbar() {
             logConsentWorkflow('Einwilligungen wurden erteilt');
             // Zurücksetzen der Flags
             setRedirectingToConsent(false);
-            setRedirectedAt(null);
             setConsentChecked(true);
             setNeedsConsent(false);
           }
@@ -172,7 +147,7 @@ export function Navbar() {
   }, [pathname, isLoaded, user, signOut, router, profilePageLoaded, needsConsent]);
 
   // Funktion, die prüft, ob ungespeicherte Änderungen vorhanden sind
-  const hasUnsavedChanges = () => {
+  const hasUnsavedChanges = (): boolean => {
     // Da die Daten immer gespeichert sind, gibt es keine ungespeicherten Änderungen mehr
     return false;
   };
@@ -288,59 +263,6 @@ export function Navbar() {
                       Admin
                     </Button>
                   </Link>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="ghost" className="text-base">
-                        <Code className="h-4 w-4 mr-2" />
-                        Debug
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-5xl max-h-[80vh] overflow-auto">
-                      <DialogHeader>
-                        <DialogTitle>
-                          Analysierte Daten
-                          {editJobId && (
-                            <span className="ml-2 text-sm font-normal bg-gray-100 px-2 py-1 rounded">
-                              Job-ID: {editJobId}
-                            </span>
-                          )}
-                        </DialogTitle>
-                      </DialogHeader>
-                      <div className="relative">
-                        <pre className="bg-gray-100 p-4 rounded-md text-sm font-mono whitespace-pre-wrap overflow-x-auto border border-gray-200">
-                          {JSON.stringify(metadata, null, 2)}
-                        </pre>
-                        <div className="absolute bottom-2 right-2 flex space-x-2">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => {
-                              const jsonText = JSON.stringify(metadata, null, 2);
-                              navigator.clipboard.writeText(jsonText);
-                            }}
-                          >
-                            Kopieren
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => {
-                              const jsonData = metadata;
-                              const jsonBlob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
-                              const url = URL.createObjectURL(jsonBlob);
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = 'debug-data.json';
-                              a.click();
-                              URL.revokeObjectURL(url);
-                            }}
-                          >
-                            Herunterladen
-                          </Button>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
                 </>
               )}
               
@@ -419,59 +341,6 @@ export function Navbar() {
                         <Settings className="h-4 w-4 mr-2" />
                         Admin
                       </Button>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" className="w-full text-base justify-start">
-                            <Code className="h-4 w-4 mr-2" />
-                            Debug
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-5xl max-h-[80vh] overflow-auto">
-                          <DialogHeader>
-                            <DialogTitle>
-                              Analysierte Daten
-                              {editJobId && (
-                                <span className="ml-2 text-sm font-normal bg-gray-100 px-2 py-1 rounded">
-                                  Job-ID: {editJobId}
-                                </span>
-                              )}
-                            </DialogTitle>
-                          </DialogHeader>
-                          <div className="relative">
-                            <pre className="bg-gray-100 p-4 rounded-md text-sm font-mono whitespace-pre-wrap overflow-x-auto border border-gray-200">
-                              {JSON.stringify(metadata, null, 2)}
-                            </pre>
-                            <div className="absolute bottom-2 right-2 flex space-x-2">
-                              <Button 
-                                size="sm" 
-                                variant="outline" 
-                                onClick={() => {
-                                  const jsonText = JSON.stringify(metadata, null, 2);
-                                  navigator.clipboard.writeText(jsonText);
-                                }}
-                              >
-                                Kopieren
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="outline" 
-                                onClick={() => {
-                                  const jsonData = metadata;
-                                  const jsonBlob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
-                                  const url = URL.createObjectURL(jsonBlob);
-                                  const a = document.createElement('a');
-                                  a.href = url;
-                                  a.download = 'debug-data.json';
-                                  a.click();
-                                  URL.revokeObjectURL(url);
-                                }}
-                              >
-                                Herunterladen
-                              </Button>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
                     </>
                   )}
                 </SignedIn>

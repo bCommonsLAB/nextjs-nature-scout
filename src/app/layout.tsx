@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { Navbar } from "@/components/layout/navbar";
-import { Footer } from '@/components/layout/footer';  
+import { Navbar } from "@/components/layout/Navbar";
+import { Footer } from '@/components/layout/Footer';  
 import '../styles/leaflet-custom.css';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css'; // CSS für Leaflet Draw

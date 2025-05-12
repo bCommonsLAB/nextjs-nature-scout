@@ -1,10 +1,12 @@
 'use client';
 
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Shield } from "lucide-react";
 import { useState } from 'react';
-import { OrganizationTable } from '@/components/admin/organization-table';
+import { OrganizationTable } from '@/components/admin/OrganizationTable';
 import { useAdmin } from '@/hooks/use-admin';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { ShieldAlert, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 
 export default function OrganizationsPage() {
   const { isAdmin, isLoading } = useAdmin();
@@ -21,7 +23,7 @@ export default function OrganizationsPage() {
     return (
       <div className="container mx-auto py-8">
         <Alert variant="destructive" className="mb-4">
-          <ShieldAlert className="h-4 w-4" />
+          <Shield className="h-4 w-4" />
           <AlertTitle>Zugriff verweigert</AlertTitle>
           <AlertDescription>
             Du hast keine Administratorrechte für diese Seite.
@@ -32,8 +34,16 @@ export default function OrganizationsPage() {
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <OrganizationTable />
+    <div className="container mx-auto p-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Organisationsmanagement</CardTitle>
+          <CardDescription>Verwalten Sie alle Organisationen in der Anwendung</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <OrganizationTable />
+        </CardContent>
+      </Card>
     </div>
   );
 } 

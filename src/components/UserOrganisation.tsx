@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
-import { CustomUserButton } from "@/components/custom-user-button";
+import { CustomUserButton } from "@/components/CustomUserButton";
 
 export function UserOrganisationButton() {
   const [userRole, setUserRole] = useState<string | null>(null);

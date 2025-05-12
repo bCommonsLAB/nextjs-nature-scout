@@ -8,12 +8,12 @@ import { MoveIcon, MapPinCheck, RefreshCw, CircleDashed, LocateFixed } from "luc
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import { InstructionDialog } from "@/components/ui/instruction-dialog";
-import type { MapNoSSRHandle } from "@/components/map/mapNoSSR";
+import type { MapNoSSRHandle } from "@/components/map/MapNoSSR";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useRouter, useSearchParams } from "next/navigation";
 
 // Dynamisch geladene Karte ohne SSR
-const MapNoSSR = dynamic(() => import('@/components/map/mapNoSSR'), {
+const MapNoSSR = dynamic(() => import('@/components/map/MapNoSSR'), {
   ssr: false,
   loading: () => <div className="flex items-center justify-center h-full">Karte wird geladen...</div>
 });

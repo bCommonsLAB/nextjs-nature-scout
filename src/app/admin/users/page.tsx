@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { UserTable } from '@/components/admin/user-table';
+import { UserTable } from '@/components/admin/UserTable';
 import { useAdmin } from '@/hooks/use-admin';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';

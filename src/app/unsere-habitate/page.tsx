@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { HabitatCard } from '@/components/Landing/HabitatCard';
+import { HabitatCard } from '@/components/landing/HabitatCard';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Search, FilterX } from 'lucide-react';
 import { 
@@ -14,7 +14,7 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { MultiSelectFilter } from './components/multi-select-filter';
+import { MultiSelectFilter } from './components/MultiSelectFilter';
 import { Badge } from '@/components/ui/badge';
 
 interface HabitatEntry {

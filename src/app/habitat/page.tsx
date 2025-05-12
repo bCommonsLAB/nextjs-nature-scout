@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import { ShieldCheck, Plus, ShieldAlert, X, Download, Trash2 } from 'lucide-react';
-import { HabitateList } from './components/habitate-list';
-import { SearchBar } from './components/search-bar';
+import { HabitateList } from './components/HabitateList';
+import { SearchBar } from './components/SearchBar';
 import { 
   Select, 
   SelectContent, 
@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { FilterSelect } from './components/filter-select';
+import { FilterSelect } from './components/FilterSelect';
 
 interface HabitateEntry {
   jobId: string;

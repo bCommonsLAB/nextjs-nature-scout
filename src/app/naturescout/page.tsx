@@ -1,4 +1,4 @@
-import ClientNatureScout from '@/components/nature-scout/clientNatureScout';
+import ClientNatureScout from '@/components/NatureScout/ClientNatureScout';
 
 export default function NatureScoutPage() {
   return <ClientNatureScout />;

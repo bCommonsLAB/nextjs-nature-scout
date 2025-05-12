@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 
-const MapNoSSR = dynamic(() => import('./mapNoSSR'), {
+// Dynamically load the map component without SSR
+const MapNoSSR = dynamic(() => import('./MapNoSSR'), {
   ssr: false,
-  loading: () => <div className="w-full h-full bg-gray-100" />
+  loading: () => <div className="flex justify-center items-center h-96">Karte wird geladen...</div>
 });
 
 // Typdefinition für die Habitat-Daten aus der API
@@ -211,5 +212,4 @@ const Map: React.FC<MapProps> = ({ position, zoom, onCenterChange }) => {
   );
 };
 
-export default Map;
-
+export default Map; 

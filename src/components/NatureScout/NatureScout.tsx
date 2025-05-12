@@ -4,14 +4,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Welcome } from "./welcome";
-import { GetImage } from "./get-image";
-import { Summary } from "./summary";
-import { UploadedImageList } from "./uploaded-image-list";
-import { HabitatAnalysis } from "./habitat-analysis";
-import { UploadImages } from "./upload-images";
+import { Welcome } from "./Welcome";
+import { Summary } from "./Summary";
+import { UploadedImageList } from "./UploadedImageList";
+import { HabitatAnalysis } from "./HabitatAnalysis";
+import { UploadImages } from "./UploadImages";
 import { Bild, NatureScoutData, AnalyseErgebnis, llmInfo, PlantNetResult } from "@/types/nature-scout";
-import { LocationDetermination } from './locationDetermination';
+import { LocationDetermination } from './LocationDetermination';
 import { ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNatureScoutState } from "@/context/nature-scout-context";
@@ -47,15 +46,6 @@ function isNextButtonDisabled(schritt: number, metadata: NatureScoutData, isAnyU
   }
 }
 
-// Verschiebe useEffect in einen separaten Client-Komponenten
-function DebugLogger({ metadata }: { metadata: NatureScoutData }) {
-  useEffect(() => {
-    console.log("Aktuelle Bilder:", metadata.bilder);
-  }, [metadata.bilder]);
-  
-  return null;
-}
-
 export default function NatureScout() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -75,7 +65,6 @@ export default function NatureScout() {
     bilder: [],
     analyseErgebnis: undefined
   });
-  const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [shouldScrollToNext, setShouldScrollToNext] = useState(false);
@@ -187,21 +176,6 @@ export default function NatureScout() {
     setIsAnyUploadActive(isActive);
   };
 
-  const handleBildUpload = (imageKey: string, filename: string, url: string, analysis: string, plantnetResult?: PlantNetResult) => {
-    const neuesBild: Bild = {
-      imageKey,
-      filename,
-      url,
-      analyse: analysis,
-      plantnetResult
-    };
-      
-    setMetadata(prev => ({
-      ...prev,
-      bilder: [...prev.bilder.filter(b => b.imageKey !== imageKey), neuesBild]
-    }));
-  };
-
   const handleAnalysisComplete = (
     ergebnis: AnalyseErgebnis, 
     llmInfo: llmInfo
@@ -217,13 +191,6 @@ export default function NatureScout() {
     setMetadata(prev => ({
       ...prev,
       kommentar
-    }));
-  };
-
-  const handleDeleteImage = (imageKey: string) => {
-    setMetadata(prev => ({
-      ...prev,
-      bilder: prev.bilder.filter(b => b.imageKey !== imageKey)
     }));
   };
 
@@ -366,7 +333,6 @@ export default function NatureScout() {
 
   return (
     <div className="container mx-auto p-4">
-      <DebugLogger metadata={metadata} />
       <div className="mb-2" ref={progressBarRef}>
         <Progress value={(aktiverSchritt / (schritte.length - 1)) * 100} className="w-full" />
         <div className="flex justify-between mt-1 px-1">

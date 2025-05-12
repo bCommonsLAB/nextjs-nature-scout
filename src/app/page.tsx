@@ -1,5 +1,5 @@
-import { NatureScoutPage } from "@/components/LandingPage";
+import { NatureScoutPage } from "@/components/landing/LandingPage";
 
-export default function HomePage() {
+export default function Home() {
   return <NatureScoutPage />;
 }

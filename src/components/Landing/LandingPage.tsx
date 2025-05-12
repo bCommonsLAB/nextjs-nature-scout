@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import { useState, useEffect } from "react";
-import { HabitatCard } from "./Landing/HabitatCard";
-import { FeatureCard } from "./Landing/FeatureCard";
-import { ProcessStep } from "./Landing/ProcessStep";
+import { HabitatCard } from "./HabitatCard";
+import { FeatureCard } from "./FeatureCard";
+import { ProcessStep } from "./ProcessStep";
 import { Button } from "@/components/ui/button";
 import { ArrowDown, ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
