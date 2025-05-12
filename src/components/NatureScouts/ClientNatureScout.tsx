@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 
 const NatureScout = dynamic(
-  () => import('@/components/NatureScout/NatureScout'),
+  () => import('@/components/NatureScouts/NatureScout'),
   { ssr: false }
 );
 
