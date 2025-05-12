@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { ChevronDown, ChevronUp, Flower2, Sparkles, CheckCircle2, Camera, MessagesSquare, MessageSquare, Terminal, AlertTriangle, Loader2 } from 'lucide-react';
 import { NatureScoutData, AnalyseErgebnis, llmInfo, SimplifiedSchema } from "@/types/nature-scout";
-import { ParameterHeading } from './parameter-heading';
+import { ParameterHeading } from './ParameterHeading';
 import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
 import { useNatureScoutState } from "@/context/nature-scout-context";
 

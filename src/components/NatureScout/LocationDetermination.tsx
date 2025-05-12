@@ -435,15 +435,112 @@ export function LocationDetermination({
   // Diese Funktion wird nur bei der Initialisierung eines neuen Habitats verwendet
   const getCurrentLocation = () => {
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
+      // Referenz für den watchPosition-Handler speichern
+      let watchId: number | null = null;
+      
+      // Status-Variable für erste Position
+      let hasReceivedPosition = false;
+      
+      // Feedback-Element für die Genauigkeit erstellen
+      let accuracyFeedback: HTMLDivElement | null = null;
+      
+      if (typeof document !== 'undefined') {
+        accuracyFeedback = document.createElement('div');
+        accuracyFeedback.className = 'accuracy-feedback';
+        accuracyFeedback.style.position = 'absolute';
+        accuracyFeedback.style.bottom = '80px';
+        accuracyFeedback.style.left = '50%';
+        accuracyFeedback.style.transform = 'translateX(-50%)';
+        accuracyFeedback.style.backgroundColor = 'rgba(0,0,0,0.7)';
+        accuracyFeedback.style.color = 'white';
+        accuracyFeedback.style.padding = '8px 12px';
+        accuracyFeedback.style.borderRadius = '4px';
+        accuracyFeedback.style.zIndex = '10000';
+        accuracyFeedback.style.fontSize = '12px';
+        accuracyFeedback.style.display = 'none';
+        
+        // Zum DOM hinzufügen
+        setTimeout(() => {
+          const container = document.querySelector('.leaflet-container');
+          if (container && accuracyFeedback) {
+            container.appendChild(accuracyFeedback);
+            accuracyFeedback.style.display = 'block';
+            accuracyFeedback.textContent = 'GPS-Position wird ermittelt...';
+          }
+        }, 500);
+      }
+
+      // watchPosition statt getCurrentPosition verwenden für kontinuierliche Updates
+      watchId = navigator.geolocation.watchPosition(
         (position) => {
-          const { latitude, longitude } = position.coords;
+          const { latitude, longitude, accuracy } = position.coords;
           
           // Position aktualisieren
           setCurrentPosition([latitude, longitude]);
           
-          // Zoom-Level aktualisieren
-          setZoom(18);
+          // Feedback zur Genauigkeit anzeigen
+          if (accuracyFeedback) {
+            // Genauigkeit auf Meter runden
+            const accuracyInMeters = Math.round(accuracy);
+            
+            // Textfarbe basierend auf Genauigkeit
+            let statusColor = 'red';
+            let statusText = 'Ungenau';
+            
+            if (accuracy <= 15) {
+              statusColor = 'lime';
+              statusText = 'Sehr gut';
+            } else if (accuracy <= 30) {
+              statusColor = 'yellow';
+              statusText = 'Gut';
+            } else if (accuracy <= 50) {
+              statusColor = 'orange';
+              statusText = 'Mittelmäßig';
+            }
+            
+            accuracyFeedback.innerHTML = `
+              GPS-Genauigkeit: <span style="color: ${statusColor}; font-weight: bold;">${statusText}</span> (±${accuracyInMeters}m)
+            `;
+          }
+          
+          // Zoom-Level aktualisieren, aber nur beim ersten Empfang
+          if (!hasReceivedPosition) {
+            setZoom(18);
+            hasReceivedPosition = true;
+          }
+          
+          console.log("Neue GPS-Position empfangen:", { latitude, longitude, accuracy });
+          
+          // Optional: Position-Watcher beenden nach einer gewissen Zeit oder bei ausreichender Genauigkeit
+          if (accuracy <= 15) { // Wenn Genauigkeit besser als 15 Meter ist
+            if (watchId !== null) {
+              console.log("Position mit guter Genauigkeit empfangen, beende watchPosition");
+              
+              // Feedback-Element mit Erfolgsmeldung aktualisieren
+              if (accuracyFeedback) {
+                accuracyFeedback.style.backgroundColor = 'rgba(0,100,0,0.7)';
+                accuracyFeedback.innerHTML = 'GPS-Position erfolgreich ermittelt!';
+                
+                // Nach 3 Sekunden ausblenden
+                setTimeout(() => {
+                  if (accuracyFeedback) {
+                    accuracyFeedback.style.opacity = '0';
+                    accuracyFeedback.style.transition = 'opacity 1s';
+                    
+                    // Aus dem DOM entfernen nach Ausblenden
+                    setTimeout(() => {
+                      if (accuracyFeedback && accuracyFeedback.parentNode) {
+                        accuracyFeedback.parentNode.removeChild(accuracyFeedback);
+                      }
+                    }, 1000);
+                  }
+                }, 3000);
+              }
+              
+              navigator.geolocation.clearWatch(watchId);
+              watchId = null;
+            }
+          }
         },
         (error) => {
           // Ausführlichere Fehlerinformationen ausgeben
@@ -462,16 +559,49 @@ export function LocationDetermination({
             originalError: error
           });
           
+          // Feedback-Element mit Fehlermeldung aktualisieren
+          if (accuracyFeedback) {
+            accuracyFeedback.style.backgroundColor = 'rgba(220,38,38,0.9)';
+            accuracyFeedback.textContent = 'GPS-Fehler: ' + errorMessage;
+            
+            // Nach 5 Sekunden ausblenden
+            setTimeout(() => {
+              if (accuracyFeedback) {
+                if (accuracyFeedback.parentNode) {
+                  accuracyFeedback.parentNode.removeChild(accuracyFeedback);
+                }
+              }
+            }, 5000);
+          }
+          
           // Optional: Dem Benutzer eine Nachricht anzeigen
           alert(`Standort konnte nicht ermittelt werden: ${errorMessage}\n\nBitte wählen Sie Ihren Standort manuell auf der Karte.`);
+          
+          // Watcher bei Fehler beenden
+          if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+          }
         },
         // Zusätzliche Optionen für die Standortermittlung
         {
           enableHighAccuracy: true,  // Hohe Genauigkeit anfordern
-          timeout: 10000,           // 10 Sekunden Timeout
+          timeout: 30000,           // 30 Sekunden Timeout
           maximumAge: 0             // Keinen Cache verwenden
         }
       );
+      
+      // Watcher-ID im UseEffect cleanup beenden
+      return () => {
+        if (watchId !== null) {
+          navigator.geolocation.clearWatch(watchId);
+        }
+        
+        // Feedback-Element entfernen
+        if (accuracyFeedback && accuracyFeedback.parentNode) {
+          accuracyFeedback.parentNode.removeChild(accuracyFeedback);
+        }
+      };
     } else {
       console.error("Geolocation wird von diesem Browser nicht unterstützt.");
       alert("Die Standortermittlung wird von Ihrem Browser nicht unterstützt. Bitte wählen Sie Ihren Standort manuell auf der Karte.");
@@ -768,6 +898,99 @@ export function LocationDetermination({
       // Wird stattdessen beim Schließen des Dialogs gemacht
     }
   }, [showHelp, mapMode]);
+
+  // Effekt, um sicherzustellen, dass der Positionsmarker auf der Karte aktualisiert wird
+  useEffect(() => {
+    // Wenn Map initialisiert und wir im Navigationsmodus sind
+    if (mapRef.current && mapMode === 'navigation') {
+      // Marker auf aktuelle Position setzen
+      if (currentPosition[0] !== 0 && currentPosition[1] !== 0) {
+        try {
+          mapRef.current.centerMap(currentPosition[0], currentPosition[1]);
+          console.log("Positionsmarker aktualisiert:", currentPosition);
+        } catch (error) {
+          console.error("Fehler beim Aktualisieren des Positionsmarkers:", error);
+        }
+      }
+    }
+  }, [currentPosition, mapMode]);
+
+  // Funktion zum Zentieren auf die aktuelle GPS-Position (nicht auf die gespeicherte Position)
+  const centerToCurrentGPS = useCallback(() => {
+    if (navigator.geolocation) {
+      mapRef.current?.centerMap(currentPosition[0], currentPosition[1], 18);
+      
+      // Optionaler Statushinweis
+      const statusElement = document.createElement('div');
+      statusElement.textContent = 'GPS-Position wird abgerufen...';
+      statusElement.style.position = 'absolute';
+      statusElement.style.top = '50%';
+      statusElement.style.left = '50%';
+      statusElement.style.transform = 'translate(-50%, -50%)';
+      statusElement.style.backgroundColor = 'rgba(0,0,0,0.7)';
+      statusElement.style.color = 'white';
+      statusElement.style.padding = '8px 12px';
+      statusElement.style.borderRadius = '4px';
+      statusElement.style.zIndex = '10000';
+      
+      // Füge das Element zum DOM hinzu
+      if (mapContainerRef?.current) {
+        mapContainerRef.current.appendChild(statusElement);
+      }
+      
+      // Einmalige Position abrufen für sofortiges Update
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          
+          // Position aktualisieren
+          setCurrentPosition([latitude, longitude]);
+          
+          // Sofort auf die neue Position zentrieren
+          mapRef.current?.centerMap(latitude, longitude, 18);
+          
+          // Status entfernen
+          if (statusElement.parentNode) {
+            statusElement.parentNode.removeChild(statusElement);
+          }
+        },
+        (error) => {
+          console.error("Fehler beim Aktualisieren der GPS-Position:", error);
+          
+          // Status mit Fehlermeldung aktualisieren
+          statusElement.textContent = 'GPS-Abfrage fehlgeschlagen';
+          statusElement.style.backgroundColor = 'rgba(220,38,38,0.9)';
+          
+          // Status nach 2 Sekunden entfernen
+          setTimeout(() => {
+            if (statusElement.parentNode) {
+              statusElement.parentNode.removeChild(statusElement);
+            }
+          }, 2000);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    }
+  }, [currentPosition]);
+
+  // Referenz für den Map-Container
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  
+  // Beim ersten Rendern den Container-Ref setzen
+  useEffect(() => {
+    // Prüfen, ob wir im Browser sind
+    if (typeof document !== 'undefined') {
+      // Container-Element per Selektor finden
+      const containerElement = document.querySelector('.leaflet-container') as HTMLDivElement;
+      if (containerElement) {
+        mapContainerRef.current = containerElement;
+      }
+    }
+  }, []);
 
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)]">
@@ -1084,6 +1307,16 @@ export function LocationDetermination({
               title="Karte auf gespeicherte Position zentrieren"
             >
               <LocateFixed className="h-6 w-6" />
+            </Button>
+            
+            <Button 
+              variant="secondary" 
+              size="icon" 
+              onClick={centerToCurrentGPS} 
+              className="h-7 w-7 shadow-lg bg-blue-600 hover:bg-blue-700"
+              title="Aktuelle GPS-Position verwenden"
+            >
+              <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
         )}

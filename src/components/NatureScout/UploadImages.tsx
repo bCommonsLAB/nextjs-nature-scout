@@ -1,7 +1,7 @@
 "use client";
 
 import { NatureScoutData, Bild, PlantNetResult } from "@/types/nature-scout";
-import { GetImage } from "./get-image";
+import { GetImage } from "./GetImage";
 import { InstructionDialog } from "@/components/ui/instruction-dialog";
 import { useState, useEffect } from "react";
 

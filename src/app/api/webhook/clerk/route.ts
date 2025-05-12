@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Webhook } from 'svix';
 import { WebhookEvent } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
-import { addWebhookEvent } from '../../debug/webhooks/route';
 
 export async function POST(req: NextRequest) {
   // Webhook Secret aus Umgebungsvariablen
@@ -45,12 +44,6 @@ export async function POST(req: NextRequest) {
     
     console.log('Webhook erfolgreich verifiziert:', evt.type);
     
-    // Event zur Debug-Liste hinzufügen
-    await addWebhookEvent({
-      type: evt.type,
-      data: evt.data
-    });
-    
     // Event verarbeiten
     return await handleWebhookEvent(evt);
     
@@ -73,34 +66,16 @@ async function handleWebhookEvent(evt: WebhookEvent) {
     
     if (!user_id) {
       console.error('Keine Benutzer-ID in den Session-Daten gefunden');
-      await addWebhookEvent({
-        type: 'error_no_user_id_in_session',
-        data: evt.data
-      });
       return NextResponse.json({ error: 'Keine Benutzer-ID vorhanden' }, { status: 400 });
     }
     
     try {
       // Aktualisiere das lastAccess-Datum des Benutzers
-      const updatedUser = await UserService.updateLastAccess(user_id);
-      
-      // Erfolg zur Debug-Liste hinzufügen
-      await addWebhookEvent({
-        type: 'user_last_access_updated',
-        userId: user_id,
-        timestamp: new Date().toISOString()
-      });
+      const _updatedUser = await UserService.updateLastAccess(user_id);
       
       return NextResponse.json({ success: true, action: 'lastAccessUpdated' });
     } catch (error) {
       console.error('Fehler beim Aktualisieren des lastAccess-Datums:', error);
-      
-      // Fehler zur Debug-Liste hinzufügen
-      await addWebhookEvent({
-        type: 'user_last_access_update_error',
-        userId: user_id,
-        error: (error as Error).message
-      });
       
       return NextResponse.json({ error: 'Interner Serverfehler' }, { status: 500 });
     }
@@ -123,19 +98,11 @@ async function handleWebhookEvent(evt: WebhookEvent) {
     
     if (!id) {
       console.error('Keine Benutzer-ID in den Webhook-Daten gefunden');
-      await addWebhookEvent({
-        type: 'error_no_id',
-        data: evt.data
-      });
       return NextResponse.json({ error: 'Keine Benutzer-ID vorhanden' }, { status: 400 });
     }
     
     if (!email) {
       console.error('Keine E-Mail-Adresse in den Webhook-Daten gefunden');
-      await addWebhookEvent({
-        type: 'error_no_email',
-        data: evt.data
-      });
       return NextResponse.json({ error: 'Keine E-Mail-Adresse vorhanden' }, { status: 400 });
     }
     
@@ -159,22 +126,12 @@ async function handleWebhookEvent(evt: WebhookEvent) {
         }
         
         // Benutzer aktualisieren - immer die clerkId aktualisieren, falls es ein importierter Benutzer war
-        const updatedUser = await UserService.updateUser(existingUser.clerkId, { 
+        const _updatedUser = await UserService.updateUser(existingUser.clerkId, { 
           clerkId: id, // Stelle sicher, dass die tatsächliche Clerk-ID verwendet wird
           email, 
           name,
           // Füge ein Profilbild hinzu, wenn vorhanden
           ...(image_url && { image: image_url })
-        });
-        
-        // Erfolg zur Debug-Liste hinzufügen
-        await addWebhookEvent({
-          type: 'user_updated',
-          userId: id,
-          previousId: existingUser.clerkId !== id ? existingUser.clerkId : undefined,
-          email,
-          name,
-          result: updatedUser
         });
         
         return NextResponse.json({ success: true, action: 'updated' });
@@ -190,28 +147,10 @@ async function handleWebhookEvent(evt: WebhookEvent) {
         
         console.log('Neuer Benutzer erstellt:', newUser);
         
-        // Erfolg zur Debug-Liste hinzufügen
-        await addWebhookEvent({
-          type: 'user_created',
-          userId: id,
-          email,
-          name,
-          result: newUser
-        });
-        
         return NextResponse.json({ success: true, action: 'created' });
       }
     } catch (error) {
       console.error('Fehler beim Verarbeiten des Webhooks:', error);
-      
-      // Fehler zur Debug-Liste hinzufügen
-      await addWebhookEvent({
-        type: 'user_processing_error',
-        userId: id,
-        email,
-        name,
-        error: (error as Error).message
-      });
       
       return NextResponse.json({ error: 'Interner Serverfehler' }, { status: 500 });
     }
@@ -227,32 +166,13 @@ async function handleWebhookEvent(evt: WebhookEvent) {
     try {
       await UserService.deleteUser(id);
       
-      // Erfolg zur Debug-Liste hinzufügen
-      await addWebhookEvent({
-        type: 'user_deleted',
-        userId: id
-      });
-      
       return NextResponse.json({ success: true, action: 'deleted' });
     } catch (error) {
       console.error('Fehler beim Löschen des Benutzers:', error);
       
-      // Fehler zur Debug-Liste hinzufügen
-      await addWebhookEvent({
-        type: 'user_deletion_error',
-        userId: id,
-        error: (error as Error).message
-      });
-      
       return NextResponse.json({ error: 'Interner Serverfehler' }, { status: 500 });
     }
   }
-  
-  // Unbekanntes Event zur Debug-Liste hinzufügen
-  await addWebhookEvent({
-    type: 'unknown_event_type',
-    eventType
-  });
   
   return NextResponse.json({ received: true });
 }
