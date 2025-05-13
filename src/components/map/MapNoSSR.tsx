@@ -369,7 +369,7 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
       
       // Leaflet-Map initialisieren mit Basisoptionen
       mapRef.current = L.map(mapContainerRef.current, {
-        maxZoom: 18,                 // Maximaler Zoom
+        maxZoom: 22,                 // Maximaler Zoom
         minZoom: 3,                  // Minimaler Zoom
         zoomControl: showZoomControls, // Zoom-Controls basierend auf Prop
         zoomSnap: 0.5,               // Zoom in 0.5-Schritten
@@ -409,6 +409,9 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
       
       // Basis OpenStreetMap Layer als Grundkarte definieren
       const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxNativeZoom: 20,
+        maxZoom: 22,
+        detectRetina: true     // optional, funktioniert jetzt korrekt
       });
       // Wichtig: OSM-Layer noch nicht hinzufügen! (addTo wird erst später aufgerufen)
 
@@ -421,7 +424,10 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
           transparent: true,
           version: '1.3.0',
           opacity: 1,
-        });
+          maxNativeZoom: 20,
+          maxZoom: 22,
+          detectRetina: true     // optional, funktioniert jetzt korrekt
+          });
         // Wichtig: WMS-Layer noch nicht hinzufügen!
         wmsLayerRef.current = wmsLayer;
       } catch (error) {

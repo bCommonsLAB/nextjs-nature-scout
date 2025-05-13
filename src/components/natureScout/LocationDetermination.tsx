@@ -478,7 +478,7 @@ export function LocationDetermination({
         }));
         
         // Ladezustand beenden, sobald valide Koordinaten empfangen wurden
-        if (isLoadingGPS && latitude !== 0 && longitude !== 0) {
+        if (isLoadingGPS && latitude !== 0 && longitude !== 0 && gpsStats.messagesCount > 3) {
           setIsLoadingGPS(false);
         }
         
@@ -534,7 +534,7 @@ export function LocationDetermination({
       },
       { 
         enableHighAccuracy: true,  // GPS-Genauigkeit erzwingen (wichtig für Naturaufnahme)
-        timeout: 15000,            // 15 Sekunden Timeout - lieber länger warten als ungenau sein
+        timeout: 10000,            // 15 Sekunden Timeout - lieber länger warten als ungenau sein
         maximumAge: 0              // Niemals Cache verwenden, immer neue Koordinaten abrufen
       }
     );
@@ -570,7 +570,7 @@ export function LocationDetermination({
       console.log("Einmalige Zentrierung auf GPS-Position:", currentPosition);
       
       // Zentrierung mit hohem Zoom-Level
-      mapRef.current.centerMap(currentPosition[0], currentPosition[1], 18);
+      mapRef.current.centerMap(currentPosition[0], currentPosition[1], 20);
       
       // Flag setzen, damit dies nur einmal geschieht
       setHasZoomedToGPS(true);
@@ -598,7 +598,7 @@ export function LocationDetermination({
   const centerToCurrentGPS = useCallback(() => {
     if (navigator.geolocation && mapRef.current && currentPosition[0] !== 0 && currentPosition[1] !== 0) {
       // Auf aktuelle Position zentrieren mit hohem Zoom-Level
-      mapRef.current.centerMap(currentPosition[0], currentPosition[1], 18);
+      mapRef.current.centerMap(currentPosition[0], currentPosition[1], 20);
       
       // Optionaler Statushinweis
       const statusElement = document.createElement('div');
