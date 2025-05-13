@@ -1,7 +1,7 @@
 // components/MapNoSSR.tsx
 // Implementiert eine interaktive Karte mit Polygon-Zeichnungsfunktionalität mithilfe von Leaflet
 // Die Komponente wird client-seitig ohne SSR geladen, um Kompatibilitätsprobleme zu vermeiden
-import React, { useEffect, useRef, useCallback, useMemo, useImperativeHandle, forwardRef } from 'react';
+import React, { useEffect, useRef, useCallback, useMemo, useImperativeHandle, forwardRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet-draw';
 import 'leaflet-geometryutil'; // Importiere das GeometryUtil-Modul für Flächenberechnungen
@@ -90,6 +90,7 @@ interface Habitat {
 export interface MapNoSSRHandle {
   centerMap: (lat: number, lng: number, zoom?: number) => void;
   getCurrentPolygonPoints: () => Array<[number, number]>;
+  updatePositionMarker: (lat: number, lng: number) => void;
 }
 
 // Props-Interface für die MapNoSSR-Komponente
@@ -150,6 +151,12 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
   const activeDrawHandlerRef = useRef<any>(null);               // Aktiver Draw-Handler für Polygon-Zeichnung
   const positionMarkerRef = useRef<L.Marker | null>(null);      // Positionsmarker
   const habitatPolygonsRef = useRef<L.LayerGroup | null>(null); // Layer-Gruppe für Habitat-Polygone
+  
+  // Separate Ref für die Marker-Position, um sie von der Map-Position zu trennen
+  const markerPositionRef = useRef<[number, number]>([0, 0]);
+
+  // Status-Tracking für Map-Bereitschaft
+  const [isMapReady, setIsMapReady] = useState(false);
 
   // Exponiere Methoden nach außen über Ref
   useImperativeHandle(ref, () => ({
@@ -161,10 +168,9 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
         // setView ändert sowohl die Position als auch den Zoom-Level in einer Operation
         mapRef.current.setView([lat, lng], newZoom !== undefined ? newZoom : mapRef.current.getZoom());
         
-        // Falls der Marker existiert, seine Position auch aktualisieren
-        if (positionMarkerRef.current) {
-          positionMarkerRef.current.setLatLng([lat, lng]);
-        }
+        // WICHTIG: Den Positionsmarker bewusst NICHT aktualisieren!
+        // Der Positionsmarker zeigt die GPS-Position des Nutzers an, nicht die Kartenposition
+        // Die Aktualisierung des Markers muss explizit über updatePositionMarker() erfolgen
       }
     },
     
@@ -198,6 +204,33 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
       } catch (error) {
         console.error('Fehler beim Extrahieren der Polygon-Punkte:', error);
         return [];
+      }
+    },
+    
+    // Methode zum Aktualisieren des Positionsmarkers
+    updatePositionMarker: (lat: number, lng: number) => {
+      if (!mapRef.current) return;
+      
+      // Speichere die aktuelle Marker-Position
+      markerPositionRef.current = [lat, lng];
+      
+      console.log('Position des Markers aktualisiert:', { lat, lng });
+      
+      // Positionsmarker erstellen, falls noch nicht vorhanden
+      if (!positionMarkerRef.current) {
+        // Erstelle GPS-Icon
+        const gpsIcon = L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div style="background-color: rgba(255, 0, 0, 0.5); border: 2px solid red; border-radius: 50%; width: 16px; height: 16px; transform: translate(-50%, -50%)"></div>`,
+          iconSize: [16, 16],
+          iconAnchor: [8, 8]
+        });
+        
+        // Marker erstellen
+        positionMarkerRef.current = L.marker([lat, lng], { icon: gpsIcon }).addTo(mapRef.current);
+      } else {
+        // Marker verschieben
+        positionMarkerRef.current.setLatLng([lat, lng]);
       }
     }
   }));
@@ -411,24 +444,12 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
 
       // Positionsmarker hinzufügen, wenn gewünscht
       if (showPositionMarker) {
-        // Benutzerdefiniertes Icon für den Marker definieren
-        const positionIcon = L.divIcon({
-          className: 'position-marker-icon',
-          html: `
-            <div class="position-marker-container">
-              <div class="position-marker-pulse"></div>
-              <div class="position-marker-center"></div>
-            </div>
-          `,
-          iconSize: [24, 24],
-          iconAnchor: [12, 12]
-        });
-
-        // Marker erstellen und zur Karte hinzufügen
-        positionMarkerRef.current = L.marker(position, {
-          icon: positionIcon,
-          zIndexOffset: 1000
-        }).addTo(mapRef.current);
+        // WICHTIG: Initial keinen Marker erstellen, dieser wird durch updatePositionMarker gesetzt
+        // Wir setzen die Marker-Position nicht auf die map.position, sondern warten auf einen
+        // expliziten updatePositionMarker-Aufruf
+        
+        // Bei initialer Erstellung setzen wir eine Flagge, damit im nächsten Effekt
+        // bekannt ist, dass wir dem mapStart sind
       }
 
       // Initialen Polygon hinzufügen, wenn vorhanden (z.B. beim Bearbeiten eines bestehenden Polygons)
@@ -505,6 +526,9 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
         });
         updateHabitatDisplay();
       }
+
+      // Map als bereit markieren
+      setIsMapReady(true);
     }
 
     // Cleanup-Funktion: Entfernt die Karte, wenn die Komponente unmontiert wird
@@ -513,9 +537,27 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
         mapRef.current.remove();
         mapRef.current = null;
         positionMarkerRef.current = null;
+        setIsMapReady(false);
       }
     };
-  }, []); // Leeres Dependency Array - wird nur beim Mount ausgeführt
+  }, []);
+
+  // Marker je nach Einstellung anzeigen/verstecken
+  useEffect(() => {
+    if (!mapRef.current || !positionMarkerRef.current) return;
+    
+    if (showPositionMarker) {
+      // Falls der Marker nicht auf der Karte ist, hinzufügen
+      if (!mapRef.current.hasLayer(positionMarkerRef.current)) {
+        positionMarkerRef.current.addTo(mapRef.current);
+      }
+    } else {
+      // Falls der Marker auf der Karte ist, entfernen
+      if (mapRef.current.hasLayer(positionMarkerRef.current)) {
+        positionMarkerRef.current.remove();
+      }
+    }
+  }, [showPositionMarker]);
 
   // Funktion zum expliziten Beenden des Zeichnungsmodus
   // Wird aufgerufen, wenn der Benutzer den Zeichnungsmodus verlässt oder wenn ein Polygon abgeschlossen wird
@@ -871,10 +913,8 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
         updateHabitatDisplay();
       }
       
-      // Position des Markers aktualisieren
-      if (positionMarkerRef.current) {
-        positionMarkerRef.current.setLatLng(position);
-      }
+      // ENTFERNT: Positionsmarker wird NICHT mehr bei Map-Position-Updates angepasst
+      // Die Position des Markers wird nur durch explizite updatePositionMarker-Aufrufe geändert
     }
   }, [position, zoom, updateHabitatDisplay]);
 

@@ -69,8 +69,6 @@ In dieser Phase konzentrieren wir uns auf Änderungen an der Benutzeroberfläche
      // Berechne Mittelpunkt des Polygons
      if (polygonPoints.length > 0) {
        const centerPoint = calculatePolygonCenter(polygonPoints);
-       setCurrentPosition(centerPoint);
-       setInitialPosition(centerPoint);
        // Geodaten für den Mittelpunkt abrufen
        getGeoDataFromCoordinates(centerPoint[0], centerPoint[1]);
        // Metadaten aktualisieren

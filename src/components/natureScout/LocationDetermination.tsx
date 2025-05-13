@@ -98,7 +98,6 @@ interface MapHabitat {
 
 // Konvertierung von API-Habitat zu internem Habitat-Format
 function convertToMapHabitat(apiHabitat: HabitatFromAPI): MapHabitat | null {
-  console.log('convertToMapHabitat wird ausgeführt');
 
   // Sicherstellen, dass wir gültige Koordinaten haben
   if ((!apiHabitat.metadata?.latitude || !apiHabitat.metadata?.longitude) && 
@@ -239,12 +238,59 @@ export function LocationDetermination({
   scrollToNext?: () => void;
 }) {
   // Grundlegende Zustände für die Map
-  const [currentPosition, setCurrentPosition] = useState<[number, number]>([
-    // Fallback-Wert für latitude verwenden, wenn undefined oder 0
+  // GPS-Standort des Nutzers - unabhängig vom Habitat
+  const [currentPosition, setCurrentPosition] = useState<[number, number]>([0, 0]);
+  
+  // Neuer Zustand für den GPS-Ladestatus
+  const [isLoadingGPS, setIsLoadingGPS] = useState<boolean>(true);
+  
+  // Neuer Zustand für GPS-Statusfeedback
+  const [gpsStats, setGpsStats] = useState<{
+    accuracy: number | null;
+    messagesCount: number;
+    lastUpdate: number;
+  }>({
+    accuracy: null,
+    messagesCount: 0,
+    lastUpdate: 0
+  });
+  
+  // Zustand für das Anzeigen des GPS-Statusbadges
+  const [showGpsStatus, setShowGpsStatus] = useState<boolean>(true);
+  
+  // Initialposition für die Karte - kann vom Habitat oder Standard-Fallback kommen
+  const initialMapPosition: [number, number] = [
+    // Für die Kartenzentriernung bei Bearbeitung eines Habitats
     metadata.latitude && metadata.latitude !== 0 ? metadata.latitude : 46.724212, 
-    // Fallback-Wert für longitude verwenden, wenn undefined oder 0
     metadata.longitude && metadata.longitude !== 0 ? metadata.longitude : 11.65555
-  ]);
+  ];
+  
+  // Flag, das bestimmt, ob bereits auf GPS-Position gezoomt wurde
+  const [hasZoomedToGPS, setHasZoomedToGPS] = useState(false);
+  
+  // Speichern der letzten GPS-Positionen zur Ausreißer-Eliminierung
+  const [recentPositions, setRecentPositions] = useState<Array<{
+    position: [number, number], 
+    accuracy: number,
+    timestamp: number
+  }>>([]);
+  
+  // Watchposition ID für cleanup
+  const watchPositionIdRef = useRef<number | null>(null);
+  
+  // Referenz für den letzten Update-Zeitpunkt (für Throttling)
+  const lastUpdateTimeRef = useRef<number>(0);
+  
+  // Map-Initialisierungsstatus
+  const mapInitializedRef = useRef<boolean>(false);
+  
+  // Debug-Logging nur im Entwicklungsmodus aktivieren
+  const isDev = process.env.NODE_ENV === 'development';
+  const logDebug = useCallback((...args: any[]) => {
+    if (isDev && args[0] === 'IMPORTANT') {
+      console.log(...args.slice(1));
+    }
+  }, [isDev]);
   
   // Initialen Zoom-Level höher setzen, wenn ein existierendes Habitat bearbeitet wird
   const [zoom, setZoom] = useState<number>(() => {
@@ -254,9 +300,6 @@ export function LocationDetermination({
     // Bei existierendem Habitat direkter hoher Zoom (20), sonst niedriger Zoom (13)
     return hasExistingCoordinates ? 20 : 13;
   });
-  
-  // Initialisierungsstatus, um mehrfache Map-Initialisierungen zu verhindern
-  const [isMapInitialized, setIsMapInitialized] = useState<boolean>(false);
   
   const [mapMode, setMapMode] = useState<MapMode>('navigation');
   const [polygonPoints, setPolygonPoints] = useState<Array<[number, number]>>(
@@ -326,15 +369,12 @@ export function LocationDetermination({
       setShowLocationInfo(true);
     }
   }, [searchParams, metadata.polygonPoints]);
-  
 
   // Funktion zum Laden bestehender Habitate
   const loadExistingHabitats = useCallback(async () => {
     try {
       setIsLoadingHabitats(true);
       setHabitatLoadError(null);
-      
-      console.log('Lade Habitate - API-Aufruf wird gestartet...');
       
       // Erhöhtes Limit, um mehr Habitate für den aktuellen Bereich zu erhalten
       const response = await fetch('/api/habitat/public?limit=100&verifizierungsstatus=alle');
@@ -344,7 +384,6 @@ export function LocationDetermination({
       }
       
       const data = await response.json();
-      console.log(`${data.entries.length} Habitate vom Server geladen`);
       
       // Konvertiere API-Daten in das Format für die Karte
       const validHabitats = data.entries
@@ -356,7 +395,6 @@ export function LocationDetermination({
         .map(convertToMapHabitat)
         .filter(Boolean); // Entferne null-Werte
       
-      console.log(`${validHabitats.length} gültige Habitate für die Karte vorbereitet`);
       setExistingHabitats(validHabitats);
       
     } catch (err) {
@@ -372,16 +410,6 @@ export function LocationDetermination({
     setSelectedHabitatId(habitatId);
     setShowLocationInfo(true); // Informationsanzeige aktivieren
   }, []);
-
-  // Memoized Map-Position, um unnötige Re-Renderings zu verhindern
-  const memoizedPosition = useMemo(() => {
-    return currentPosition;
-  }, [currentPosition[0], currentPosition[1]]);
-  
-  // Memoized hasPolygon-Wert für stabile Referenz
-  const hasPolygon = useMemo(() => {
-    return Boolean(polygonPoints && polygonPoints.length > 0);
-  }, [polygonPoints]);
   
   // Weitere memoized Callbacks
   const handlePolygonChange = useCallback((newPoints: Array<[number, number]>) => {
@@ -420,191 +448,233 @@ export function LocationDetermination({
     }
   }, [selectedHabitatId]);
 
-  // Funktion zum Zentrieren der Karte auf die gespeicherte Position
-  const centerMapToCurrentPosition = useCallback(() => {
-    // Direkte Methode aufrufen, um die Karte zu zentrieren
-    if (mapRef.current) {
+  // Kontinuierliche GPS-Verfolgung - der wichtigste Effekt
+  useEffect(() => {
+    // Nur aktivieren im Browser
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setIsLoadingGPS(false); // GPS nicht verfügbar, Ladezustand beenden
+      return;
+    }
+    
+    console.log('Starte kontinuierliche GPS-Verfolgung');
+
+    // Status-Badge nach 15 Sekunden automatisch ausblenden
+    const hideStatusTimeout = setTimeout(() => {
+      console.log('GPS-Verfolgung beendet');
+      setShowGpsStatus(false);
+    }, 15000);
+    
+    // Starte die kontinuierliche GPS-Verfolgung
+    watchPositionIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        const now = Date.now();
+        
+        // Sofort GPS-Status aktualisieren mit jedem Signal
+        setGpsStats(prev => ({
+          accuracy,
+          messagesCount: prev.messagesCount + 1,
+          lastUpdate: now
+        }));
+        
+        // Ladezustand beenden, sobald valide Koordinaten empfangen wurden
+        if (isLoadingGPS && latitude !== 0 && longitude !== 0) {
+          setIsLoadingGPS(false);
+        }
+        
+        // Throttling: Updates nur einmal pro Sekunde verarbeiten
+        if (now - lastUpdateTimeRef.current < 1000) {
+          return; // Zu schnelles Update ignorieren
+        }
+        
+        // Aktuellen Zeitpunkt speichern
+        lastUpdateTimeRef.current = now;
+        
+        // Neue Position zu den letzten Positionen hinzufügen
+        setRecentPositions(prev => {
+          // Nur die letzten 30 Positionen behalten (30 Sekunden bei 1s Intervall)
+          const updatedPositions = [...prev, { 
+            position: [latitude, longitude] as [number, number], 
+            accuracy, 
+            timestamp: now 
+          }];
+          
+          // Auf 30 Einträge begrenzen
+          if (updatedPositions.length > 30) {
+            return updatedPositions.slice(updatedPositions.length - 30);
+          }
+          return updatedPositions;
+        });
+        
+        // WICHTIG: Bei der ersten Messung schon den unfiltered Marker setzen,
+        // damit Benutzer sofortiges Feedback bekommt
+        if (currentPosition[0] === 0 && currentPosition[1] === 0) {
+          setCurrentPosition([latitude, longitude]);
+        } else {
+          // Gefilterte Position berechnen
+          const filteredPosition = calculateFilteredPosition(
+            [...recentPositions, { position: [latitude, longitude], accuracy, timestamp: now }]
+          );
+          
+          // Aktuelle Position aktualisieren
+          if (filteredPosition) {
+            setCurrentPosition(filteredPosition);
+          }
+        }
+      },
+      (error) => {
+        console.error("Fehler bei GPS-Verfolgung:", error);
+        setIsLoadingGPS(false); // Fehler bei GPS, Ladezustand beenden
+        
+        // Bei Fehler auch den Statustext anpassen
+        setGpsStats(prev => ({
+          ...prev,
+          accuracy: -1 // Negativer Wert bedeutet Fehler
+        }));
+      },
+      { 
+        enableHighAccuracy: true,  // GPS-Genauigkeit erzwingen (wichtig für Naturaufnahme)
+        timeout: 15000,            // 15 Sekunden Timeout - lieber länger warten als ungenau sein
+        maximumAge: 0              // Niemals Cache verwenden, immer neue Koordinaten abrufen
+      }
+    );
+    
+    // Nach 5 Sekunden GPS-Ladescreen auf jeden Fall ausblenden (Timeout-Sicherung)
+    const timeoutId = setTimeout(() => {
+      setIsLoadingGPS(false);
+    }, 8000);
+    
+    // Cleanup
+    return () => {
+      if (watchPositionIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchPositionIdRef.current);
+        watchPositionIdRef.current = null;
+      }
+      clearTimeout(timeoutId);
+      clearTimeout(hideStatusTimeout);
+    };
+  }, []); // Keine Abhängigkeiten - nur einmal starten und im Hintergrund laufen lassen
+
+  // Effekt zum Aktualisieren des Markers und einmaliger Zentrierung
+  useEffect(() => {
+    if (!mapRef.current || currentPosition[0] === 0 || currentPosition[1] === 0) {
+      return; // Noch keine gültige Position
+    }
+    
+    // 1. Marker auf aktuelle Position setzen (immer)
+    mapRef.current.updatePositionMarker(currentPosition[0], currentPosition[1]);
+    console.log("Positionsmarker aktualisiert:", currentPosition);
+    
+    // 2. Einmalige Zentrierung und Zoom (nur beim ersten gültigen GPS-Update)
+    if (!hasZoomedToGPS && mapInitializedRef.current) {
+      console.log("Einmalige Zentrierung auf GPS-Position:", currentPosition);
+      
+      // Zentrierung mit hohem Zoom-Level
       mapRef.current.centerMap(currentPosition[0], currentPosition[1], 18);
-    } else {
-      // Fallback: Nur Zoom ändern, falls keine direkte Methode verfügbar ist
-      setZoom(18);
+      
+      // Flag setzen, damit dies nur einmal geschieht
+      setHasZoomedToGPS(true);
+    }
+  }, [currentPosition, hasZoomedToGPS]);
+
+  // Vereinfachte Map-Initialisierung - wird nur einmal ausgeführt
+  useEffect(() => {
+    // Nur einmal ausführen
+    if (mapInitializedRef.current) {
+      return;
+    }
+    
+    // Karte wird mit niedrigem Zoom-Level initialisiert
+    const initialZoom = 13; // Niedriger Zoom-Level zu Beginn
+    setZoom(initialZoom);
+    
+    // Map als initialisiert markieren
+    mapInitializedRef.current = true;
+    
+    console.log('Karte initialisiert mit niedrigem Zoom-Level');
+  }, []); // Leere Abhängigkeiten - nur einmal ausführen
+
+  // Funktion zum Zentrieren auf die aktuelle GPS-Position (nur bei Button-Klick)
+  const centerToCurrentGPS = useCallback(() => {
+    if (navigator.geolocation && mapRef.current && currentPosition[0] !== 0 && currentPosition[1] !== 0) {
+      // Auf aktuelle Position zentrieren mit hohem Zoom-Level
+      mapRef.current.centerMap(currentPosition[0], currentPosition[1], 18);
+      
+      // Optionaler Statushinweis
+      const statusElement = document.createElement('div');
+      statusElement.textContent = 'GPS-Position wird verwendet...';
+      statusElement.style.position = 'absolute';
+      statusElement.style.top = '50%';
+      statusElement.style.left = '50%';
+      statusElement.style.transform = 'translate(-50%, -50%)';
+      statusElement.style.backgroundColor = 'rgba(0,0,0,0.7)';
+      statusElement.style.color = 'white';
+      statusElement.style.padding = '8px 12px';
+      statusElement.style.borderRadius = '4px';
+      statusElement.style.zIndex = '10000';
+      
+      // Füge das Element zum DOM hinzu
+      if (mapContainerRef?.current) {
+        mapContainerRef.current.appendChild(statusElement);
+      }
+      
+      // Nach 1 Sekunde ausblenden
+      setTimeout(() => {
+        if (statusElement.parentNode) {
+          statusElement.parentNode.removeChild(statusElement);
+        }
+      }, 1000);
     }
   }, [currentPosition]);
 
-  // Aktuelle GPS-Position abrufen und als currentPosition setzen
-  // Diese Funktion wird nur bei der Initialisierung eines neuen Habitats verwendet
-  const getCurrentLocation = () => {
-    if (navigator.geolocation) {
-      // Referenz für den watchPosition-Handler speichern
-      let watchId: number | null = null;
+  // Funktion zum Berechnen der gefilterten Position
+  const calculateFilteredPosition = (positions: Array<{
+    position: [number, number], 
+    accuracy: number,
+    timestamp: number
+  }>): [number, number] | null => {
+    // Mindestens 5 Positionen benötigen für sinnvolle Filterung
+    if (positions.length < 5) {
+      if (positions.length === 0) return null;
+      const lastPos = positions[positions.length - 1];
+      return lastPos ? lastPos.position : null;
+    }
+    
+    try {
+      // Sortiere Positionen nach Aktualität (neueste zuerst)
+      const sortedByTime = [...positions].sort((a, b) => b.timestamp - a.timestamp);
       
-      // Status-Variable für erste Position
-      let hasReceivedPosition = false;
+      // Nur die letzten 20 Sekunden berücksichtigen
+      const threshold = Date.now() - 20000;
+      const recentEnough = sortedByTime.filter(p => p.timestamp > threshold);
       
-      // Feedback-Element für die Genauigkeit erstellen
-      let accuracyFeedback: HTMLDivElement | null = null;
-      
-      if (typeof document !== 'undefined') {
-        accuracyFeedback = document.createElement('div');
-        accuracyFeedback.className = 'accuracy-feedback';
-        accuracyFeedback.style.position = 'absolute';
-        accuracyFeedback.style.bottom = '80px';
-        accuracyFeedback.style.left = '50%';
-        accuracyFeedback.style.transform = 'translateX(-50%)';
-        accuracyFeedback.style.backgroundColor = 'rgba(0,0,0,0.7)';
-        accuracyFeedback.style.color = 'white';
-        accuracyFeedback.style.padding = '8px 12px';
-        accuracyFeedback.style.borderRadius = '4px';
-        accuracyFeedback.style.zIndex = '10000';
-        accuracyFeedback.style.fontSize = '12px';
-        accuracyFeedback.style.display = 'none';
-        
-        // Zum DOM hinzufügen
-        setTimeout(() => {
-          const container = document.querySelector('.leaflet-container');
-          if (container && accuracyFeedback) {
-            container.appendChild(accuracyFeedback);
-            accuracyFeedback.style.display = 'block';
-            accuracyFeedback.textContent = 'GPS-Position wird ermittelt...';
-          }
-        }, 500);
+      // Wenn zu wenige aktuelle Messungen, normale Position verwenden
+      if (recentEnough.length < 5 && sortedByTime.length > 0) {
+        const firstItem = sortedByTime[0];
+        return firstItem ? firstItem.position : null;
       }
-
-      // watchPosition statt getCurrentPosition verwenden für kontinuierliche Updates
-      watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          const { latitude, longitude, accuracy } = position.coords;
-          
-          // Position aktualisieren
-          setCurrentPosition([latitude, longitude]);
-          
-          // Feedback zur Genauigkeit anzeigen
-          if (accuracyFeedback) {
-            // Genauigkeit auf Meter runden
-            const accuracyInMeters = Math.round(accuracy);
-            
-            // Textfarbe basierend auf Genauigkeit
-            let statusColor = 'red';
-            let statusText = 'Ungenau';
-            
-            if (accuracy <= 15) {
-              statusColor = 'lime';
-              statusText = 'Sehr gut';
-            } else if (accuracy <= 30) {
-              statusColor = 'yellow';
-              statusText = 'Gut';
-            } else if (accuracy <= 50) {
-              statusColor = 'orange';
-              statusText = 'Mittelmäßig';
-            }
-            
-            accuracyFeedback.innerHTML = `
-              GPS-Genauigkeit: <span style="color: ${statusColor}; font-weight: bold;">${statusText}</span> (±${accuracyInMeters}m)
-            `;
-          }
-          
-          // Zoom-Level aktualisieren, aber nur beim ersten Empfang
-          if (!hasReceivedPosition) {
-            setZoom(18);
-            hasReceivedPosition = true;
-          }
-          
-          console.log("Neue GPS-Position empfangen:", { latitude, longitude, accuracy });
-          
-          // Optional: Position-Watcher beenden nach einer gewissen Zeit oder bei ausreichender Genauigkeit
-          if (accuracy <= 15) { // Wenn Genauigkeit besser als 15 Meter ist
-            if (watchId !== null) {
-              console.log("Position mit guter Genauigkeit empfangen, beende watchPosition");
-              
-              // Feedback-Element mit Erfolgsmeldung aktualisieren
-              if (accuracyFeedback) {
-                accuracyFeedback.style.backgroundColor = 'rgba(0,100,0,0.7)';
-                accuracyFeedback.innerHTML = 'GPS-Position erfolgreich ermittelt!';
-                
-                // Nach 3 Sekunden ausblenden
-                setTimeout(() => {
-                  if (accuracyFeedback) {
-                    accuracyFeedback.style.opacity = '0';
-                    accuracyFeedback.style.transition = 'opacity 1s';
-                    
-                    // Aus dem DOM entfernen nach Ausblenden
-                    setTimeout(() => {
-                      if (accuracyFeedback && accuracyFeedback.parentNode) {
-                        accuracyFeedback.parentNode.removeChild(accuracyFeedback);
-                      }
-                    }, 1000);
-                  }
-                }, 3000);
-              }
-              
-              navigator.geolocation.clearWatch(watchId);
-              watchId = null;
-            }
-          }
-        },
-        (error) => {
-          // Ausführlichere Fehlerinformationen ausgeben
-          const errorMessages: Record<number, string> = {
-            1: "Der Zugriff auf den Standort wurde verweigert. Bitte überprüfen Sie Ihre Browser-Berechtigungen.",
-            2: "Die Standortinformationen sind nicht verfügbar. Bitte überprüfen Sie, ob GPS aktiviert ist.",
-            3: "Zeitüberschreitung bei der Standortermittlung. Bitte versuchen Sie es erneut."
-          };
-          
-          const errorCode = error.code || 0;
-          const errorMessage = errorMessages[errorCode] || `Unbekannter Fehler (${errorCode}): ${error.message}`;
-          
-          console.error("Fehler bei der Standortermittlung:", {
-            code: errorCode,
-            message: errorMessage,
-            originalError: error
-          });
-          
-          // Feedback-Element mit Fehlermeldung aktualisieren
-          if (accuracyFeedback) {
-            accuracyFeedback.style.backgroundColor = 'rgba(220,38,38,0.9)';
-            accuracyFeedback.textContent = 'GPS-Fehler: ' + errorMessage;
-            
-            // Nach 5 Sekunden ausblenden
-            setTimeout(() => {
-              if (accuracyFeedback) {
-                if (accuracyFeedback.parentNode) {
-                  accuracyFeedback.parentNode.removeChild(accuracyFeedback);
-                }
-              }
-            }, 5000);
-          }
-          
-          // Optional: Dem Benutzer eine Nachricht anzeigen
-          alert(`Standort konnte nicht ermittelt werden: ${errorMessage}\n\nBitte wählen Sie Ihren Standort manuell auf der Karte.`);
-          
-          // Watcher bei Fehler beenden
-          if (watchId !== null) {
-            navigator.geolocation.clearWatch(watchId);
-            watchId = null;
-          }
-        },
-        // Zusätzliche Optionen für die Standortermittlung
-        {
-          enableHighAccuracy: true,  // Hohe Genauigkeit anfordern
-          timeout: 30000,           // 30 Sekunden Timeout
-          maximumAge: 0             // Keinen Cache verwenden
-        }
+      
+      // Sortiere nach Genauigkeit (beste zuerst)
+      const sortedByAccuracy = [...recentEnough].sort((a, b) => a.accuracy - b.accuracy);
+      
+      // Verwende die besten 66% der Messungen (sortierte Top-Genauigkeiten)
+      const goodPositions = sortedByAccuracy.slice(0, Math.ceil(sortedByAccuracy.length * 0.66));
+      
+      // Mittelwert der guten Positionen berechnen
+      const sum = goodPositions.reduce(
+        (acc, p) => [acc[0] + p.position[0], acc[1] + p.position[1]] as [number, number], 
+        [0, 0] as [number, number]
       );
       
-      // Watcher-ID im UseEffect cleanup beenden
-      return () => {
-        if (watchId !== null) {
-          navigator.geolocation.clearWatch(watchId);
-        }
-        
-        // Feedback-Element entfernen
-        if (accuracyFeedback && accuracyFeedback.parentNode) {
-          accuracyFeedback.parentNode.removeChild(accuracyFeedback);
-        }
-      };
-    } else {
-      console.error("Geolocation wird von diesem Browser nicht unterstützt.");
-      alert("Die Standortermittlung wird von Ihrem Browser nicht unterstützt. Bitte wählen Sie Ihren Standort manuell auf der Karte.");
+      return [
+        sum[0] / goodPositions.length,
+        sum[1] / goodPositions.length
+      ];
+    } catch (error) {
+      console.error("Fehler bei der Berechnung der gefilterten Position:", error);
+      if (positions.length === 0) return null;
+      const lastPos = positions[positions.length - 1];
+      return lastPos ? lastPos.position : null;
     }
   };
 
@@ -732,11 +802,13 @@ export function LocationDetermination({
       // Metadaten in einem Schritt aktualisieren
       setMetadata(updatedMetadata);
       
-      // Lokaler State für Polygon-Punkte und Position aktualisieren
+      // Lokaler State für Polygon-Punkte aktualisieren
       setPolygonPoints(currentPoints);
-      setCurrentPosition([centerLat, centerLng]);
+      // HINWEIS: currentPosition (GPS-Standort des Nutzers) wird hier NICHT überschrieben
+      // Habitat-Position (centerLat/centerLng) und GPS-Position des Nutzers sind bewusst getrennt,
+      // damit der Nutzer sich im Gelände frei bewegen kann, während das Habitat an seinem Ort bleibt
       
-      // Standortinformationen abrufen
+      // Standortinformationen für das Habitat abrufen (nicht für den Nutzerstandort)
       await getGeoDataFromCoordinates(centerLat, centerLng);
       
       // Explizit den "none"-Modus setzen, um anzuzeigen, dass wir fertig sind
@@ -794,189 +866,6 @@ export function LocationDetermination({
     }
   }, [metadata.standort]);
   
-  // Ein einzelner Effekt für alle Map-Initialisierungs- und Positionierungslogik
-  useEffect(() => {
-    // Wenn die Karte bereits initialisiert wurde, nichts tun
-    if (isMapInitialized) {
-      console.log('Karte bereits initialisiert, überspringe wiederholte Initialisierung');
-      return;
-    }
-    
-    // Lokale Referenz auf die Karte speichern
-    const mapInstance = mapRef.current;
-    
-    // Flag zum Tracking, ob wir bereits ein Habitat geladen haben
-    const hasExistingCoordinates = metadata.latitude && metadata.longitude && 
-                                  metadata.latitude !== 0 && metadata.longitude !== 0;
-    
-    // Polygon vorhanden? Mit sicherem Zugriff auf length
-    const hasPolygon = metadata.polygonPoints && 
-                       Array.isArray(metadata.polygonPoints) && 
-                       metadata.polygonPoints.length > 0;
-    
-    // 1. Bei bestehendem Habitat: Standortinfos anzeigen
-    if (hasExistingCoordinates && hasPolygon) {
-      setShowLocationInfo(true);
-    }
-    
-    // 2. Keine Koordinaten: GPS verwenden (für neue Habitate)
-    if (!hasExistingCoordinates) {
-      console.log('Keine Koordinaten vorhanden, verwende getCurrentLocation');
-      // getCurrentLocation als Funktion direkt aufrufen, nicht als Dependency verwenden
-      if (typeof navigator !== 'undefined' && navigator.geolocation) {
-        getCurrentLocation();
-      }
-      // Karte als initialisiert markieren
-      setIsMapInitialized(true);
-      return; // Frühzeitiger Return, andere Positionierungslogik nicht ausführen
-    }
-    
-    // 3. Bestehende Koordinaten: Karte zentrieren (wenn Karte bereits geladen)
-    if (mapInstance && hasExistingCoordinates) {
-      // Verzögerung hinzufügen, um sicherzustellen, dass die Map vollständig geladen ist
-      const timer = setTimeout(() => {
-        console.log('Zentriere Karte auf bestehende Koordinaten:', {
-          lat: metadata.latitude,
-          lng: metadata.longitude
-        });
-        
-        // Wichtig: Zentrieren ohne Zoom-Änderung
-        if (mapInstance && metadata.latitude && metadata.longitude) {
-          mapInstance.centerMap(metadata.latitude, metadata.longitude);
-        }
-        
-        // Karte als initialisiert markieren, nachdem die Initialisierung abgeschlossen ist
-        setIsMapInitialized(true);
-      }, 100);
-      
-      // Cleanup für Timer
-      return () => clearTimeout(timer);
-    } else {
-      // Karte ohne Zentrierung als initialisiert markieren
-      setIsMapInitialized(true);
-    }
-  }, [metadata.latitude, metadata.longitude, metadata.polygonPoints, isMapInitialized]);
-  
-  // Einfacher Effekt zum einmaligen Laden der Habitate beim Komponenten-Mount
-  useEffect(() => {
-    let isMounted = true;
-    
-    // Habitate nur laden, wenn noch keine geladen wurden
-    if (existingHabitats.length === 0 && !isLoadingHabitats) {
-      console.log('Initialisiere Habitat-Ladung');
-      
-      // Async IIFE für sauberes Error-Handling
-      (async () => {
-        try {
-          // Wrapper um loadExistingHabitats, der prüft, ob die Komponente noch mounted ist
-          await loadExistingHabitats();
-        } catch (error) {
-          if (isMounted) {
-            console.error('Fehler beim Laden der Habitate im Mount-Effekt:', error);
-          }
-        }
-      })();
-    }
-    
-    // Cleanup-Funktion
-    return () => {
-      isMounted = false;
-    };
-  }, []); // Leeres Dependency-Array für einmalige Ausführung beim Mount
-
-  // Effekt für den Hilfe-Button
-  useEffect(() => {
-    if (showHelp) {
-      // Je nach aktuellem Modus den entsprechenden Dialog anzeigen
-      if (mapMode === 'polygon') {
-        setShowPolygonPopup(true);
-      } else {
-        setShowWelcomePopup(true);
-      }
-      
-      // Nach dem Anzeigen das Help-Flag NICHT sofort zurücksetzen
-      // Wird stattdessen beim Schließen des Dialogs gemacht
-    }
-  }, [showHelp, mapMode]);
-
-  // Effekt, um sicherzustellen, dass der Positionsmarker auf der Karte aktualisiert wird
-  useEffect(() => {
-    // Wenn Map initialisiert und wir im Navigationsmodus sind
-    if (mapRef.current && mapMode === 'navigation') {
-      // Marker auf aktuelle Position setzen
-      if (currentPosition[0] !== 0 && currentPosition[1] !== 0) {
-        try {
-          mapRef.current.centerMap(currentPosition[0], currentPosition[1]);
-          console.log("Positionsmarker aktualisiert:", currentPosition);
-        } catch (error) {
-          console.error("Fehler beim Aktualisieren des Positionsmarkers:", error);
-        }
-      }
-    }
-  }, [currentPosition, mapMode]);
-
-  // Funktion zum Zentieren auf die aktuelle GPS-Position (nicht auf die gespeicherte Position)
-  const centerToCurrentGPS = useCallback(() => {
-    if (navigator.geolocation) {
-      mapRef.current?.centerMap(currentPosition[0], currentPosition[1], 18);
-      
-      // Optionaler Statushinweis
-      const statusElement = document.createElement('div');
-      statusElement.textContent = 'GPS-Position wird abgerufen...';
-      statusElement.style.position = 'absolute';
-      statusElement.style.top = '50%';
-      statusElement.style.left = '50%';
-      statusElement.style.transform = 'translate(-50%, -50%)';
-      statusElement.style.backgroundColor = 'rgba(0,0,0,0.7)';
-      statusElement.style.color = 'white';
-      statusElement.style.padding = '8px 12px';
-      statusElement.style.borderRadius = '4px';
-      statusElement.style.zIndex = '10000';
-      
-      // Füge das Element zum DOM hinzu
-      if (mapContainerRef?.current) {
-        mapContainerRef.current.appendChild(statusElement);
-      }
-      
-      // Einmalige Position abrufen für sofortiges Update
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          
-          // Position aktualisieren
-          setCurrentPosition([latitude, longitude]);
-          
-          // Sofort auf die neue Position zentrieren
-          mapRef.current?.centerMap(latitude, longitude, 18);
-          
-          // Status entfernen
-          if (statusElement.parentNode) {
-            statusElement.parentNode.removeChild(statusElement);
-          }
-        },
-        (error) => {
-          console.error("Fehler beim Aktualisieren der GPS-Position:", error);
-          
-          // Status mit Fehlermeldung aktualisieren
-          statusElement.textContent = 'GPS-Abfrage fehlgeschlagen';
-          statusElement.style.backgroundColor = 'rgba(220,38,38,0.9)';
-          
-          // Status nach 2 Sekunden entfernen
-          setTimeout(() => {
-            if (statusElement.parentNode) {
-              statusElement.parentNode.removeChild(statusElement);
-            }
-          }, 2000);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        }
-      );
-    }
-  }, [currentPosition]);
-
   // Referenz für den Map-Container
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   
@@ -992,13 +881,21 @@ export function LocationDetermination({
     }
   }, []);
 
+  // Funktion zum manuellen Ein-/Ausblenden des GPS-Status-Badges
+  const toggleGpsStatus = useCallback(() => {
+    console.log('GPS-Status-Badge angeklickt');
+    setShowGpsStatus(prev => !prev);
+    // Debugging-Information in der Konsole ausgeben
+    console.log('Neuer Status showGpsStatus:', !showGpsStatus);
+  }, [showGpsStatus]);
+
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)]">
       {/* Map-Container mit relativer Positionierung für überlagerte UI-Elemente */}
       <div className="relative w-full flex-grow">
         <MapNoSSR
           ref={mapRef}
-          position={memoizedPosition}
+          position={initialMapPosition}
           zoom={zoom}
           onCenterChange={handleCenterChange}
           onZoomChange={handleZoomChange}
@@ -1006,9 +903,9 @@ export function LocationDetermination({
           onAreaChange={handleAreaChange}
           editMode={mapMode === 'polygon'}
           initialPolygon={polygonPoints}
-          hasPolygon={hasPolygon}
+          hasPolygon={Boolean(polygonPoints && polygonPoints.length > 0)}
           showZoomControls={mapMode !== 'polygon'}
-          showPositionMarker={mapMode === 'navigation'}
+          showPositionMarker={true}
           habitats={existingHabitats}
           onHabitatClick={handleHabitatClick}
           onClick={handleMapClick}
@@ -1018,6 +915,65 @@ export function LocationDetermination({
         {isLoadingHabitats && (
           <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-white/80 py-1 px-3 rounded shadow-md text-sm">
             Lade bestehende Habitate...
+          </div>
+        )}
+        
+        {/* Verbesserter GPS-Ladehinweis (in der Mitte des Bildschirms mit höherem z-index) */}
+        {isLoadingGPS && (
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-700 text-white py-3 px-6 rounded-lg shadow-xl text-base font-medium flex items-center gap-3 z-[9999]">
+            <div className="w-4 h-4 bg-white rounded-full animate-ping"></div>
+            GPS-Position wird ermittelt...
+          </div>
+        )}
+
+        {/* GPS Status-Anzeige (permanent oder durch Klick auf GPS-Icon aufrufbar) */}
+        {showGpsStatus && (
+          <div 
+            className="absolute bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-2 text-xs"
+            onClick={toggleGpsStatus}
+            style={{
+              zIndex: 20000, // Höherer z-index als alle anderen Elemente
+              position: 'absolute', // Wieder auf absolute setzen für korrekte Positionierung
+              left: '55px', // Neben dem GPS-Button (10px + Buttonbreite + Abstand)
+              top: '75px'   // Gleiche Höhe wie der GPS-Button
+            }}
+          >
+            <div className="font-semibold mb-1 flex items-center justify-between">
+              <span>GPS-Status</span>
+              <button className="text-gray-500 hover:text-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span>Messungen:</span>
+                <span className="font-medium">{gpsStats.messagesCount}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Aktuelle Position:</span>
+                <span className="font-medium">{currentPosition[0] !== 0 ? 'Verfügbar' : 'Wird ermittelt...'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Genauigkeit:</span>
+                <span className={`font-medium ${gpsStats.accuracy && gpsStats.accuracy > 0 && gpsStats.accuracy < 10 ? 'text-green-600' : 
+                  (gpsStats.accuracy && gpsStats.accuracy < 20 ? 'text-amber-600' : 'text-red-600')}`}>
+                  {gpsStats.accuracy === null ? 'Unbekannt' : 
+                   gpsStats.accuracy < 0 ? 'Fehler!' : 
+                   `${Math.round(gpsStats.accuracy)}m`}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Letzte Aktualisierung:</span>
+                <span className="font-medium">
+                  {gpsStats.lastUpdate > 0 ? 
+                   `${Math.round((Date.now() - gpsStats.lastUpdate) / 1000)}s` : 
+                   'Keine'}
+                </span>
+              </div>
+            </div>
           </div>
         )}
         
@@ -1302,22 +1258,29 @@ export function LocationDetermination({
             <Button 
               variant="secondary" 
               size="icon" 
-              onClick={centerMapToCurrentPosition} 
-              className="h-7 w-7 shadow-lg"
-              title="Karte auf gespeicherte Position zentrieren"
-            >
-              <LocateFixed className="h-6 w-6" />
-            </Button>
-            
-            <Button 
-              variant="secondary" 
-              size="icon" 
               onClick={centerToCurrentGPS} 
               className="h-7 w-7 shadow-lg bg-blue-600 hover:bg-blue-700"
-              title="Aktuelle GPS-Position verwenden"
+              title="Auf aktuelle GPS-Position zentrieren"
             >
-              <RefreshCw className="h-4 w-4" />
+              <LocateFixed className="h-4 w-4 text-white" />
             </Button>
+            
+            {/* Neuer Button zum Anzeigen des GPS-Status */}
+            {!showGpsStatus && (
+              <Button 
+                variant="secondary" 
+                size="icon" 
+                onClick={toggleGpsStatus} 
+                className="h-7 w-7 shadow-lg bg-gray-600 hover:bg-gray-700"
+                title="GPS-Status anzeigen"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-white">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="16" x2="12" y2="12"></line>
+                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+              </Button>
+            )}
           </div>
         )}
         {/* Entferne alte Buttons für Speichern/Neu (wurden nach oben verschoben) */}
