@@ -5,7 +5,6 @@ import { useAuth } from '@/context/auth-context'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
-// Ersatz für Clerk's SignInButton
 interface SignInButtonProps {
   mode?: 'redirect' | 'modal'
   children?: ReactNode
@@ -43,8 +42,6 @@ export function SignInButton({
     </Link>
   )
 }
-
-// Ersatz für Clerk's SignedIn
 interface SignedInProps {
   children: ReactNode
 }
@@ -59,7 +56,6 @@ export function SignedIn({ children }: SignedInProps) {
   return isSignedIn ? <>{children}</> : null
 }
 
-// Ersatz für Clerk's SignedOut  
 interface SignedOutProps {
   children: ReactNode
 }
@@ -74,7 +70,6 @@ export function SignedOut({ children }: SignedOutProps) {
   return !isSignedIn ? <>{children}</> : null
 }
 
-// Ersatz für Clerk's SignUpButton
 interface SignUpButtonProps {
   mode?: 'redirect' | 'modal'
   children?: ReactNode
@@ -101,7 +96,6 @@ export function SignUpButton({
   )
 }
 
-// Einfacher UserButton-Ersatz (für vollständige Clerk-Kompatibilität)
 interface UserButtonProps {
   appearance?: any
   afterSignOutUrl?: string

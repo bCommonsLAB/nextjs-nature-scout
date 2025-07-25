@@ -5,8 +5,7 @@ import crypto from 'crypto';
 
 export interface IUser {
   _id?: string | ObjectId;
-  clerkId?: string; // Optional für Migration - später entfernen
-  email: string;
+  email: string; // Primärer Identifier für alle Benutzeraktivitäten
   password?: string; // Für Auth.js - gehashtes Passwort
   name: string;
   role: 'user' | 'experte' | 'admin' | 'superadmin';
@@ -38,12 +37,9 @@ export interface CreateUserData {
   consent_data_processing?: boolean;
   consent_image_ccby?: boolean;
   habitat_name_visibility?: 'public' | 'members' | null;
-  // Migration helper
-  clerkId?: string;
 }
 
 export interface UpdateUserData {
-  clerkId?: string;
   email?: string;
   name?: string;
   role?: 'user' | 'experte' | 'admin' | 'superadmin';
@@ -70,7 +66,6 @@ export class UserService {
     const collection = await this.getUsersCollection();
     
     // Grundlegende Indizes für Einzelfelder
-    await collection.createIndex({ clerkId: 1 }, { unique: true });
     await collection.createIndex({ email: 1 }, { unique: true, sparse: true });
     await collection.createIndex({ role: 1 });
     await collection.createIndex({ organizationId: 1 });
@@ -79,7 +74,7 @@ export class UserService {
     await collection.createIndex({ createdAt: -1 });
     
     // Verbundindizes für häufige Abfragen
-    await collection.createIndex({ clerkId: 1, role: 1 });
+    await collection.createIndex({ email: 1, role: 1 });
     await collection.createIndex({ organizationId: 1, role: 1 });
     await collection.createIndex({ organizationId: 1, habitat_name_visibility: 1 });
     
@@ -90,20 +85,14 @@ export class UserService {
   }
   
   /**
-   * Findet einen Benutzer anhand seiner Clerk-ID
-   */
-  static async findByClerkId(clerkId: string): Promise<IUser | null> {
-    const collection = await this.getUsersCollection();
-    return collection.findOne({ clerkId });
-  }
-  
-  /**
-   * Findet einen Benutzer anhand seiner E-Mail-Adresse
+   * Findet einen Benutzer anhand seiner E-Mail (primärer Identifier)
    */
   static async findByEmail(email: string): Promise<IUser | null> {
     const collection = await this.getUsersCollection();
-    return collection.findOne({ email });
+    return collection.findOne({ email: email.toLowerCase().trim() });
   }
+  
+
   
   /**
    * Erstellt einen neuen Benutzer in der Datenbank
@@ -124,9 +113,9 @@ export class UserService {
   }
   
   /**
-   * Aktualisiert einen bestehenden Benutzer
+   * Aktualisiert einen bestehenden Benutzer anhand seiner E-Mail
    */
-  static async updateUser(clerkId: string, userData: UpdateUserData): Promise<IUser | null> {
+  static async updateUser(email: string, userData: UpdateUserData): Promise<IUser | null> {
     const collection = await this.getUsersCollection();
     
     const updateData = {
@@ -135,7 +124,7 @@ export class UserService {
     };
     
     const result = await collection.findOneAndUpdate(
-      { clerkId },
+      { email: email.toLowerCase().trim() },
       { $set: updateData },
       { returnDocument: 'after' }
     );
@@ -144,21 +133,13 @@ export class UserService {
   }
   
   /**
-   * Aktualisiert das lastAccess-Datum eines Benutzers (unterstützt sowohl _id als auch clerkId)
+   * Aktualisiert das lastAccess-Datum eines Benutzers anhand seiner E-Mail
    */
-  static async updateLastAccess(identifier: string): Promise<IUser | null> {
+  static async updateLastAccess(email: string): Promise<IUser | null> {
     const collection = await this.getUsersCollection();
     
-    // Versuche zunächst mit _id, falls das fehlschlägt mit clerkId (für Migration)
-    let query: any;
-    if (ObjectId.isValid(identifier)) {
-      query = { _id: new ObjectId(identifier) };
-    } else {
-      query = { clerkId: identifier };
-    }
-    
     const result = await collection.findOneAndUpdate(
-      query,
+      { email: email.toLowerCase().trim() },
       { $set: { lastAccess: new Date() } },
       { returnDocument: 'after' }
     );
@@ -244,6 +225,21 @@ export class UserService {
   }
 
   /**
+   * Validiert einen Passwort-Reset-Token (ohne ihn zu löschen)
+   */
+  static async validatePasswordResetToken(token: string): Promise<IUser | null> {
+    const collection = await this.getUsersCollection();
+    
+    // Token prüfen und noch gültig?
+    const user = await collection.findOne({
+      passwordResetToken: token,
+      passwordResetExpires: { $gt: new Date() }
+    });
+    
+    return user;
+  }
+
+  /**
    * Setzt ein neues Passwort mit Reset-Token
    */
   static async resetPasswordWithToken(token: string, newPassword: string): Promise<IUser | null> {
@@ -280,11 +276,11 @@ export class UserService {
   }
   
   /**
-   * Löscht einen Benutzer
+   * Löscht einen Benutzer anhand seiner E-Mail
    */
-  static async deleteUser(clerkId: string): Promise<boolean> {
+  static async deleteUser(email: string): Promise<boolean> {
     const collection = await this.getUsersCollection();
-    const result = await collection.deleteOne({ clerkId });
+    const result = await collection.deleteOne({ email: email.toLowerCase().trim() });
     return result.deletedCount > 0;
   }
   
@@ -299,20 +295,20 @@ export class UserService {
   /**
    * Prüft, ob ein Benutzer Admin-Berechtigungen hat
    */
-  static async isAdmin(clerkId: string): Promise<boolean> {
+  static async isAdmin(email: string): Promise<boolean> {
     const collection = await this.getUsersCollection();
     // Projektion: Nur das role-Feld zurückgeben
-    const user = await collection.findOne({ clerkId }, { projection: { role: 1, _id: 0 } });
+    const user = await collection.findOne({ email: email.toLowerCase().trim() }, { projection: { role: 1, _id: 0 } });
     return user?.role === 'admin' || user?.role === 'superadmin';
   }
   
   /**
    * Prüft, ob ein Benutzer Experte ist
    */
-  static async isExpert(clerkId: string): Promise<boolean> {
+  static async isExpert(email: string): Promise<boolean> {
     const collection = await this.getUsersCollection();
     // Projektion: Nur das role-Feld zurückgeben
-    const user = await collection.findOne({ clerkId }, { projection: { role: 1, _id: 0 } });
+    const user = await collection.findOne({ email: email.toLowerCase().trim() }, { projection: { role: 1, _id: 0 } });
     return user?.role === 'experte' || user?.role === 'admin' || user?.role === 'superadmin';
   }
 } 

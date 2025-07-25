@@ -44,8 +44,8 @@ export const authOptions = {
             return null
           }
 
-          // Last Access aktualisieren (mit angepasster Methode)
-          await UserService.updateLastAccess(user._id?.toString() || '')
+          // Last Access aktualisieren (mit E-Mail)
+          await UserService.updateLastAccess(user.email)
 
           // User-Objekt für Session zurückgeben
           return {
@@ -66,9 +66,10 @@ export const authOptions = {
   ],
 
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: { token: any; user: any }) {
       // Bei der ersten Anmeldung User-Daten in Token speichern
       if (user) {
+        token.email = user.email
         token.role = user.role
         token.organizationId = user.organizationId
         token.organizationName = user.organizationName
@@ -76,10 +77,11 @@ export const authOptions = {
       return token
     },
     
-    async session({ session, token }) {
+    async session({ session, token }: { session: any; token: any }) {
       // User-Daten aus Token in Session übertragen
       if (token) {
         session.user.id = token.sub || ''
+        session.user.email = token.email || ''
         session.user.role = token.role as string
         session.user.organizationId = token.organizationId as string
         session.user.organizationName = token.organizationName as string
@@ -89,7 +91,7 @@ export const authOptions = {
   },
 
   // Sicherheitseinstellungen
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET || 'temporary-secret-for-development-only',
 }
 
 export default NextAuth(authOptions) 

@@ -60,8 +60,8 @@ export function Welcome({
     async function fetchUserData() {
       if (isLoaded && user) {
         try {
-          // API-Anfrage an unseren Endpunkt mit der Clerk-ID
-          const response = await fetch(`/api/users/${user.id}`);
+          // API-Anfrage an unseren Endpunkt mit der E-Mail-Adresse
+          const response = await fetch(`/api/users/${encodeURIComponent(user.email)}`);
           
           if (!response.ok) {
             console.error("Fehler beim Abrufen der Benutzerdaten:", response.statusText);
@@ -74,7 +74,7 @@ export function Welcome({
           // Daten aus unserem MongoDB-Nutzerprofil übernehmen
           setMetadata(prev => ({
             ...prev,
-            erfassungsperson: userData.name || user.fullName || "",
+            erfassungsperson: userData.name || user.name || "",
             organizationId: userData.organizationId || "",
             organizationName: userData.organizationName || "",
             organizationLogo: userData.organizationLogo || "",
@@ -105,7 +105,7 @@ export function Welcome({
           <div className="space-y-4">
             <div>
               <p className="mb-3">
-                {isLoaded && user?.fullName ? `Hallo ${user.fullName},` : 'Hallo,'}
+                {isLoaded && user?.name ? `Hallo ${user.name},` : 'Hallo,'}
               </p>
               <p className="mb-3">
                 in diesem Frageassistenten werden Sie gebeten, vor Ort einige Standort-Merkmale eines Naturhabitats zu erfassen 

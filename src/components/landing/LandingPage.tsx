@@ -77,45 +77,6 @@ interface HabitatEntry {
   };
 }
 
-// Demohabitate, die durch echte Daten ersetzt werden
-const demoHabitats = [
-  { 
-    imageSrc: "/panoramasamples/magerwiese-artenreich.jpg", 
-    title: "Magerwiese artenreich", 
-    location: "Meran", 
-    recorder: "Anna Mayer",
-    status: "hochwertig",
-    org: "AVS Meran",
-    orgLogo: "/images/habitat-placeholder.jpg"
-  },
-  { 
-    imageSrc: "/panoramasamples/fettwiese-standard.jpg", 
-    title: "Fettwiese", 
-    location: "Brixen", 
-    recorder: "Thomas Hofer",
-    status: "standard",
-    org: "Heimatpflegeverband Südtirol",
-    orgLogo: "/images/habitat-placeholder.jpg"
-  },
-  { 
-    imageSrc: "/panoramasamples/verlandungsmoor.jpg", 
-    title: "Verlandungsmoor", 
-    location: "Bozen", 
-    recorder: "Lisa Pichler",
-    status: "gesetzlich",
-    org: "Klima Club Südtirol",
-    orgLogo: "/images/habitat-placeholder.jpg"
-  },
-  { 
-    imageSrc: "/panoramasamples/trockenrasen-kurzgrasig.jpg", 
-    title: "Trockenrasen kurzgrasig", 
-    location: "Schlanders", 
-    recorder: "Michael Gruber",
-    status: "gesetzlich",
-    org: "Umweltschutzgruppe Vinschgau",
-    orgLogo: "/images/habitat-placeholder.jpg"
-  }
-];
 
 export function NatureScoutPage() {
   //console.log('NatureScoutPage Component wird gerendert');
@@ -155,7 +116,6 @@ export function NatureScoutPage() {
         }
       } catch (error) {
         console.error('Fehler beim Laden der verifizierten Habitate:', error);
-        // Fallback zu Demo-Daten bei Fehler
         setVerifiedHabitats([]);
       } finally {
         setIsLoading(false);

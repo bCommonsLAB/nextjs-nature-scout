@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { OrganizationService } from '@/lib/services/organization-service';
+import { UserService } from '@/lib/services/user-service';
+import { requireAuth } from '@/lib/server-auth';
 import fs from 'fs';
 import path from 'path';
 
@@ -25,9 +27,10 @@ interface ImportStats {
  */
 export async function GET(req: Request) {
   try {
-    // TEMPORÄR: Demo-Admin für Init-Routen
-    const userId = 'demo-user-123';
-    const isAdmin = true;
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
+    const isAdmin = await UserService.isAdmin(currentUser.email);
     
     // const auth = getAuth(req);
     // const userId = auth.userId;

@@ -1,33 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/server-auth';
 import { UserService } from '@/lib/services/user-service';
 
-// GET /api/users/[clerkId] - Holt einen bestimmten Benutzer
+// GET /api/users/[email] - Holt einen bestimmten Benutzer
 export async function GET(
   req: Request,
-  { params }: { params: { clerkId: string } }
+  { params }: { params: { email: string } }
 ) {
   try {
-    // TEMPORÄR: Mock-Auth für Demo-Modus
-    const userId = 'demo-user-123';
-    // const auth = getAuth(req);
-    // const userId = auth.userId;
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
     
-    // if (!userId) {
-    //   return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    // }
+    // Hole die E-Mail (URL-dekodiert)
+    const { email: emailParam } = await params;
+    const email = decodeURIComponent(emailParam);
     
-    // Hole die clerkId
-    const clerkId = params.clerkId;
+    // Benutzer kann nur seine eigenen Daten sehen (außer Admins)
+    if (currentUser.email !== email) {
+      const isAdmin = await UserService.isAdmin(currentUser.email);
+      if (!isAdmin) {
+        return NextResponse.json({ error: 'Zugriff verweigert' }, { status: 403 });
+      }
+    }
     
-    // TEMPORÄR: Demo-Admin-Zugang - alle Daten erlaubt
-    // if (userId !== clerkId) {
-    //   const isAdmin = await UserService.isAdmin(userId);
-    //   if (!isAdmin) {
-    //     return NextResponse.json({ error: 'Zugriff verweigert' }, { status: 403 });
-    //   }
-    // }
-    
-    const user = await UserService.findByClerkId(clerkId);
+    const user = await UserService.findByEmail(email);
     
     if (!user) {
       return NextResponse.json({ error: 'Benutzer nicht gefunden' }, { status: 404 });
@@ -40,27 +36,23 @@ export async function GET(
   }
 }
 
-// PATCH /api/users/[clerkId] - Aktualisiert einen bestimmten Benutzer
+// PATCH /api/users/[email] - Aktualisiert einen bestimmten Benutzer
 export async function PATCH(
   req: Request,
-  { params }: { params: { clerkId: string } }
+  { params }: { params: { email: string } }
 ) {
   try {
-    // TEMPORÄR: Mock-Auth für Demo-Modus  
-    const userId = 'demo-user-123';
-    // const auth = getAuth(req);
-    // const userId = auth.userId;
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userEmail = currentUser.email;
     
-    // if (!userId) {
-    //   return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    // }
+    // Hole die E-Mail (URL-dekodiert)
+    const { email: emailParam } = await params;
+    const email = decodeURIComponent(emailParam);
     
-    // Hole die clerkId
-    const clerkId = params.clerkId;
-    
-    // TEMPORÄR: Demo-Admin-Zugang
-    const isAdmin = true;
-    const isSelf = userId === clerkId;
+    // Echte Admin-Prüfung
+    const isAdmin = await UserService.isAdmin(currentUser.email);
+    const isSelf = currentUser.email === email;
     
     if (!isAdmin && !isSelf) {
       return NextResponse.json({ error: 'Zugriff verweigert' }, { status: 403 });
@@ -69,7 +61,7 @@ export async function PATCH(
     const body = await req.json();
     const { 
       name, 
-      email, 
+      newEmail, 
       role, 
       organizationId, 
       organizationName,
@@ -84,7 +76,7 @@ export async function PATCH(
       // Prüfen, ob dieser Benutzer der letzte Admin ist
       const allUsers = await UserService.getAllUsers();
       const adminUsers = allUsers.filter(user => 
-        (user.role === 'admin' || user.role === 'superadmin') && user.clerkId !== clerkId
+        (user.role === 'admin' || user.role === 'superadmin') && user.email !== email
       );
       
       // Wenn dies der letzte Admin ist, verweigere die Änderung
@@ -99,7 +91,7 @@ export async function PATCH(
     // Normale Benutzer dürfen ihre Rolle nicht ändern, aber ihre Consent-Einstellungen
     const updateData = {
       ...(name !== undefined ? { name } : {}), 
-      ...(email !== undefined ? { email } : {}),
+      ...(newEmail !== undefined ? { email: newEmail } : {}),
       ...(isAdmin && role ? { role } : {}),
       ...(organizationId !== undefined ? { organizationId } : {}),
       ...(organizationName !== undefined ? { organizationName } : {}),
@@ -110,7 +102,7 @@ export async function PATCH(
       ...(habitat_name_visibility !== undefined ? { habitat_name_visibility } : {})
     };
     
-    const updatedUser = await UserService.updateUser(clerkId, updateData);
+    const updatedUser = await UserService.updateUser(email, updateData);
     
     if (!updatedUser) {
       return NextResponse.json({ error: 'Benutzer nicht gefunden' }, { status: 404 });
@@ -123,38 +115,33 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/users/[clerkId] - Löscht einen bestimmten Benutzer
+// DELETE /api/users/[email] - Löscht einen bestimmten Benutzer
 export async function DELETE(
   req: Request,
-  { params }: { params: { clerkId: string } }
+  { params }: { params: { email: string } }
 ) {
   try {
-    // TEMPORÄR: Mock-Auth für Demo-Modus
-    const userId = 'demo-user-123';
-    // const auth = getAuth(req);
-    // const userId = auth.userId;
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
     
-    // if (!userId) {
-    //   return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    // }
+    // Hole die E-Mail (URL-dekodiert)
+    const { email: emailParam } = await params;
+    const email = decodeURIComponent(emailParam);
     
-    // Hole die clerkId
-    const clerkId = params.clerkId;
-    
-    // TEMPORÄR: Demo-Admin-Zugang 
-    const isAdmin = true;
+    // Echte Admin-Prüfung
+    const isAdmin = await UserService.isAdmin(currentUser.email);
     
     if (!isAdmin) {
       return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
     }
     
     // Prüfen, ob der zu löschende Benutzer ein Admin ist
-    const userToDelete = await UserService.findByClerkId(clerkId);
+    const userToDelete = await UserService.findByEmail(email);
     if (userToDelete && (userToDelete.role === 'admin' || userToDelete.role === 'superadmin')) {
       // Prüfen, ob dies der letzte Admin ist
       const allUsers = await UserService.getAllUsers();
       const adminUsers = allUsers.filter(user => 
-        (user.role === 'admin' || user.role === 'superadmin') && user.clerkId !== clerkId
+        (user.role === 'admin' || user.role === 'superadmin') && user.email !== email
       );
       
       // Wenn dies der letzte Admin ist, verweigere das Löschen
@@ -166,7 +153,7 @@ export async function DELETE(
       }
     }
     
-    const success = await UserService.deleteUser(clerkId);
+    const success = await UserService.deleteUser(email);
     
     if (!success) {
       return NextResponse.json({ error: 'Benutzer nicht gefunden' }, { status: 404 });

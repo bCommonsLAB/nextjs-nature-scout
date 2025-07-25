@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { UserService } from '@/lib/services/user-service';
+import { requireAuth } from '@/lib/server-auth';
 
 /**
- * GET /api/users/isAdmin - TEMPORÄR: Alle Benutzer sind Admins (Demo-Modus)
+ * GET /api/users/isAdmin - Prüft Admin-Rechte des aktuellen Benutzers
  */
 export async function GET(req: Request) {
   try {
-    // TEMPORÄR: Alle Benutzer sind Admins (für Demo-Modus ohne Auth)
-    const isAdmin = true;
+    const currentUser = await requireAuth();
+    const isAdmin = await UserService.isAdmin(currentUser.email);
     
     return NextResponse.json({ isAdmin });
   } catch (error) {

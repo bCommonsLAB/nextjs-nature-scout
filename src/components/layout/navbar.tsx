@@ -7,14 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Menu, Settings, TestTube2, MapPinCheckInside, Users, MapPinPlusInside, Map } from "lucide-react";
 import { SignInButton, SignedIn, SignedOut } from "@/components/auth/AuthComponents";
-import { useUser, useClerk } from "@/context/auth-context";
+import { useUser, useAuth } from "@/context/auth-context";
 import { UserOrganisationButton } from "@/components/UserOrganisation";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 
 export function Navbar() {
   const { user, isLoaded } = useUser();
-  const { signOut } = useClerk();
+  const { signOut } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isExpert, setIsExpert] = useState(false);
   const router = useRouter();
@@ -350,7 +350,7 @@ export function Navbar() {
                   </SignInButton>
                 </SignedOut>
                 <SignedIn>
-                  <div className="pt-4 pl-2 clerk-user-button-container mt-auto mb-16" data-clerk-component-wrapper>
+                  <div className="pt-4 pl-2 user-button-container mt-auto mb-16">
                     <UserOrganisationButton />
                   </div>
                 </SignedIn>

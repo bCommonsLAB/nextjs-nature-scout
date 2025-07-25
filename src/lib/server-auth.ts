@@ -1,85 +1,109 @@
-import { headers } from 'next/headers'
-import { getServerSession } from 'next-auth'
-import { authOptions } from './auth'
+import { getServerSession } from "next-auth/next"
+import { authOptions } from "./auth"
+import { UserService } from "./services/user-service"
 
-// Generisches Server-Auth Interface (Ersatz für Clerk's auth())
-export interface ServerAuth {
-  userId: string | null
-  user: {
-    id: string
-    email: string
-    name: string
-    role: 'user' | 'experte' | 'admin' | 'superadmin'
-  } | null
-  protect: () => void
-  redirectToSignIn: () => never
-}
-
-// **AUTH.JS INTEGRIERTE** Server-Auth Implementation
-export async function auth(): Promise<ServerAuth> {
-  // Verwende echte Auth.js Session
+/**
+ * Holt die aktuelle Session vom Server
+ */
+export async function auth() {
   const session = await getServerSession(authOptions)
-  
-  if (!session?.user) {
-    return {
-      userId: null,
-      user: null,
-      protect: () => {
-        throw new Error('Nicht authentifiziert')
-      },
-      redirectToSignIn: () => {
-        throw new Error('Umleitung zur Anmeldung')
-      }
-    }
-  }
+  return session
+}
 
-  // Konvertiere Auth.js Session zu unserem Format
-  const user = {
-    id: session.user.id || '',
-    email: session.user.email || '',
-    name: session.user.name || '',
-    role: (session.user as any).role || 'user'
-  }
-
+/**
+ * Holt die aktuelle Session und gibt User-Info zurück
+ */
+export async function getAuth() {
+  const session = await getServerSession(authOptions)
   return {
-    userId: user.id,
-    user,
-    protect: () => {
-      // Bereits authentifiziert, nichts zu tun
-    },
-    redirectToSignIn: () => {
-      throw new Error('Umleitung zur Anmeldung')
+    user: session?.user,
+    isAuthenticated: !!session?.user
+  }
+}
+
+/**
+ * Prüft ob der Benutzer angemeldet ist
+ */
+export async function requireAuth() {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    throw new Error('Nicht angemeldet')
+  }
+  return session.user
+}
+
+/**
+ * Prüft ob der Benutzer Admin-Rechte hat
+ */
+export async function requireAdmin() {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.email) {
+    throw new Error('Nicht angemeldet')
+  }
+  
+  const isAdmin = await UserService.isAdmin(session.user.email)
+  if (!isAdmin) {
+    throw new Error('Keine Administratorrechte')
+  }
+  
+  return session.user
+}
+
+/**
+ * Prüft ob der Benutzer Experte ist
+ */
+export async function requireExpert() {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.email) {
+    throw new Error('Nicht angemeldet')
+  }
+  
+  const isExpert = await UserService.isExpert(session.user.email)
+  if (!isExpert) {
+    throw new Error('Keine Expertenrechte')
+  }
+  
+  return session.user
+}
+
+/**
+ * Prüft Admin-Rechte und gibt Boolean zurück (für API-Routen)
+ */
+export async function checkAdminAccess() {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return { isAdmin: false, error: 'Nicht angemeldet' }
     }
+    
+    const isAdmin = await UserService.isAdmin(session.user.email)
+    if (!isAdmin) {
+      return { isAdmin: false, error: 'Keine Administratorrechte' }
+    }
+    
+    return { isAdmin: true, error: null, user: session.user }
+  } catch (error) {
+    return { isAdmin: false, error: 'Authentifizierungsfehler' }
   }
 }
 
-// Ersatz für getAuth() - gleiche Funktionalität wie auth()
-export async function getAuth(req?: Request): Promise<ServerAuth> {
-  return auth()
-}
-
-// Utility-Funktionen für häufige Checks
-export async function requireAuth(): Promise<ServerAuth> {
-  const authResult = await auth()
-  if (!authResult.userId) {
-    throw new Error('Authentifizierung erforderlich')
+/**
+ * Prüft Experten-Rechte und gibt Boolean zurück (für API-Routen)
+ */
+export async function checkExpertAccess() {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return { isExpert: false, error: 'Nicht angemeldet' }
+    }
+    
+    const isExpert = await UserService.isExpert(session.user.email)
+    if (!isExpert) {
+      return { isExpert: false, error: 'Keine Expertenrechte' }
+    }
+    
+    return { isExpert: true, error: null, user: session.user }
+  } catch (error) {
+    return { isExpert: false, error: 'Authentifizierungsfehler' }
   }
-  return authResult
-}
-
-export async function requireAdmin(): Promise<ServerAuth> {
-  const authResult = await requireAuth()
-  if (authResult.user?.role !== 'admin' && authResult.user?.role !== 'superadmin') {
-    throw new Error('Administrator-Berechtigung erforderlich')
-  }
-  return authResult
-}
-
-export async function requireExpert(): Promise<ServerAuth> {
-  const authResult = await requireAuth()
-  const allowedRoles = ['experte', 'admin', 'superadmin']
-  if (!allowedRoles.includes(authResult.user?.role || '')) {
-    throw new Error('Experten-Berechtigung erforderlich')
-  }
-  return authResult
 } 

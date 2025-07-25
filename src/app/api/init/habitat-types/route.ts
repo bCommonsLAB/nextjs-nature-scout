@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
+import { UserService } from '@/lib/services/user-service';
+import { requireAuth } from '@/lib/server-auth';
 
 // Aktualisierte Habitattypen mit typicalSpecies
 const updatedHabitatTypes = [
@@ -272,19 +274,10 @@ const updatedHabitatTypes = [
 
 export async function GET() {
   try {
-    // TEMPORÄR: Demo-Admin für Init-Routen
-    const userId = 'demo-user-123';
-    
-    // const { userId } = await auth();
-    // if (!userId) {
-    //   return NextResponse.json(
-    //     { error: 'Nicht autorisiert' },
-    //     { status: 401 }
-    //   );
-    // }
-    
-    // TEMPORÄR: Demo-Admin-Zugang
-    const isAdmin = true;
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
+    const isAdmin = await UserService.isAdmin(currentUser.email);
     
     // if (!isAdmin) {
     //   return NextResponse.json(

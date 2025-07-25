@@ -285,15 +285,6 @@ async function updateHabitatTypesWithMissingPlants(): Promise<UpdateResult> {
 
 export async function GET() {
   try {
-    // TEMPORÄR: Mock-Auth für Demo-Modus
-    const userId = 'demo-user-123';
-    // const { userId } = await auth();
-    // if (!userId) {
-    //   return NextResponse.json(
-    //     { error: 'Nicht autorisiert' },
-    //     { status: 401 }
-    //   );
-    // }
     
     const db = await connectToDatabase();
     const collection = db.collection('habitatTypes');
@@ -333,15 +324,6 @@ export async function GET() {
 
 export async function POST() {
   try {
-    // TEMPORÄR: Mock-Auth für Demo-Modus
-    const userId = 'demo-user-123';
-    // const { userId } = await auth();
-    // if (!userId) {
-    //   return NextResponse.json(
-    //     { error: 'Nicht autorisiert' },
-    //     { status: 401 }
-    //   );
-    // }
     
     // Prüfen, ob der Test-Images-Pfad existiert
     if (!process.env.HABITAT_TEST_IMAGES_PATH) {

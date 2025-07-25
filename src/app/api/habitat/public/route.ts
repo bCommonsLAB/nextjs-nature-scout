@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { Sort as MongoSort } from 'mongodb';
 import { connectToDatabase } from '@/lib/services/db';
 import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
+import { requireAuth } from '@/lib/server-auth';
 
 // Definiere die Typen
 interface MongoFilter {
@@ -23,8 +24,9 @@ export async function GET(request: Request) {
   const includeFilterOptions = searchParams.get('includeFilterOptions') === 'true';
   
   try {
-    // TEMPORÄR: Keine Auth-Checks (Demo-Modus)
-    const userId = null;
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
         
     // Nutzerinformationen abrufen, falls angemeldet
     let currentUserEmail: string | null = null;
@@ -37,7 +39,7 @@ export async function GET(request: Request) {
     if (userId) {
       // Benutzerinformationen aus der Datenbank holen
       const currentUserData = await usersCollection.findOne(
-        { clerkId: userId },
+        { email: userId },
         { projection: { email: 1, organizationId: 1 } }
       );
       

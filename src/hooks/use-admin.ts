@@ -50,7 +50,7 @@ export function useAdmin(): UseAdminResult {
       }
 
       try {
-        const response = await fetch(`/api/users/${user.id}`);
+        const response = await fetch(`/api/users/${encodeURIComponent(user.email)}`);
         
         if (response.status === 404) {
           // Benutzer existiert noch nicht in der Datenbank

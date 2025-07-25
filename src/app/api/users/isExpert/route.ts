@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { UserService } from '@/lib/services/user-service';
+import { requireAuth } from '@/lib/server-auth';
 
 /**
- * GET /api/users/isExpert - TEMPORÄR: Alle Benutzer sind Experten (Demo-Modus)
+ * GET /api/users/isExpert - Prüft Experten-Rechte des aktuellen Benutzers
  */
 export async function GET(req: Request) {
   try {
-    // TEMPORÄR: Alle Benutzer sind Experten (für Demo-Modus ohne Auth)
-    const isExpert = true;
+    const currentUser = await requireAuth();
+    const isExpert = await UserService.isExpert(currentUser.email);
     
     return NextResponse.json({ isExpert });
   } catch (error) {

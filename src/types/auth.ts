@@ -7,6 +7,7 @@ declare module "next-auth" {
       role: string
       organizationId?: string
       organizationName?: string
+
     } & DefaultSession["user"]
   }
 
@@ -15,6 +16,7 @@ declare module "next-auth" {
     role: string
     organizationId?: string
     organizationName?: string
+
   }
 }
 

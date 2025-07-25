@@ -3,6 +3,7 @@ import { Sort as MongoSort, Document } from 'mongodb';
 import { connectToDatabase } from '@/lib/services/db';
 import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
 import { UserService } from '@/lib/services/user-service';
+import { requireAuth } from '@/lib/server-auth';
 
 // Vor der GET-Funktion, definiere die Typen
 interface MongoFilter {
@@ -68,8 +69,9 @@ export async function GET(request: Request) {
   const sortOrder = searchParams.get('sortOrder') || 'desc';
   
   try {
-    // TEMPORÄR: Mock-Auth für Demo-Modus
-    const userId = 'demo-user-123';
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
     
     if (!userId) {
       return NextResponse.json(
@@ -84,7 +86,7 @@ export async function GET(request: Request) {
     const hasAdvancedPermissions = isAdmin || isExpert;
     
     // Holen des Benutzers, um die E-Mail für die Filterung zu bekommen
-    const userRecord = await UserService.findByClerkId(userId);
+          const userRecord = await UserService.findByEmail(userId);
     
     if (!userRecord) {
       return NextResponse.json(

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
+import { UserService } from '@/lib/services/user-service';
+import { requireAuth } from '@/lib/server-auth';
 
 export async function PATCH(
   request: Request,
@@ -10,27 +12,18 @@ export async function PATCH(
   const jobId = auftragsId;
   
   try {
-    // TEMPORÄR: Mock-Auth für Demo-Modus
-    const userId = 'demo-user-123';
-    // const { userId } = await auth();
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
+    const isAdmin = await UserService.isAdmin(currentUser.email);
+    const isExpert = await UserService.isExpert(currentUser.email);
     
-    // if (!userId) {
-    //   return NextResponse.json(
-    //     { error: 'Nicht autorisiert' },
-    //     { status: 401 }
-    //   );
-    // }
-    
-    // TEMPORÄR: Demo-Expert-Zugang
-    const isAdmin = true;
-    const isExpert = true;
-    
-    // if (!isAdmin && !isExpert) {
-    //   return NextResponse.json(
-    //     { error: 'Zugriff verweigert. Nur Experten und Administratoren können den effektiven Habitat bearbeiten.' },
-    //     { status: 403 }
-    //   );
-    // }
+    if (!isAdmin && !isExpert) {
+      return NextResponse.json(
+        { error: 'Zugriff verweigert. Nur Experten und Administratoren können den effektiven Habitat bearbeiten.' },
+        { status: 403 }
+      );
+    }
     
     const body = await request.json();
     const { effectiveHabitat, kommentar } = body;
@@ -46,8 +39,6 @@ export async function PATCH(
     const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
     const habitatTypesCollection = db.collection('habitatTypes');
     
-    // TEMPORÄR: Mock-User für Demo-Modus
-    const currentUser = { name: 'Demo-Experte', email: 'demo@example.com' };
     const userName = currentUser.name;
     
     // Aktuellen Eintrag abrufen

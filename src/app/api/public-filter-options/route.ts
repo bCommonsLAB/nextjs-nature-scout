@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
 import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
+import { requireAuth } from '@/lib/server-auth';
 
 interface FilterOption {
   value: string;
@@ -97,8 +98,9 @@ export async function GET(request: Request) {
         break;
         
       case 'personen':
-        // TEMPORÄR: Kein Auth-Check (Demo-Modus)
-        const userId = null;
+        // Echte Authentifizierung
+        const currentUser = await requireAuth();
+        const userId = currentUser.email;
         
         // Nutzerinformationen abrufen, falls angemeldet
         let currentUserEmail: string | null = null;
@@ -108,7 +110,7 @@ export async function GET(request: Request) {
           // Benutzerinformationen aus der Datenbank holen
           const usersCollection = db.collection('users');
           const currentUserData = await usersCollection.findOne(
-            { clerkId: userId },
+            { email: userId },
             { projection: { email: 1, organizationId: 1 } }
           );
           

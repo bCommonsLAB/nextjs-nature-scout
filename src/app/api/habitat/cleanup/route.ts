@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
 import { UserService } from '@/lib/services/user-service';
+import { requireAuth } from '@/lib/server-auth';
 
 /**
  * Löscht alle Einträge ohne result-Objekt oder mit leerem result-Objekt
@@ -8,24 +9,17 @@ import { UserService } from '@/lib/services/user-service';
  */
 export async function DELETE() {
   try {
-    // TEMPORÄR: Demo-Admin für Admin-Funktionen
-    const userId = 'demo-user-123';
-    const isAdmin = true;
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
+    const isAdmin = await UserService.isAdmin(currentUser.email);
     
-    // const { userId } = await auth();
-    // if (!userId) {
-    //   return NextResponse.json(
-    //     { error: 'Nicht autorisiert' },
-    //     { status: 401 }
-    //   );
-    // }
-    // const isAdmin = await UserService.isAdmin(userId);
-    // if (!isAdmin) {
-    //   return NextResponse.json(
-    //     { error: 'Zugriff verweigert. Nur Administratoren können diese Aktion ausführen.' },
-    //     { status: 403 }
-    //   );
-    // }
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: 'Zugriff verweigert. Nur Administratoren können diese Aktion ausführen.' },
+        { status: 403 }
+      );
+    }
     
     // Verbindung zur Datenbank herstellen
     const db = await connectToDatabase();

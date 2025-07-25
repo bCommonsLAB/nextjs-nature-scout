@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, ReactNode, useState, useEffect } from 'react'
+import { createContext, useContext, ReactNode } from 'react'
 import { useSession, signIn as nextAuthSignIn, signOut as nextAuthSignOut } from 'next-auth/react'
 
 // Generische User-Interface (temporär ohne Auth)
@@ -13,13 +13,6 @@ export interface User {
   organizationId?: string
   organizationName?: string
   organizationLogo?: string
-  // Clerk-Kompatibilität
-  firstName?: string
-  lastName?: string
-  username?: string
-  imageUrl?: string
-  fullName?: string
-  primaryEmailAddress?: { emailAddress: string }
 }
 
 // Generische Auth-Interface
@@ -35,9 +28,6 @@ export interface AuthActions {
   signIn: (credentials?: any) => Promise<void>
   signOut: (options?: { redirectUrl?: string }) => Promise<void>
   updateUser: (userData: Partial<User>) => Promise<void>
-  // Clerk-Kompatibilität
-  openSignIn: () => void
-  openUserProfile: () => void
 }
 
 // Kombinierter Auth-Context
@@ -53,19 +43,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Konvertiere Auth.js Session zu unserem User-Format
   const user: User | null = session?.user ? {
     id: session.user.id || '',
+
     email: session.user.email || '',
     name: session.user.name || '',
     role: (session.user as any).role || 'user',
     image: session.user.image || undefined,
     organizationId: (session.user as any).organizationId || undefined,
-    organizationName: (session.user as any).organizationName || undefined,
-    // Clerk-Kompatibilität
-    firstName: session.user.name?.split(' ')[0] || undefined,
-    lastName: session.user.name?.split(' ').slice(1).join(' ') || undefined,
-    username: session.user.email?.split('@')[0] || undefined,
-    imageUrl: session.user.image || undefined,
-    fullName: session.user.name || undefined,
-    primaryEmailAddress: { emailAddress: session.user.email || '' }
+    organizationName: (session.user as any).organizationName || undefined
   } : null
 
   const authState: AuthState = {
@@ -105,15 +89,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('UpdateUser aufgerufen:', userData)
       // TODO: Implementiere User-Update über API
       console.warn('User-Update noch nicht implementiert')
-    },
-
-    // Clerk-Kompatibilität
-    openSignIn: () => {
-      window.location.href = '/authentification/anmelden'
-    },
-
-    openUserProfile: () => {
-      window.location.href = '/profile'
     }
   }
 
@@ -129,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 }
 
-// Hook für Auth-Zugriff (Ersatz für useUser und useClerk)
+// Hook für Auth-Zugriff
 export function useAuth() {
   const context = useContext(AuthContext)
   if (context === undefined) {
@@ -138,21 +113,12 @@ export function useAuth() {
   return context
 }
 
-// Clerk-kompatible Hooks für einfachere Migration
+// Hook für User-Daten
 export function useUser() {
   const auth = useAuth()
   return {
     user: auth.user,
     isLoaded: auth.isLoaded,
     isSignedIn: auth.isSignedIn
-  }
-}
-
-export function useClerk() {
-  const auth = useAuth()
-  return {
-    signOut: auth.signOut,
-    openSignIn: auth.openSignIn,
-    openUserProfile: auth.openUserProfile
   }
 } 

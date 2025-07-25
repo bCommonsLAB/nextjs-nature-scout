@@ -256,7 +256,7 @@ export function UserTable() {
     
     setLastAdminError(null);
     try {
-      const response = await fetch(`/api/users/${selectedUser.clerkId}`, {
+      const response = await fetch(`/api/users/${encodeURIComponent(selectedUser.email)}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -288,10 +288,10 @@ export function UserTable() {
   };
 
   // Benutzerrolle aktualisieren
-  const updateUserRole = async (clerkId: string, role: string) => {
+  const updateUserRole = async (email: string, role: string) => {
     setLastAdminError(null);
     try {
-      const response = await fetch(`/api/users/${clerkId}`, {
+      const response = await fetch(`/api/users/${encodeURIComponent(email)}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -322,7 +322,7 @@ export function UserTable() {
   };
 
   // Benutzerorganisation aktualisieren
-  const updateUserOrganization = async (clerkId: string, organizationId: string) => {
+  const updateUserOrganization = async (email: string, organizationId: string) => {
     // "none" in null umwandeln für die Datenbank
     const orgIdToSave = organizationId === 'none' ? null : organizationId;
     
@@ -339,7 +339,7 @@ export function UserTable() {
     }
     
     try {
-      const response = await fetch(`/api/users/${clerkId}`, {
+      const response = await fetch(`/api/users/${encodeURIComponent(email)}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -366,14 +366,14 @@ export function UserTable() {
   };
 
   // Benutzer löschen
-  const deleteUser = async (clerkId: string) => {
+  const deleteUser = async (email: string) => {
     setLastAdminError(null);
     if (!confirm('Sind Sie sicher, dass Sie diesen Benutzer löschen möchten?')) {
       return;
     }
     
     try {
-      const response = await fetch(`/api/users/${clerkId}`, {
+      const response = await fetch(`/api/users/${encodeURIComponent(email)}`, {
         method: 'DELETE',
       });
 
@@ -585,14 +585,14 @@ export function UserTable() {
               </TableRow>
             ) : (
               filteredUsers.map((user) => (
-                <TableRow key={user.clerkId}>
+                <TableRow key={user.email}>
                   <TableCell>{user.name}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       <Select 
                         defaultValue={user.role} 
-                        onValueChange={(value) => updateUserRole(user.clerkId, value)}
+                        onValueChange={(value) => updateUserRole(user.email, value)}
                       >
                         <SelectTrigger className="w-[130px]">
                           <SelectValue placeholder="Rolle wählen" />
@@ -613,7 +613,7 @@ export function UserTable() {
                     <div className="flex flex-col gap-1">
                       <Select 
                         value={user.organizationId || 'none'} 
-                        onValueChange={(value) => updateUserOrganization(user.clerkId, value)}
+                        onValueChange={(value) => updateUserOrganization(user.email, value)}
                       >
                         <SelectTrigger className="w-[180px]">
                           <SelectValue placeholder="Organisation wählen" />
@@ -659,7 +659,7 @@ export function UserTable() {
                       <Button 
                         variant="ghost" 
                         size="icon"
-                        onClick={() => deleteUser(user.clerkId)}
+                        onClick={() => deleteUser(user.email)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

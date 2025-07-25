@@ -1,22 +1,16 @@
 import { NextResponse } from 'next/server';
 import { UserService } from '@/lib/services/user-service';
+import { checkAdminAccess } from '@/lib/server-auth';
 
 // GET /api/users - Holt alle Benutzer (nur für Admins)
 export async function GET(req: Request) {
   try {
-    // TEMPORÄR: Demo-Admin für Core-Funktionen
-    const userId = 'demo-user-123';
-    const isAdmin = true;
+    // Echte Admin-Authentifizierung
+    const { isAdmin, error, user } = await checkAdminAccess();
     
-    // const auth = getAuth(req);
-    // const userId = auth.userId;
-    // if (!userId) {
-    //   return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    // }
-    // const isAdmin = await UserService.isAdmin(userId);
-    // if (!isAdmin) {
-    //   return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
-    // }
+    if (!isAdmin) {
+      return NextResponse.json({ error: error || 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
+    }
     
     const users = await UserService.getAllUsers();
     return NextResponse.json(users);
@@ -29,23 +23,15 @@ export async function GET(req: Request) {
 // POST /api/users - Erstellt einen neuen Benutzer oder aktualisiert einen bestehenden
 export async function POST(req: Request) {
   try {
-    // TEMPORÄR: Demo-Admin für Core-Funktionen
-    const userId = 'demo-user-123';
-    const isAdmin = true;
+    // Echte Admin-Authentifizierung
+    const { isAdmin, error, user } = await checkAdminAccess();
     
-    // const auth = getAuth(req);
-    // const userId = auth.userId;
-    // if (!userId) {
-    //   return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    // }
-    // const isAdmin = await UserService.isAdmin(userId);
-    // if (!isAdmin) {
-    //   return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
-    // }
+    if (!isAdmin) {
+      return NextResponse.json({ error: error || 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
+    }
     
     const body = await req.json();
     const { 
-      clerkId, 
       email, 
       name, 
       role, 
@@ -54,17 +40,16 @@ export async function POST(req: Request) {
       organizationLogo 
     } = body;
     
-    if (!clerkId || !email || !name) {
-      return NextResponse.json({ error: 'clerkId, email und name sind erforderlich' }, { status: 400 });
+    if (!email || !name) {
+      return NextResponse.json({ error: 'email und name sind erforderlich' }, { status: 400 });
     }
     
     // Prüfen, ob Benutzer bereits existiert
-    const existingUser = await UserService.findByClerkId(clerkId);
+    const existingUser = await UserService.findByEmail(email);
     
     if (existingUser) {
       // Benutzer aktualisieren
-      const updatedUser = await UserService.updateUser(clerkId, { 
-        email, 
+      const updatedUser = await UserService.updateUser(email, { 
         name, 
         role, 
         organizationId, 
@@ -75,7 +60,6 @@ export async function POST(req: Request) {
     } else {
       // Neuen Benutzer erstellen
       const newUser = await UserService.createUser({ 
-        clerkId, 
         email, 
         name, 
         role, 

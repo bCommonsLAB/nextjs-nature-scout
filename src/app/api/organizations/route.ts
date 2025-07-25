@@ -1,19 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { OrganizationService } from '@/lib/services/organization-service';
+import { UserService } from '@/lib/services/user-service';
+import { requireAuth } from '@/lib/server-auth';
 
 // GET /api/organizations - Holt alle Organisationen (für alle authentifizierten Benutzer)
 export async function GET(request: Request) {
   try {
-    // TEMPORÄR: Demo-Admin für Core-Funktionen
-    const userId = 'demo-user-123';
-    const isAdmin = true;
-    
-    // const auth = getAuth(request);
-    // const userId = auth.userId;
-    // if (!userId) {
-    //   return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    // }
-    // const isAdmin = await UserService.isAdmin(userId);
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
+    const isAdmin = await UserService.isAdmin(currentUser.email);
     
     // Alle authentifizierten Benutzer können Organisationen sehen, ohne Admin-Überprüfung
     const organizations = await OrganizationService.getAllOrganizations();
@@ -34,19 +30,14 @@ export async function GET(request: Request) {
 // POST /api/organizations - Erstellt eine neue Organisation (nur für Admins)
 export async function POST(request: Request) {
   try {
-    // TEMPORÄR: Demo-Admin für Core-Funktionen
-    const userId = 'demo-user-123';
-    const isAdmin = true;
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
+    const isAdmin = await UserService.isAdmin(currentUser.email);
     
-    // const auth = getAuth(request);
-    // const userId = auth.userId;
-    // if (!userId) {
-    //   return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    // }
-    // const isAdmin = await UserService.isAdmin(userId);
-    // if (!isAdmin) {
-    //   return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
-    // }
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
+    }
     
     const body = await request.json();
     

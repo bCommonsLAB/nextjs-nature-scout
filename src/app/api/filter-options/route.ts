@@ -2,37 +2,19 @@ import { NextResponse } from 'next/server';
 import { UserService } from '@/lib/services/user-service';
 import { getFilterOptions } from '@/lib/services/habitat-service';
 import { connectToDatabase } from '@/lib/services/db';
+import { requireAuth } from '@/lib/server-auth';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const filterType = searchParams.get('type'); // 'gemeinden', 'habitate', 'familien', 'schutzstati', 'personen', 'organizations'
   
   try {
-    // TEMPORÄR: Demo-Admin/Expert für Core-Funktionen
-    const userId = 'demo-user-123';
-    const isAdmin = true;
-    const isExpert = true;
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userEmail = currentUser.email;
+    const isAdmin = await UserService.isAdmin(userEmail);
+    const isExpert = await UserService.isExpert(userEmail);
     const hasAdvancedPermissions = isAdmin || isExpert;
-    const userEmail = 'demo@example.com';
-    
-    // const { userId } = await auth();
-    // if (!userId) {
-    //   return NextResponse.json(
-    //     { error: 'Nicht autorisiert' },
-    //     { status: 401 }
-    //   );
-    // }
-    // const isAdmin = await UserService.isAdmin(userId);
-    // const isExpert = await UserService.isExpert(userId);
-    // const hasAdvancedPermissions = isAdmin || isExpert;
-    // const userRecord = await UserService.findByClerkId(userId);
-    // if (!userRecord) {
-    //   return NextResponse.json(
-    //     { error: 'Benutzer nicht gefunden' },
-    //     { status: 404 }
-    //   );
-    // }
-    // const userEmail = userRecord.email;
     
     // Prüfe, ob das angeforderte Filtertyp gültig ist
     if (!filterType || !['gemeinden', 'habitate', 'familien', 'schutzstati', 'personen', 'organizations'].includes(filterType)) {

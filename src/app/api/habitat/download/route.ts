@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
 import { UserService } from '@/lib/services/user-service';
+import { requireAuth } from '@/lib/server-auth';
 
 export async function GET() {
   try {
-    // TEMPORÄR: Demo-Admin für Admin-Funktionen
-    const userId = 'demo-user-123';
-    const isAdmin = true;
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
+    const isAdmin = await UserService.isAdmin(currentUser.email);
     
     // const { userId } = await auth();
     // if (!userId) {
