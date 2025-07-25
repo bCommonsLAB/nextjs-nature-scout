@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
+import { SignedIn, SignedOut, SignInButton } from '@/components/auth/AuthComponents';
 import { Button } from '@/components/ui/button';
 import { ShieldCheck, Plus, ShieldAlert, X, Download, Trash2 } from 'lucide-react';
 import { HabitateList } from './components/HabitateList';

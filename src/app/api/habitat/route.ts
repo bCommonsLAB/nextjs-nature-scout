@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Sort as MongoSort, Document } from 'mongodb';
 import { connectToDatabase } from '@/lib/services/db';
-import { auth } from '@clerk/nextjs/server';
 import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
 import { UserService } from '@/lib/services/user-service';
 
@@ -69,8 +68,8 @@ export async function GET(request: Request) {
   const sortOrder = searchParams.get('sortOrder') || 'desc';
   
   try {
-    // Hole den aktuellen Benutzer und prüfe seine Berechtigungen
-    const { userId } = await auth();
+    // TEMPORÄR: Mock-Auth für Demo-Modus
+    const userId = 'demo-user-123';
     
     if (!userId) {
       return NextResponse.json(

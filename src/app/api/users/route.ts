@@ -1,23 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getAuth } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
 import { UserService } from '@/lib/services/user-service';
 
 // GET /api/users - Holt alle Benutzer (nur für Admins)
 export async function GET(req: Request) {
   try {
-    const auth = getAuth(req);
-    const userId = auth.userId;
+    // TEMPORÄR: Demo-Admin für Core-Funktionen
+    const userId = 'demo-user-123';
+    const isAdmin = true;
     
-    if (!userId) {
-      return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    }
-    
-    // Prüfe, ob der anfragende Benutzer ein Admin ist
-    const isAdmin = await UserService.isAdmin(userId);
-    
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
-    }
+    // const auth = getAuth(req);
+    // const userId = auth.userId;
+    // if (!userId) {
+    //   return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
+    // }
+    // const isAdmin = await UserService.isAdmin(userId);
+    // if (!isAdmin) {
+    //   return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
+    // }
     
     const users = await UserService.getAllUsers();
     return NextResponse.json(users);
@@ -30,19 +29,19 @@ export async function GET(req: Request) {
 // POST /api/users - Erstellt einen neuen Benutzer oder aktualisiert einen bestehenden
 export async function POST(req: Request) {
   try {
-    const auth = getAuth(req);
-    const userId = auth.userId;
+    // TEMPORÄR: Demo-Admin für Core-Funktionen
+    const userId = 'demo-user-123';
+    const isAdmin = true;
     
-    if (!userId) {
-      return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    }
-    
-    // Nur Admins dürfen Benutzer erstellen/aktualisieren
-    const isAdmin = await UserService.isAdmin(userId);
-    
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
-    }
+    // const auth = getAuth(req);
+    // const userId = auth.userId;
+    // if (!userId) {
+    //   return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
+    // }
+    // const isAdmin = await UserService.isAdmin(userId);
+    // if (!isAdmin) {
+    //   return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
+    // }
     
     const body = await req.json();
     const { 

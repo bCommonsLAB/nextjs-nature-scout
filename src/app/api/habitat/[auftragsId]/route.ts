@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
-import { auth } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
+
+// TEMPORÄR: Mock-Auth Funktion für Demo-Modus
+const mockAuth = () => ({ userId: 'demo-user-123' });
 
 export async function GET(
   request: Request, 
@@ -11,8 +13,8 @@ export async function GET(
   const jobId = auftragsId;
   
   try {
-    // Hole den aktuellen Benutzer und prüfe seine Berechtigungen
-    const { userId } = await auth();
+    // TEMPORÄR: Mock-Auth für Demo-Modus
+    const userId = 'demo-user-123';
     
     if (!userId) {
       return NextResponse.json(
@@ -78,7 +80,7 @@ export async function DELETE(
   
   try {
     // Hole den aktuellen Benutzer und prüfe seine Berechtigungen
-    const { userId } = await auth();
+    const { userId } = await mockAuth();
     
     if (!userId) {
       return NextResponse.json(
@@ -167,7 +169,7 @@ export async function POST(
   
   try {
     // Hole den aktuellen Benutzer und prüfe seine Berechtigungen
-    const { userId } = await auth();
+    const { userId } = await mockAuth();
     
     if (!userId) {
       return NextResponse.json(

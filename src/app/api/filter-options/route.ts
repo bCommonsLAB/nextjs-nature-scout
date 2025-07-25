@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
 import { getFilterOptions } from '@/lib/services/habitat-service';
 import { connectToDatabase } from '@/lib/services/db';
@@ -9,30 +8,31 @@ export async function GET(request: Request) {
   const filterType = searchParams.get('type'); // 'gemeinden', 'habitate', 'familien', 'schutzstati', 'personen', 'organizations'
   
   try {
-    // Authentifizierung prüfen
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Nicht autorisiert' },
-        { status: 401 }
-      );
-    }
-    
-    // Benutzerberechtigungen prüfen
-    const isAdmin = await UserService.isAdmin(userId);
-    const isExpert = await UserService.isExpert(userId);
+    // TEMPORÄR: Demo-Admin/Expert für Core-Funktionen
+    const userId = 'demo-user-123';
+    const isAdmin = true;
+    const isExpert = true;
     const hasAdvancedPermissions = isAdmin || isExpert;
+    const userEmail = 'demo@example.com';
     
-    // Benutzer für Email-Filterung holen
-    const userRecord = await UserService.findByClerkId(userId);
-    if (!userRecord) {
-      return NextResponse.json(
-        { error: 'Benutzer nicht gefunden' },
-        { status: 404 }
-      );
-    }
-    
-    const userEmail = userRecord.email;
+    // const { userId } = await auth();
+    // if (!userId) {
+    //   return NextResponse.json(
+    //     { error: 'Nicht autorisiert' },
+    //     { status: 401 }
+    //   );
+    // }
+    // const isAdmin = await UserService.isAdmin(userId);
+    // const isExpert = await UserService.isExpert(userId);
+    // const hasAdvancedPermissions = isAdmin || isExpert;
+    // const userRecord = await UserService.findByClerkId(userId);
+    // if (!userRecord) {
+    //   return NextResponse.json(
+    //     { error: 'Benutzer nicht gefunden' },
+    //     { status: 404 }
+    //   );
+    // }
+    // const userEmail = userRecord.email;
     
     // Prüfe, ob das angeforderte Filtertyp gültig ist
     if (!filterType || !['gemeinden', 'habitate', 'familien', 'schutzstati', 'personen', 'organizations'].includes(filterType)) {

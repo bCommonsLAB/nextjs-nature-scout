@@ -1,16 +1,6 @@
-import { SignUp } from "@clerk/nextjs";
+import { redirect } from 'next/navigation'
 
 export default function SignUpPage() {
-  return (
-    <div className="flex justify-center items-center py-12">
-      <SignUp 
-        appearance={{
-          elements: {
-            rootBox: "mx-auto",
-            card: "shadow-lg rounded-lg",
-          }
-        }}
-      />
-    </div>
-  );
+  // Weiterleitung zur neuen Registrierungsseite
+  redirect('/authentification/registrieren')
 } 

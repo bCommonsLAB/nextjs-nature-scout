@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { UserButton } from '@clerk/nextjs';
-import { dark } from '@clerk/themes';
+import { UserButton } from '@/components/auth/AuthComponents';
 import { useTheme } from 'next-themes';
 
 export function CustomUserButton() {
@@ -23,7 +22,7 @@ export function CustomUserButton() {
     <UserButton
       afterSignOutUrl="/"
       appearance={{
-        baseTheme: isDarkMode ? dark : undefined,
+        // baseTheme: isDarkMode ? dark : undefined,  // Temporär deaktiviert
         elements: {
           userButtonAvatarBox: 'w-8 h-8',
         },

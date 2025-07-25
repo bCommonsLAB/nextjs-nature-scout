@@ -6,7 +6,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Menu, Settings, TestTube2, MapPinCheckInside, Users, MapPinPlusInside, Map } from "lucide-react";
-import { SignInButton, SignedIn, SignedOut, useUser, useClerk } from "@clerk/nextjs";
+import { SignInButton, SignedIn, SignedOut } from "@/components/auth/AuthComponents";
+import { useUser, useClerk } from "@/context/auth-context";
 import { UserOrganisationButton } from "@/components/UserOrganisation";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
@@ -58,7 +59,8 @@ export function Navbar() {
     }
   }, [pathname]);
   
-  // Consent-Prüfung einmalig pro Session mit Weiterleitung zur Profilseite
+  // TEMPORÄR DEAKTIVIERT - Consent-Prüfung für Demo-Modus
+  /*
   useEffect(() => {
     if (isLoaded && user && !consentChecked && !redirectingToConsent) {
       const checkConsent = async () => {
@@ -91,6 +93,7 @@ export function Navbar() {
       checkConsent();
     }
   }, [isLoaded, user, router, consentChecked, redirectingToConsent]);
+  */
   
   // Überwacht, ob nach der Profilseite wieder auf eine andere Seite navigiert wird, ohne dass Einwilligungen erteilt wurden
   useEffect(() => {
@@ -115,9 +118,7 @@ export function Navbar() {
             });
             
             // Benutzer abmelden
-            await signOut(() => {
-              router.push('/');
-            });
+            await signOut({ redirectUrl: '/' });
           } else {
             logConsentWorkflow('Einwilligungen wurden erteilt');
             // Zurücksetzen der Flags
@@ -135,10 +136,7 @@ export function Navbar() {
             duration: 5000
           });
           
-          // Bei Fehlern sicherheitshalber abmelden
-          await signOut(() => {
-            router.push('/');
-          });
+          
         }
       };
       

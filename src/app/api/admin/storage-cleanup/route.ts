@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
-import { auth } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
 import { AzureStorageService } from '@/lib/services/azure-storage-service';
 import sharp from 'sharp';
@@ -15,17 +14,18 @@ interface StorageImage {
 
 // Nur Admin-Zugriff
 async function checkAdminAccess() {
-  const { userId } = await auth();
+  // TEMPORÄR: Demo-Admin für Admin-Funktionen
+  const userId = 'demo-user-123';
+  const isAdmin = true;
   
-  if (!userId) {
-    return { isAdmin: false, error: 'Nicht angemeldet' };
-  }
-  
-  const isAdmin = await UserService.isAdmin(userId);
-  
-  if (!isAdmin) {
-    return { isAdmin: false, error: 'Keine Administratorrechte' };
-  }
+  // const { userId } = await auth();
+  // if (!userId) {
+  //   return { isAdmin: false, error: 'Nicht angemeldet' };
+  // }
+  // const isAdmin = await UserService.isAdmin(userId);
+  // if (!isAdmin) {
+  //   return { isAdmin: false, error: 'Keine Administratorrechte' };
+  // }
   
   return { isAdmin: true, error: null };
 }

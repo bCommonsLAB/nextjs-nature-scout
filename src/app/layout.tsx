@@ -1,27 +1,25 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { Navbar } from "@/components/layout/Navbar";
-import { Footer } from '@/components/layout/Footer';  
+import { Navbar } from "@/components/layout/navbar";
+import { Footer } from '@/components/layout/footer';  
 import '../styles/leaflet-custom.css';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css'; // CSS für Leaflet Draw
 import './leaflet-custom.css';  // Ihre custom Styles
-import { ClerkProvider } from "@clerk/nextjs";
-import { deDE } from '@clerk/localizations'
-import { NatureScoutProvider } from "@/context/nature-scout-context";
+import { AuthProviders } from "@/components/providers/AuthProviders"
 
-const customLocalization = {
-  ...deDE,
-  signIn: {
-    ...deDE.signIn,
-    start: {
-      ...deDE.signIn?.start,
-      title: "Anmelden bei NatureScout",
-      subtitle: "Willkommen zurück! Bitte melden Sie sich an, um fortzufahren",
-    },
-  },
-};
+// const customLocalization = {
+//   ...deDE,
+//   signIn: {
+//     ...deDE.signIn,
+//     start: {
+//       ...deDE.signIn?.start,
+//       title: "Anmelden bei NatureScout",
+//       subtitle: "Willkommen zurück! Bitte melden Sie sich an, um fortzufahren",
+//     },
+//   },
+// };
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -46,20 +44,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider localization={customLocalization}>
-      <html lang="de">
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
-        >
-          <NatureScoutProvider>
-            <Navbar />
-            <main>
-              {children}
-            </main>
-            <Footer />
-          </NatureScoutProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="de">
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
+      >
+        <AuthProviders>
+          <Navbar />
+          <main>
+            {children}
+          </main>
+          <Footer />
+        </AuthProviders>
+      </body>
+    </html>
   );
 }

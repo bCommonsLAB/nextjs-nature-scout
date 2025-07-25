@@ -1,10 +1,13 @@
 import { connectToDatabase } from '@/lib/services/db';
 import { ObjectId } from 'mongodb';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 export interface IUser {
   _id?: string | ObjectId;
-  clerkId: string;
+  clerkId?: string; // Optional für Migration - später entfernen
   email: string;
+  password?: string; // Für Auth.js - gehashtes Passwort
   name: string;
   role: 'user' | 'experte' | 'admin' | 'superadmin';
   image?: string;
@@ -17,11 +20,16 @@ export interface IUser {
   consent_data_processing?: boolean;
   consent_image_ccby?: boolean;
   habitat_name_visibility?: 'public' | 'members' | null;
+  // Felder für E-Mail-Verifizierung und Passwort-Reset
+  emailVerified?: Date;
+  emailVerificationToken?: string;
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
 }
 
 export interface CreateUserData {
-  clerkId: string;
   email: string;
+  password?: string; // Optional - für Einladungen kann es automatisch generiert werden
   name: string;
   role?: 'user' | 'experte' | 'admin' | 'superadmin';
   organizationId?: string;
@@ -30,6 +38,8 @@ export interface CreateUserData {
   consent_data_processing?: boolean;
   consent_image_ccby?: boolean;
   habitat_name_visibility?: 'public' | 'members' | null;
+  // Migration helper
+  clerkId?: string;
 }
 
 export interface UpdateUserData {
@@ -134,14 +144,135 @@ export class UserService {
   }
   
   /**
-   * Aktualisiert das lastAccess-Datum eines Benutzers
+   * Aktualisiert das lastAccess-Datum eines Benutzers (unterstützt sowohl _id als auch clerkId)
    */
-  static async updateLastAccess(clerkId: string): Promise<IUser | null> {
+  static async updateLastAccess(identifier: string): Promise<IUser | null> {
     const collection = await this.getUsersCollection();
     
+    // Versuche zunächst mit _id, falls das fehlschlägt mit clerkId (für Migration)
+    let query: any;
+    if (ObjectId.isValid(identifier)) {
+      query = { _id: new ObjectId(identifier) };
+    } else {
+      query = { clerkId: identifier };
+    }
+    
     const result = await collection.findOneAndUpdate(
-      { clerkId },
+      query,
       { $set: { lastAccess: new Date() } },
+      { returnDocument: 'after' }
+    );
+    
+    return result;
+  }
+
+  /**
+   * Generiert ein sicheres 8-stelliges Passwort
+   */
+  static generateSecurePassword(): string {
+    // Einfaches aber sicheres 8-stelliges Passwort
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let password = '';
+    for (let i = 0; i < 8; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  }
+
+  /**
+   * Hasht ein Passwort mit bcrypt
+   */
+  static async hashPassword(password: string): Promise<string> {
+    const saltRounds = 12; // Sicher aber nicht zu langsam
+    return bcrypt.hash(password, saltRounds);
+  }
+
+  /**
+   * Erstellt einen neuen Benutzer mit gehashtem Passwort
+   */
+  static async createUserWithPassword(userData: CreateUserData): Promise<IUser> {
+    const collection = await this.getUsersCollection();
+    
+    // Passwort hashen falls vorhanden, ansonsten generieren
+    let hashedPassword: string;
+    if (userData.password) {
+      hashedPassword = await this.hashPassword(userData.password);
+    } else {
+      const tempPassword = this.generateSecurePassword();
+      hashedPassword = await this.hashPassword(tempPassword);
+    }
+    
+    const newUser: IUser = {
+      ...userData,
+      password: hashedPassword,
+      role: userData.role || 'user',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastAccess: new Date()
+    };
+    
+    const result = await collection.insertOne(newUser as any);
+    return { ...newUser, _id: result.insertedId };
+  }
+
+  /**
+   * Setzt ein Passwort-Reset-Token
+   */
+  static async setPasswordResetToken(email: string): Promise<{ token: string; user: IUser } | null> {
+    const collection = await this.getUsersCollection();
+    
+    const user = await collection.findOne({ email });
+    if (!user) return null;
+    
+    // Token generieren (32 Zeichen hex)
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 Stunde
+    
+    const result = await collection.findOneAndUpdate(
+      { email },
+      { 
+        $set: { 
+          passwordResetToken: token,
+          passwordResetExpires: expires,
+          updatedAt: new Date()
+        } 
+      },
+      { returnDocument: 'after' }
+    );
+    
+    return result ? { token, user: result } : null;
+  }
+
+  /**
+   * Setzt ein neues Passwort mit Reset-Token
+   */
+  static async resetPasswordWithToken(token: string, newPassword: string): Promise<IUser | null> {
+    const collection = await this.getUsersCollection();
+    
+    // Token prüfen und noch gültig?
+    const user = await collection.findOne({
+      passwordResetToken: token,
+      passwordResetExpires: { $gt: new Date() }
+    });
+    
+    if (!user) return null;
+    
+    // Neues Passwort hashen
+    const hashedPassword = await this.hashPassword(newPassword);
+    
+    // Passwort aktualisieren und Token entfernen
+    const result = await collection.findOneAndUpdate(
+      { _id: user._id },
+      { 
+        $set: { 
+          password: hashedPassword,
+          updatedAt: new Date()
+        },
+        $unset: {
+          passwordResetToken: "",
+          passwordResetExpires: ""
+        }
+      },
       { returnDocument: 'after' }
     );
     

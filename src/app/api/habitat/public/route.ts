@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { Sort as MongoSort } from 'mongodb';
 import { connectToDatabase } from '@/lib/services/db';
 import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
-import { auth } from '@clerk/nextjs/server';
 
 // Definiere die Typen
 interface MongoFilter {
@@ -24,8 +23,8 @@ export async function GET(request: Request) {
   const includeFilterOptions = searchParams.get('includeFilterOptions') === 'true';
   
   try {
-    // Hole aktuelle Session mit Clerk, um den aktuellen Benutzer und seine Organisation zu identifizieren
-    const { userId } = await auth();
+    // TEMPORÄR: Keine Auth-Checks (Demo-Modus)
+    const userId = null;
         
     // Nutzerinformationen abrufen, falls angemeldet
     let currentUserEmail: string | null = null;

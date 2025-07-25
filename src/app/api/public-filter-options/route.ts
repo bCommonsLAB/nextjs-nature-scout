@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
 import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
-import { auth } from '@clerk/nextjs/server';
 
 interface FilterOption {
   value: string;
@@ -98,8 +97,8 @@ export async function GET(request: Request) {
         break;
         
       case 'personen':
-        // Hole aktuelle Session mit Clerk, um den aktuellen Benutzer und seine Organisation zu identifizieren
-        const { userId } = await auth();
+        // TEMPORÄR: Kein Auth-Check (Demo-Modus)
+        const userId = null;
         
         // Nutzerinformationen abrufen, falls angemeldet
         let currentUserEmail: string | null = null;

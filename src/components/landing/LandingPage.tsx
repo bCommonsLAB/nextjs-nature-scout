@@ -10,7 +10,7 @@ import { ArrowDown, ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Info, Sparkles } from "lucide-react";
 import Link from 'next/link';
-import { useUser } from "@clerk/nextjs";
+import { useUser } from "@/context/auth-context";
 //console.log('LandingPage wird gerendert');
 
 const colors = {

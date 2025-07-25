@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuth } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
 
 // GET /api/users/[clerkId] - Holt einen bestimmten Benutzer
@@ -8,23 +7,25 @@ export async function GET(
   { params }: { params: { clerkId: string } }
 ) {
   try {
-    const auth = getAuth(req);
-    const userId = auth.userId;
+    // TEMPORÄR: Mock-Auth für Demo-Modus
+    const userId = 'demo-user-123';
+    // const auth = getAuth(req);
+    // const userId = auth.userId;
     
-    if (!userId) {
-      return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    }
+    // if (!userId) {
+    //   return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
+    // }
     
     // Hole die clerkId
     const clerkId = params.clerkId;
     
-    // Benutzer dürfen nur ihre eigenen Daten abrufen, es sei denn, sie sind Admins
-    if (userId !== clerkId) {
-      const isAdmin = await UserService.isAdmin(userId);
-      if (!isAdmin) {
-        return NextResponse.json({ error: 'Zugriff verweigert' }, { status: 403 });
-      }
-    }
+    // TEMPORÄR: Demo-Admin-Zugang - alle Daten erlaubt
+    // if (userId !== clerkId) {
+    //   const isAdmin = await UserService.isAdmin(userId);
+    //   if (!isAdmin) {
+    //     return NextResponse.json({ error: 'Zugriff verweigert' }, { status: 403 });
+    //   }
+    // }
     
     const user = await UserService.findByClerkId(clerkId);
     
@@ -45,18 +46,20 @@ export async function PATCH(
   { params }: { params: { clerkId: string } }
 ) {
   try {
-    const auth = getAuth(req);
-    const userId = auth.userId;
+    // TEMPORÄR: Mock-Auth für Demo-Modus  
+    const userId = 'demo-user-123';
+    // const auth = getAuth(req);
+    // const userId = auth.userId;
     
-    if (!userId) {
-      return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    }
+    // if (!userId) {
+    //   return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
+    // }
     
     // Hole die clerkId
     const clerkId = params.clerkId;
     
-    // Benutzer mit Admin-Rechten oder Benutzer, die ihre eigenen Daten aktualisieren
-    const isAdmin = await UserService.isAdmin(userId);
+    // TEMPORÄR: Demo-Admin-Zugang
+    const isAdmin = true;
     const isSelf = userId === clerkId;
     
     if (!isAdmin && !isSelf) {
@@ -126,18 +129,20 @@ export async function DELETE(
   { params }: { params: { clerkId: string } }
 ) {
   try {
-    const auth = getAuth(req);
-    const userId = auth.userId;
+    // TEMPORÄR: Mock-Auth für Demo-Modus
+    const userId = 'demo-user-123';
+    // const auth = getAuth(req);
+    // const userId = auth.userId;
     
-    if (!userId) {
-      return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    }
+    // if (!userId) {
+    //   return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
+    // }
     
     // Hole die clerkId
     const clerkId = params.clerkId;
     
-    // Nur Admins dürfen Benutzer löschen
-    const isAdmin = await UserService.isAdmin(userId);
+    // TEMPORÄR: Demo-Admin-Zugang 
+    const isAdmin = true;
     
     if (!isAdmin) {
       return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });

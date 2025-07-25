@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useUser } from '@/context/auth-context';
 
 interface UseAdminResult {
   isAdmin: boolean;

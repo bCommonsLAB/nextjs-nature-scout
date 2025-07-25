@@ -1,20 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuth } from '@clerk/nextjs/server';
-import { UserService } from '@/lib/services/user-service';
 import { OrganizationService } from '@/lib/services/organization-service';
 
 // GET /api/organizations/[id] - Holt eine bestimmte Organisation
 export async function GET(
-  req: NextRequest,
+  req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const auth = getAuth(req);
-    const userId = auth.userId;
+    // TEMPORÄR: Demo-Admin für Core-Funktionen
+    const userId = 'demo-user-123';
     
-    if (!userId) {
-      return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    }
+    // const auth = getAuth(req);
+    // const userId = auth.userId;
+    // if (!userId) {
+    //   return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
+    // }
     
     // Hole die ID mit await
     const id = params.id;
@@ -35,23 +35,23 @@ export async function GET(
 
 // PATCH /api/organizations/[id] - Aktualisiert eine Organisation (nur für Admins)
 export async function PATCH(
-  req: NextRequest,
+  req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const auth = getAuth(req);
-    const userId = auth.userId;
+    // TEMPORÄR: Demo-Admin für Core-Funktionen
+    const userId = 'demo-user-123';
+    const isAdmin = true;
     
-    if (!userId) {
-      return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    }
-    
-    // Prüfe, ob der anfragende Benutzer ein Admin ist
-    const isAdmin = await UserService.isAdmin(userId);
-    
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
-    }
+    // const auth = getAuth(req);
+    // const userId = auth.userId;
+    // if (!userId) {
+    //   return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
+    // }
+    // const isAdmin = await UserService.isAdmin(userId);
+    // if (!isAdmin) {
+    //   return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
+    // }
     
     // Hole die ID mit await
     const id = params.id;
@@ -77,23 +77,23 @@ export async function PATCH(
 
 // DELETE /api/organizations/[id] - Löscht eine Organisation (nur für Admins)
 export async function DELETE(
-  req: NextRequest,
+  req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const auth = getAuth(req);
-    const userId = auth.userId;
+    // TEMPORÄR: Demo-Admin für Core-Funktionen
+    const userId = 'demo-user-123';
+    const isAdmin = true;
     
-    if (!userId) {
-      return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    }
-    
-    // Prüfe, ob der anfragende Benutzer ein Admin ist
-    const isAdmin = await UserService.isAdmin(userId);
-    
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
-    }
+    // const auth = getAuth(req);
+    // const userId = auth.userId;
+    // if (!userId) {
+    //   return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
+    // }
+    // const isAdmin = await UserService.isAdmin(userId);
+    // if (!isAdmin) {
+    //   return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
+    // }
     
     // Hole die ID mit await
     const id = params.id;

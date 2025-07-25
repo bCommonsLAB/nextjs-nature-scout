@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
-import { useUser } from "@clerk/nextjs";
+import { useUser } from "@/context/auth-context";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NatureScoutData } from "@/types/nature-scout";
 import { InstructionDialog } from "@/components/ui/instruction-dialog";

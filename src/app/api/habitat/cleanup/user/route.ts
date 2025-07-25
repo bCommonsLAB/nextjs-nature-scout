@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
-import { auth } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
 
 /**
@@ -8,25 +7,24 @@ import { UserService } from '@/lib/services/user-service';
  */
 export async function DELETE() {
   try {
-    // Authentifizierung überprüfen
-    const { userId } = await auth();
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Nicht autorisiert' },
-        { status: 401 }
-      );
-    }
+    // TEMPORÄR: Demo-User für Cleanup-Funktionen
+    const userId = 'demo-user-123';
+    const user = { email: 'demo@example.com' };
     
-    // Benutzer-E-Mail-Adresse ermitteln
-    const user = await UserService.findByClerkId(userId);
-    
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Benutzer nicht gefunden' },
-        { status: 404 }
-      );
-    }
+    // const { userId } = await auth();
+    // if (!userId) {
+    //   return NextResponse.json(
+    //     { error: 'Nicht autorisiert' },
+    //     { status: 401 }
+    //   );
+    // }
+    // const user = await UserService.findByClerkId(userId);
+    // if (!user) {
+    //   return NextResponse.json(
+    //     { error: 'Benutzer nicht gefunden' },
+    //     { status: 404 }
+    //   );
+    // }
     
     // Verbindung zur Datenbank herstellen
     const db = await connectToDatabase();

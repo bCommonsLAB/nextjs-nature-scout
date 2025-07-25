@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation';
-import { auth } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
 
 export default async function AdminLayout({
@@ -7,21 +6,18 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Überprüfen, ob der Benutzer ein Admin ist
-  const { userId } = await auth();
+  // TEMPORÄR: Demo-Admin für Schritt 1 (Clerk Decoupling)
+  const userId = 'demo-user-123';
+  const isAdmin = true; // TEMPORÄR: Demo-Admin-Zugang
   
-  // Sicherstellen, dass der Benutzer angemeldet ist
-  if (!userId) {
-    redirect('/sign-in');
-  }
-  
-  // Die if-Abfrage stellt sicher, dass userId hier ein String ist
-  const isAdmin = await UserService.isAdmin(userId as string);
-  
-  if (!isAdmin) {
-    // Wenn kein Admin, zur Hauptseite umleiten
-    redirect('/');
-  }
+  // In Schritt 2 wird echte Auth.js Authentifizierung implementiert
+  // if (!userId) {
+  //   redirect('/sign-in');
+  // }
+  // const isAdmin = await UserService.isAdmin(userId as string);
+  // if (!isAdmin) {
+  //   redirect('/');
+  // }
   
   return (
     <div className="min-h-screen">

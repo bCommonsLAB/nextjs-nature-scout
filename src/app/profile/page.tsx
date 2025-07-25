@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useUser, useClerk } from '@clerk/nextjs';
+import { useUser, useClerk } from '@/context/auth-context';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -280,9 +280,7 @@ function ProfileContent() {
     setLogoutDialogOpen(false);
     
     try {
-      await signOut(() => {
-        router.push('/');
-      });
+      await signOut({ redirectUrl: '/' });
     } catch (error) {
       console.error('Fehler beim Abmelden:', error);
       // Fallback, falls signOut fehlschlägt
