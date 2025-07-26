@@ -318,6 +318,7 @@ function UnsereHabitateContent() {
                   value={personValues}
                   onValueChange={(value) => setPersonValues(value)}
                   placeholder="Erfasser"
+                  showInfoTooltip={true}
                 />
               </div>
               

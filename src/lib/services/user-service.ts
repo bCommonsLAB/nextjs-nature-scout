@@ -26,6 +26,21 @@ export interface IUser {
   passwordResetExpires?: Date;
 }
 
+export interface IInvitation {
+  _id?: string | ObjectId;
+  email: string;
+  name: string;
+  invitedBy: string;
+  invitedByName: string;
+  organizationId?: string;
+  organizationName?: string;
+  token: string;
+  expiresAt: Date;
+  used: boolean;
+  usedAt?: Date;
+  createdAt: Date;
+}
+
 export interface CreateUserData {
   email: string;
   password?: string; // Optional - für Einladungen kann es automatisch generiert werden
@@ -50,6 +65,17 @@ export interface UpdateUserData {
   consent_data_processing?: boolean;
   consent_image_ccby?: boolean;
   habitat_name_visibility?: 'public' | 'members' | null;
+}
+
+export interface CreateInvitationData {
+  email: string;
+  name: string;
+  invitedBy: string;
+  invitedByName: string;
+  organizationId?: string;
+  organizationName?: string;
+  token: string;
+  expiresAt: Date;
 }
 
 export class UserService {
@@ -310,5 +336,63 @@ export class UserService {
     // Projektion: Nur das role-Feld zurückgeben
     const user = await collection.findOne({ email: email.toLowerCase().trim() }, { projection: { role: 1, _id: 0 } });
     return user?.role === 'experte' || user?.role === 'admin' || user?.role === 'superadmin';
+  }
+
+  /**
+   * Generiert einen sicheren Einladungs-Token
+   */
+  static generateInvitationToken(): string {
+    return crypto.randomBytes(32).toString('hex');
+  }
+
+  /**
+   * Erstellt eine neue Einladung in der Datenbank
+   */
+  static async createInvitation(invitationData: CreateInvitationData): Promise<IInvitation> {
+    const db = await connectToDatabase();
+    const collection = db.collection<IInvitation>('invitations');
+    
+    const invitation: IInvitation = {
+      ...invitationData,
+      used: false,
+      createdAt: new Date()
+    };
+    
+    const result = await collection.insertOne(invitation);
+    return { ...invitation, _id: result.insertedId };
+  }
+
+  /**
+   * Findet eine Einladung anhand des Tokens
+   */
+  static async findInvitationByToken(token: string): Promise<IInvitation | null> {
+    const db = await connectToDatabase();
+    const collection = db.collection<IInvitation>('invitations');
+    
+    return collection.findOne({ 
+      token, 
+      used: false, 
+      expiresAt: { $gt: new Date() } 
+    });
+  }
+
+  /**
+   * Markiert eine Einladung als verwendet
+   */
+  static async markInvitationAsUsed(token: string): Promise<boolean> {
+    const db = await connectToDatabase();
+    const collection = db.collection<IInvitation>('invitations');
+    
+    const result = await collection.updateOne(
+      { token },
+      { 
+        $set: { 
+          used: true, 
+          usedAt: new Date() 
+        } 
+      }
+    );
+    
+    return result.modifiedCount > 0;
   }
 } 

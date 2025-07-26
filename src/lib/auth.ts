@@ -1,6 +1,7 @@
 import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { UserService } from "@/lib/services/user-service"
+import { LoginCodeService } from "@/lib/services/login-code-service"
 import bcrypt from "bcryptjs"
 
 export const authOptions = {
@@ -22,44 +23,96 @@ export const authOptions = {
       name: "credentials",
       credentials: {
         email: { label: "E-Mail", type: "email" },
-        password: { label: "Passwort", type: "password" }
+        password: { label: "Passwort", type: "password" },
+        code: { label: "Code", type: "text" },
+        loginType: { label: "Login Type", type: "text" }
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null
-        }
-
-        try {
-          // Nutze unseren bestehenden UserService
-          const user = await UserService.findByEmail(credentials.email)
-          
-          if (!user || !user.password) {
+        // Prüfe Login-Typ
+        if (credentials?.loginType === 'code') {
+          // Code-Login
+          if (!credentials?.email || !credentials?.code) {
             return null
           }
 
-          // Passwort prüfen
-          const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
-          
-          if (!isPasswordValid) {
+          try {
+            // Code-Format prüfen (6-stellige Zahl)
+            if (!/^\d{6}$/.test(credentials.code)) {
+              return null
+            }
+
+            // Prüfe, ob der Code gültig ist
+            const isValidCode = await LoginCodeService.validateCode(credentials.email, credentials.code)
+
+            if (!isValidCode) {
+              return null
+            }
+
+            // Finde den Benutzer
+            const user = await UserService.findByEmail(credentials.email)
+
+            if (!user) {
+              return null
+            }
+
+            // Markiere den Code als verwendet
+            await LoginCodeService.markCodeAsUsed(credentials.email, credentials.code)
+
+            // Last Access aktualisieren
+            await UserService.updateLastAccess(credentials.email)
+
+            // User-Objekt für Session zurückgeben
+            return {
+              id: user._id?.toString() || '',
+              email: user.email,
+              name: user.name,
+              role: user.role,
+              image: user.image,
+              organizationId: user.organizationId,
+              organizationName: user.organizationName,
+            }
+          } catch (error) {
+            console.error('Code-Login-Fehler:', error)
+            return null
+          }
+        } else {
+          // Passwort-Login
+          if (!credentials?.email || !credentials?.password) {
             return null
           }
 
-          // Last Access aktualisieren (mit E-Mail)
-          await UserService.updateLastAccess(user.email)
+          try {
+            // Nutze unseren bestehenden UserService
+            const user = await UserService.findByEmail(credentials.email)
+            
+            if (!user || !user.password) {
+              return null
+            }
 
-          // User-Objekt für Session zurückgeben
-          return {
-            id: user._id?.toString() || '',
-            email: user.email,
-            name: user.name,
-            role: user.role,
-            image: user.image,
-            organizationId: user.organizationId,
-            organizationName: user.organizationName,
+            // Passwort prüfen
+            const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
+            
+            if (!isPasswordValid) {
+              return null
+            }
+
+            // Last Access aktualisieren (mit E-Mail)
+            await UserService.updateLastAccess(user.email)
+
+            // User-Objekt für Session zurückgeben
+            return {
+              id: user._id?.toString() || '',
+              email: user.email,
+              name: user.name,
+              role: user.role,
+              image: user.image,
+              organizationId: user.organizationId,
+              organizationName: user.organizationName,
+            }
+          } catch (error) {
+            console.error('Auth-Fehler:', error)
+            return null
           }
-        } catch (error) {
-          console.error('Auth-Fehler:', error)
-          return null
         }
       }
     })

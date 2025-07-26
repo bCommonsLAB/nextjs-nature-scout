@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
 import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
-import { requireAuth } from '@/lib/server-auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 interface FilterOption {
   value: string;
@@ -23,6 +24,31 @@ export async function GET(request: Request) {
     
     const db = await connectToDatabase();
     const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
+    
+    // Optionale Authentifizierung - keine Fehler, falls nicht eingeloggt
+    let currentUserEmail: string | null = null;
+    let currentUserOrgId: string | null = null;
+    
+    try {
+      const session = await getServerSession(authOptions);
+      if (session?.user?.email) {
+        currentUserEmail = session.user.email;
+        
+        // Benutzerinformationen aus der Datenbank holen
+        const usersCollection = db.collection('users');
+        const currentUserData = await usersCollection.findOne(
+          { email: currentUserEmail },
+          { projection: { email: 1, organizationId: 1 } }
+        );
+        
+        if (currentUserData) {
+          currentUserOrgId = currentUserData.organizationId;
+        }
+      }
+    } catch (authError) {
+      // Authentifizierung fehlgeschlagen - Route funktioniert trotzdem
+      console.log('Optionale Authentifizierung fehlgeschlagen - Route funktioniert anonym');
+    }
     
     // Basisfilter - bei öffentlicher Route immer nur verifizierte Habitate
     const baseFilter: any = { 
@@ -98,28 +124,7 @@ export async function GET(request: Request) {
         break;
         
       case 'personen':
-        // Echte Authentifizierung
-        const currentUser = await requireAuth();
-        const userId = currentUser.email;
-        
-        // Nutzerinformationen abrufen, falls angemeldet
-        let currentUserEmail: string | null = null;
-        let currentUserOrgId: string | null = null;
-        
-        if (userId) {
-          // Benutzerinformationen aus der Datenbank holen
-          const usersCollection = db.collection('users');
-          const currentUserData = await usersCollection.findOne(
-            { email: userId },
-            { projection: { email: 1, organizationId: 1 } }
-          );
-          
-          if (currentUserData) {
-            currentUserEmail = currentUserData.email;
-            currentUserOrgId = currentUserData.organizationId;
-          }
-        }
-
+        // Optionale Authentifizierung implementiert - zeigt mehr Daten für eingeloggte Nutzer
         // 1. Erst alle Erfassungspersonen mit Anzahl finden
         const personen = await collection.aggregate([
           { $match: baseFilter },
@@ -158,23 +163,34 @@ export async function GET(request: Request) {
         });
 
         // 3. Filtere Personen basierend auf den Sichtbarkeitseinstellungen
-        const filteredPersonen = personen.filter(person => {
-          // Mindestens eine E-Mail der Person muss die Bedingungen erfüllen
-          return person.emails?.some((email: string) => {
-            if (!email) return false;
-            
-            const userData = userMap.get(email);
-            if (!userData) return false;
-            
-            // Sichtbarkeitsregeln prüfen:
-            // 1. Öffentliche Sichtbarkeit ODER
-            // 2. Gleiche Organisation wie der aktuelle Benutzer
-            return (
-              userData.habitat_name_visibility === 'public' || 
-              (currentUserOrgId && userData.organizationId && userData.organizationId.toString() === currentUserOrgId.toString())
-            );
-          }) || false;
-        });
+        // Im anonymen Fall: Gar keine Personen anzeigen
+        // Nur für eingeloggte Nutzer: Zeige Personen basierend auf Sichtbarkeitseinstellungen
+        let filteredPersonen = personen;
+        
+        // Im anonymen Fall (kein currentUserOrgId): Gar keine Personen anzeigen
+        if (!currentUserOrgId) {
+          filteredPersonen = [];
+        } else {
+          // Für eingeloggte Nutzer: Filtere basierend auf Sichtbarkeitseinstellungen
+          filteredPersonen = personen.filter(person => {
+            // Mindestens eine E-Mail der Person muss die Bedingungen erfüllen
+            return person.emails?.some((email: string) => {
+              if (!email) return false;
+              
+              const userData = userMap.get(email);
+              if (!userData) return false;
+              
+              // Sichtbarkeitsregeln für eingeloggte Nutzer:
+              // 1. Öffentliche Sichtbarkeit ODER
+              // 2. Gleiche Organisation wie der eingeloggte Benutzer
+              return (
+                userData.habitat_name_visibility === 'public' || 
+                (currentUserOrgId && userData.organizationId && 
+                 userData.organizationId.toString() === currentUserOrgId.toString())
+              );
+            }) || false;
+          });
+        }
 
         results = filteredPersonen
           .map(item => ({ value: item._id, count: item.count }));

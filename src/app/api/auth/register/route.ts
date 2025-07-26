@@ -4,7 +4,7 @@ import { MailjetService } from '@/lib/services/mailjet-service'
 
 export async function POST(request: Request) {
   try {
-    const { name, email, password } = await request.json()
+    const { name, email, password, inviteToken } = await request.json()
 
     // Validierung
     if (!name || !email || !password) {
@@ -39,13 +39,41 @@ export async function POST(request: Request) {
       )
     }
 
+    // Wenn Einladungs-Token vorhanden, validieren
+    let invitation = null
+    if (inviteToken) {
+      invitation = await UserService.findInvitationByToken(inviteToken)
+      if (!invitation) {
+        return NextResponse.json(
+          { message: 'Ungültiger oder abgelaufener Einladungslink.' },
+          { status: 400 }
+        )
+      }
+      
+      // Prüfen ob E-Mail mit Einladung übereinstimmt
+      if (invitation.email.toLowerCase() !== email.toLowerCase()) {
+        return NextResponse.json(
+          { message: 'Die E-Mail-Adresse stimmt nicht mit der Einladung überein.' },
+          { status: 400 }
+        )
+      }
+    }
+
     // Benutzer erstellen
     const newUser = await UserService.createUserWithPassword({
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password,
-      role: 'user'
+      role: 'user',
+      // Wenn Einladung vorhanden, Organisationsdaten übernehmen
+      organizationId: invitation?.organizationId,
+      organizationName: invitation?.organizationName
     })
+
+    // Wenn Einladung vorhanden, als verwendet markieren
+    if (invitation) {
+      await UserService.markInvitationAsUsed(inviteToken)
+    }
 
     // Willkommens-E-Mail senden
     try {
@@ -62,7 +90,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       { 
-        message: 'Registrierung erfolgreich! Sie können sich jetzt anmelden.',
+        message: invitation 
+          ? 'Registrierung erfolgreich! Sie können sich jetzt anmelden.' 
+          : 'Registrierung erfolgreich! Sie können sich jetzt anmelden.',
         user: {
           id: newUser._id,
           name: newUser.name,

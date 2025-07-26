@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { Sort as MongoSort } from 'mongodb';
 import { connectToDatabase } from '@/lib/services/db';
 import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
-import { requireAuth } from '@/lib/server-auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 // Definiere die Typen
 interface MongoFilter {
@@ -24,11 +25,7 @@ export async function GET(request: Request) {
   const includeFilterOptions = searchParams.get('includeFilterOptions') === 'true';
   
   try {
-    // Echte Authentifizierung
-    const currentUser = await requireAuth();
-    const userId = currentUser.email;
-        
-    // Nutzerinformationen abrufen, falls angemeldet
+    // Optionale Authentifizierung - keine Fehler, falls nicht eingeloggt
     let currentUserEmail: string | null = null;
     let currentUserOrgId: string | null = null;
 
@@ -36,17 +33,24 @@ export async function GET(request: Request) {
     const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
     const usersCollection = db.collection('users');
     
-    if (userId) {
-      // Benutzerinformationen aus der Datenbank holen
-      const currentUserData = await usersCollection.findOne(
-        { email: userId },
-        { projection: { email: 1, organizationId: 1 } }
-      );
-      
-      if (currentUserData) {
-        currentUserEmail = currentUserData.email;
-        currentUserOrgId = currentUserData.organizationId;
+    try {
+      const session = await getServerSession(authOptions);
+      if (session?.user?.email) {
+        currentUserEmail = session.user.email;
+        
+        // Benutzerinformationen aus der Datenbank holen
+        const currentUserData = await usersCollection.findOne(
+          { email: currentUserEmail },
+          { projection: { email: 1, organizationId: 1 } }
+        );
+        
+        if (currentUserData) {
+          currentUserOrgId = currentUserData.organizationId;
+        }
       }
+    } catch (authError) {
+      // Authentifizierung fehlgeschlagen - Route funktioniert trotzdem
+      console.log('Optionale Authentifizierung fehlgeschlagen - Route funktioniert anonym');
     }
     
     // Suchfilter erstellen
@@ -325,13 +329,20 @@ export async function GET(request: Request) {
     });
     
     // Anonymisiere Einträge basierend auf den Sichtbarkeitseinstellungen
+    // Im anonymen Fall: Gar keine Erfasser anzeigen
+    // Nur für eingeloggte Nutzer: Zeige Personen basierend auf Sichtbarkeitseinstellungen
     const anonymizedEntries = entries.map(entry => {
       // Prüfe, ob der Erfasser des Habitats angezeigt werden darf
       const userEmail = entry.metadata?.email;
       const userData = userEmail ? userVisibilityMap.get(userEmail) : null;
       
-      // Wenn keine Benutzerinformationen gefunden wurden, vorsichtshalber anonymisieren
-      if (!userData) {
+      // Im anonymen Fall (kein currentUserOrgId): Gar keine Erfasser anzeigen
+      if (!currentUserOrgId) {
+        entry.metadata.erfassungsperson = '';
+      }
+      // Für eingeloggte Nutzer: Prüfe Sichtbarkeitseinstellungen
+      else if (!userData) {
+        // Wenn keine Benutzerinformationen gefunden wurden, vorsichtshalber anonymisieren
         entry.metadata.erfassungsperson = '';
       } 
       // Anonymisieren, wenn keine öffentliche Sichtbarkeit UND nicht in derselben Organisation

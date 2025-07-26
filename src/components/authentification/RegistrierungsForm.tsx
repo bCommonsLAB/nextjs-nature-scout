@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,9 +9,13 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Eye, EyeOff, Mail, Lock, User, AlertCircle, UserPlus, CheckCircle2 } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, User, AlertCircle, UserPlus, CheckCircle2, Gift, ArrowLeft } from 'lucide-react'
 
 export function RegistrierungsForm() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const inviteToken = searchParams.get('invite')
+  
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -24,7 +28,40 @@ export function RegistrierungsForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [step, setStep] = useState(1)
-  const router = useRouter()
+  const [invitationData, setInvitationData] = useState<{
+    name: string
+    email: string
+    inviterName: string
+    organizationName?: string
+  } | null>(null)
+  const [loadingInvitation, setLoadingInvitation] = useState(false)
+
+  // Lade Einladungsdaten wenn Token vorhanden
+  useEffect(() => {
+    if (inviteToken) {
+      setLoadingInvitation(true)
+      fetch(`/api/auth/invite/validate?token=${inviteToken}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            setInvitationData(data.invitation)
+            setFormData(prev => ({
+              ...prev,
+              name: data.invitation.name,
+              email: data.invitation.email
+            }))
+          } else {
+            setError('Ungültiger oder abgelaufener Einladungslink.')
+          }
+        })
+        .catch(() => {
+          setError('Fehler beim Laden der Einladungsdaten.')
+        })
+        .finally(() => {
+          setLoadingInvitation(false)
+        })
+    }
+  }, [inviteToken])
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -87,6 +124,7 @@ export function RegistrierungsForm() {
           name: formData.name,
           email: formData.email,
           password: formData.password,
+          inviteToken: inviteToken || undefined,
         }),
       })
 
@@ -106,39 +144,60 @@ export function RegistrierungsForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-green-100 flex items-center justify-center px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="bg-green-100 p-3 rounded-full">
-              <UserPlus className="h-8 w-8 text-green-600" />
+    <div className="min-h-screen bg-gradient-to-b from-[#FAFFF3] to-[#E9F5DB] flex items-center justify-center px-4 py-8">
+      <Card className="w-full max-w-lg border-[#D3E0BD] bg-white/90 backdrop-blur-sm">
+        <CardHeader className="text-center pb-6">
+          <div className="flex justify-center mb-6">
+            <div className="bg-[#D3E0BD] p-4 rounded-full">
+              <UserPlus className="h-10 w-10 text-[#637047]" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold text-gray-900">
-            Bei NatureScout registrieren
+          <CardTitle className="text-3xl font-bold text-[#2D3321] mb-3">
+            {invitationData ? 'Einladung annehmen' : 'Registrierung'}
           </CardTitle>
-          <CardDescription className="text-base text-gray-600">
-            Schritt {step} von 2: {step === 1 ? 'Persönliche Daten' : 'Passwort erstellen'}
+          <CardDescription className="text-lg text-[#637047]">
+            {step === 1 ? 'Schritt 1 von 2' : 'Schritt 2 von 2'}
           </CardDescription>
         </CardHeader>
 
-        <form onSubmit={step === 1 ? (e) => { e.preventDefault(); handleNextStep(); } : handleSubmit}>
-          <CardContent className="space-y-6">
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription className="text-sm">
-                  {error}
-                </AlertDescription>
-              </Alert>
-            )}
+        <CardContent className="space-y-6">
+          {error && (
+            <Alert variant="destructive" className="border-red-200 bg-red-50">
+              <AlertCircle className="h-5 w-5" />
+              <AlertDescription className="text-base">
+                {error}
+              </AlertDescription>
+            </Alert>
+          )}
 
+          {/* Einladungs-Banner */}
+          {invitationData && (
+            <Alert className="border-[#D3E0BD] bg-[#FAFFF3]">
+              <Gift className="h-5 w-5 text-[#637047]" />
+              <AlertDescription className="text-base text-[#2D3321]">
+                <strong>Sie wurden eingeladen!</strong><br />
+                {invitationData.inviterName} hat Sie zu NatureScout eingeladen
+                {invitationData.organizationName && ` (${invitationData.organizationName})`}.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {loadingInvitation && (
+            <Alert className="border-[#D3E0BD] bg-[#FAFFF3]">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#637047] mr-2"></div>
+              <AlertDescription className="text-base text-[#2D3321]">
+                Lade Einladungsdaten...
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <form onSubmit={step === 1 ? (e) => { e.preventDefault(); handleNextStep(); } : handleSubmit}>
             {step === 1 && (
-              <>
+              <div className="space-y-6">
                 {/* Name */}
-                <div className="space-y-2">
-                  <Label htmlFor="name" className="text-base font-medium flex items-center gap-2">
-                    <User className="h-4 w-4" />
+                <div className="space-y-3">
+                  <Label htmlFor="name" className="text-lg font-medium flex items-center gap-3 text-[#2D3321]">
+                    <User className="h-5 w-5 text-[#637047]" />
                     Ihr Name
                   </Label>
                   <Input
@@ -148,18 +207,19 @@ export function RegistrierungsForm() {
                     onChange={(e) => handleInputChange('name', e.target.value)}
                     placeholder="Max Mustermann"
                     required
-                    className="h-12 text-base"
+                    className="h-14 text-lg border-[#D3E0BD] focus:border-[#637047] focus:ring-[#637047]"
                     autoComplete="name"
+                    disabled={!!invitationData}
                   />
-                  <p className="text-sm text-gray-500">
+                  <p className="text-base text-[#637047]">
                     Geben Sie Ihren vollständigen Namen ein, wie er angezeigt werden soll.
                   </p>
                 </div>
 
                 {/* E-Mail */}
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-base font-medium flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
+                <div className="space-y-3">
+                  <Label htmlFor="email" className="text-lg font-medium flex items-center gap-3 text-[#2D3321]">
+                    <Mail className="h-5 w-5 text-[#637047]" />
                     Ihre E-Mail-Adresse
                   </Label>
                   <Input
@@ -169,22 +229,23 @@ export function RegistrierungsForm() {
                     onChange={(e) => handleInputChange('email', e.target.value)}
                     placeholder="max@beispiel.de"
                     required
-                    className="h-12 text-base"
+                    className="h-14 text-lg border-[#D3E0BD] focus:border-[#637047] focus:ring-[#637047]"
                     autoComplete="email"
+                    disabled={!!invitationData}
                   />
-                  <p className="text-sm text-gray-500">
+                  <p className="text-base text-[#637047]">
                     Diese E-Mail-Adresse verwenden Sie später für die Anmeldung.
                   </p>
                 </div>
-              </>
+              </div>
             )}
 
             {step === 2 && (
-              <>
+              <div className="space-y-6">
                 {/* Passwort */}
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-base font-medium flex items-center gap-2">
-                    <Lock className="h-4 w-4" />
+                <div className="space-y-3">
+                  <Label htmlFor="password" className="text-lg font-medium flex items-center gap-3 text-[#2D3321]">
+                    <Lock className="h-5 w-5 text-[#637047]" />
                     Passwort erstellen
                   </Label>
                   <div className="relative">
@@ -195,28 +256,28 @@ export function RegistrierungsForm() {
                       onChange={(e) => handleInputChange('password', e.target.value)}
                       placeholder="Mindestens 8 Zeichen"
                       required
-                      className="h-12 text-base pr-12"
+                      className="h-14 text-lg pr-14 border-[#D3E0BD] focus:border-[#637047] focus:ring-[#637047]"
                       autoComplete="new-password"
                     />
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 h-10 w-10 p-0 text-[#637047] hover:bg-[#FAFFF3]"
                       onClick={() => setShowPassword(!showPassword)}
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </Button>
                   </div>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-base text-[#637047]">
                     Das Passwort muss mindestens 8 Zeichen lang sein. Verwenden Sie Buchstaben und Zahlen.
                   </p>
                 </div>
 
                 {/* Passwort bestätigen */}
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-base font-medium flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4" />
+                <div className="space-y-3">
+                  <Label htmlFor="confirmPassword" className="text-lg font-medium flex items-center gap-3 text-[#2D3321]">
+                    <CheckCircle2 className="h-5 w-5 text-[#637047]" />
                     Passwort bestätigen
                   </Label>
                   <div className="relative">
@@ -227,90 +288,98 @@ export function RegistrierungsForm() {
                       onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
                       placeholder="Passwort erneut eingeben"
                       required
-                      className="h-12 text-base pr-12"
+                      className="h-14 text-lg pr-14 border-[#D3E0BD] focus:border-[#637047] focus:ring-[#637047]"
                       autoComplete="new-password"
                     />
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 h-10 w-10 p-0 text-[#637047] hover:bg-[#FAFFF3]"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     >
-                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </Button>
                   </div>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-base text-[#637047]">
                     Geben Sie das gleiche Passwort nochmal ein, zur Sicherheit.
                   </p>
                 </div>
 
                 {/* Zustimmung */}
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div className="flex items-start space-x-3">
                     <Checkbox 
                       id="terms" 
                       checked={acceptTerms}
                       onCheckedChange={(checked) => setAcceptTerms(checked as boolean)}
+                      className="mt-1"
                     />
-                    <Label htmlFor="terms" className="text-sm leading-relaxed">
-                      Ich akzeptiere die Nutzungsbedingungen und bin damit einverstanden, 
-                      dass meine Daten zur Nutzung von NatureScout gespeichert werden.
+                    <Label htmlFor="terms" className="text-base leading-relaxed text-[#2D3321]">
+                      Ich akzeptiere die{' '}
+                      <Link href="/nutzungsbedingungen" className="text-[#637047] hover:text-[#2D3321] underline">
+                        Nutzungsbedingungen
+                      </Link>
+                      {' '}und{' '}
+                      <Link href="/datenschutz" className="text-[#637047] hover:text-[#2D3321] underline">
+                        Datenschutzerklärung
+                      </Link>
                     </Label>
                   </div>
                 </div>
-              </>
-            )}
-          </CardContent>
-
-          <CardFooter className="flex flex-col space-y-4">
-            {step === 1 ? (
-              <Button 
-                type="submit" 
-                className="w-full h-12 text-base bg-green-600 hover:bg-green-700"
-              >
-                Weiter zu Schritt 2
-              </Button>
-            ) : (
-              <div className="w-full space-y-3">
-                <Button 
-                  type="submit" 
-                  className="w-full h-12 text-base bg-green-600 hover:bg-green-700"
-                  disabled={isLoading}
-                >
-                  {isLoading ? 'Wird registriert...' : 'Registrierung abschließen'}
-                </Button>
-                <Button 
-                  type="button" 
-                  variant="outline"
-                  className="w-full h-12 text-base"
-                  onClick={() => setStep(1)}
-                >
-                  Zurück zu Schritt 1
-                </Button>
               </div>
             )}
 
-            <div className="text-center text-sm text-gray-600">
-              <span>Bereits ein Konto? </span>
-              <Link 
-                href="/authentification/anmelden" 
-                className="text-green-600 hover:text-green-700 underline font-medium"
-              >
-                Hier anmelden
-              </Link>
-            </div>
-          </CardFooter>
-        </form>
+            {/* Buttons */}
+            <CardFooter className="flex flex-col space-y-4 pt-6">
+              {step === 1 ? (
+                <Button 
+                  type="submit" 
+                  className="w-full h-14 text-lg bg-[#637047] hover:bg-[#2D3321] font-medium shadow-md"
+                >
+                  Weiter
+                </Button>
+              ) : (
+                <div className="space-y-4">
+                  <Button 
+                    type="submit" 
+                    className="w-full h-14 text-lg bg-[#637047] hover:bg-[#2D3321] font-medium shadow-md"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                        Registrierung läuft...
+                      </>
+                    ) : (
+                      'Registrierung abschließen'
+                    )}
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="ghost"
+                    className="w-full h-14 text-lg border-[#D3E0BD] hover:bg-[#FAFFF3] text-[#2D3321]"
+                    onClick={() => setStep(1)}
+                  >
+                    <ArrowLeft className="h-5 w-5 mr-2" />
+                    Zurück
+                  </Button>
+                </div>
+              )}
+            </CardFooter>
+          </form>
+        </CardContent>
 
-        {/* Hilfetext */}
+        {/* Registrierung Link */}
         <div className="px-6 pb-6">
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <h4 className="font-medium text-blue-900 mb-2">Was passiert nach der Registrierung?</h4>
-            <p className="text-sm text-blue-800">
-              Sie erhalten eine Willkommens-E-Mail und können sich sofort anmelden. 
-              Ihre Daten werden sicher gespeichert.
-            </p>
+          <div className="text-center text-base text-[#637047] border-t border-[#D3E0BD] pt-6">
+            <span>Bereits ein Konto? </span>
+            <Link 
+              href="/authentification/anmelden" 
+              className="text-[#637047] hover:text-[#2D3321] underline font-medium"
+            >
+              Hier anmelden
+            </Link>
           </div>
         </div>
       </Card>

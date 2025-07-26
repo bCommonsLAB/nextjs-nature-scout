@@ -22,8 +22,13 @@ export interface PasswordResetEmailData extends EmailData {
 export interface InvitationEmailData extends EmailData {
   inviterName: string
   organizationName?: string
-  temporaryPassword: string
+  temporaryPassword?: string
+  invitationToken?: string
   loginUrl: string
+}
+
+export interface LoginCodeEmailData extends EmailData {
+  code: string
 }
 
 export class MailjetService {
@@ -170,7 +175,7 @@ export class MailjetService {
   }
   
   /**
-   * Sendet eine Einladungs-E-Mail mit temporärem Passwort
+   * Sendet eine Einladungs-E-Mail mit Einladungslink
    */
   static async sendInvitationEmail(data: InvitationEmailData): Promise<boolean> {
     try {
@@ -194,18 +199,14 @@ export class MailjetService {
               <p>${data.inviterName} hat Sie zu NatureScout eingeladen${data.organizationName ? ` (${data.organizationName})` : ''}.</p>
               
               <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <h3 style="color: #2d5016; margin-top: 0;">Ihre Anmeldedaten:</h3>
+                <h3 style="color: #2d5016; margin-top: 0;">Ihre Registrierung:</h3>
                 <p style="margin: 10px 0;"><strong>E-Mail:</strong> ${data.to}</p>
-                <p style="margin: 10px 0;"><strong>Temporäres Passwort:</strong> 
-                   <span style="background-color: #f8f9fa; padding: 5px 10px; border-radius: 3px; font-family: monospace;">
-                     ${data.temporaryPassword}
-                   </span>
-                </p>
+                <p style="margin: 10px 0;"><strong>Name:</strong> ${data.name}</p>
               </div>
               
               <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107; margin: 20px 0;">
                 <p style="margin: 0; color: #856404;">
-                  <strong>Wichtig:</strong> Bitte ändern Sie Ihr Passwort nach der ersten Anmeldung.
+                  <strong>Wichtig:</strong> Klicken Sie auf den Link unten, um Ihre Registrierung abzuschließen.
                 </p>
               </div>
               
@@ -213,7 +214,7 @@ export class MailjetService {
                 <a href="${data.loginUrl}" 
                    style="background-color: #2d5016; color: white; padding: 12px 30px; 
                           text-decoration: none; border-radius: 5px; display: inline-block;">
-                  Jetzt anmelden
+                  Registrierung abschließen
                 </a>
               </div>
               
@@ -232,13 +233,13 @@ export class MailjetService {
             
             ${data.inviterName} hat Sie zu NatureScout eingeladen${data.organizationName ? ` (${data.organizationName})` : ''}.
             
-            Ihre Anmeldedaten:
+            Ihre Registrierung:
             E-Mail: ${data.to}
-            Temporäres Passwort: ${data.temporaryPassword}
+            Name: ${data.name}
             
-            Anmelden: ${data.loginUrl}
+            Registrierung abschließen: ${data.loginUrl}
             
-            Wichtig: Bitte ändern Sie Ihr Passwort nach der ersten Anmeldung.
+            Wichtig: Klicken Sie auf den Link, um Ihre Registrierung abzuschließen.
             
             Das NatureScout Team
           `
@@ -248,6 +249,93 @@ export class MailjetService {
       return true
     } catch (error) {
       console.error('Fehler beim Senden der Einladungs-E-Mail:', error)
+      return false
+    }
+  }
+  
+  /**
+   * Sendet eine E-Mail mit einem Login-Code
+   */
+  static async sendLoginCodeEmail(data: LoginCodeEmailData): Promise<boolean> {
+    try {
+      await mailjet.post('send', { version: 'v3.1' }).request({
+        Messages: [{
+          From: {
+            Email: process.env.MAILJET_FROM_EMAIL,
+            Name: process.env.MAILJET_FROM_NAME
+          },
+          To: [{
+            Email: data.to,
+            Name: data.name
+          }],
+          Subject: "Ihr Anmelde-Code für NatureScout",
+          HTMLPart: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #2d5016;">Ihr Anmelde-Code für NatureScout</h2>
+              
+              <p>Hallo ${data.name},</p>
+              
+              <p>Sie haben einen Anmelde-Code für NatureScout angefordert. Hier ist Ihr persönlicher Code:</p>
+              
+              <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                <h3 style="color: #2d5016; margin-top: 0; margin-bottom: 15px;">Ihr Anmelde-Code</h3>
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 2px solid #2d5016; display: inline-block;">
+                  <span style="font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; color: #2d5016; letter-spacing: 3px;">
+                    ${data.code}
+                  </span>
+                </div>
+              </div>
+              
+              <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107; margin: 20px 0;">
+                <p style="margin: 0; color: #856404;">
+                  <strong>Wichtig:</strong> Dieser Code ist nur 15 Minuten gültig und kann nur einmal verwendet werden.
+                </p>
+              </div>
+              
+              <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <h4 style="color: #2d5016; margin-top: 0;">So verwenden Sie den Code:</h4>
+                <ol style="color: #333; margin: 0; padding-left: 20px;">
+                  <li>Gehen Sie zur NatureScout-Anmeldeseite</li>
+                  <li>Wählen Sie "Mit Code" als Anmeldemethode</li>
+                  <li>Geben Sie den Code oben ein</li>
+                  <li>Klicken Sie auf "Mit Code anmelden"</li>
+                </ol>
+              </div>
+              
+              <p style="color: #666; font-size: 14px;">
+                Falls Sie diese Anfrage nicht gestellt haben, können Sie diese E-Mail ignorieren.
+                Der Code wird automatisch nach 15 Minuten ungültig.
+              </p>
+              
+              <p>Bei Fragen antworten Sie einfach auf diese E-Mail.<br>
+              Das NatureScout Team</p>
+            </div>
+          `,
+          TextPart: `
+            Ihr Anmelde-Code für NatureScout
+            
+            Hallo ${data.name},
+            
+            Sie haben einen Anmelde-Code für NatureScout angefordert. Hier ist Ihr persönlicher Code:
+            
+            ${data.code}
+            
+            Wichtig: Dieser Code ist nur 15 Minuten gültig und kann nur einmal verwendet werden.
+            
+            So verwenden Sie den Code:
+            1. Gehen Sie zur NatureScout-Anmeldeseite
+            2. Wählen Sie "Mit Code" als Anmeldemethode
+            3. Geben Sie den Code oben ein
+            4. Klicken Sie auf "Mit Code anmelden"
+            
+            Das NatureScout Team
+          `
+        }]
+      })
+      
+      return true
+    } catch (error) {
+      console.error('Fehler beim Senden der Login-Code-E-Mail:', error)
       return false
     }
   }

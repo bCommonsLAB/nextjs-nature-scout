@@ -454,7 +454,7 @@ function ProfileContent() {
           }} 
           disabled={isSubmitting}
         >
-          {isSubmitting ? 'Speichere...' : 'Organisationseinstellungen speichern'}
+          {isSubmitting ? 'Speichere...' : 'Profildaten speichern'}
         </Button>      
       </div>
 
