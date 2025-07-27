@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const { name, email } = await request.json()
+    const { name, email, message } = await request.json()
 
     // Validierung
     if (!name || !email) {
@@ -67,7 +67,8 @@ export async function POST(request: Request) {
         inviterName: session.user.name || 'Ein Benutzer',
         organizationName: session.user.organizationName || 'NatureScout',
         invitationToken,
-        loginUrl: `${process.env.NEXTAUTH_URL}/authentification/registrieren?invite=${invitationToken}`
+        loginUrl: `${process.env.NEXTAUTH_URL}/invite/${invitationToken}`,
+        personalMessage: message?.trim() || ''
       })
     } catch (emailError) {
       console.error('Fehler beim Senden der Einladungs-E-Mail:', emailError)

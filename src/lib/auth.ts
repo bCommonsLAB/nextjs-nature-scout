@@ -12,10 +12,10 @@ export const authOptions = {
   
   // Custom Pages - unsere eigenen Auth-Komponenten
   pages: {
-    signIn: '/authentification/anmelden',
-    signUp: '/authentification/registrieren',
-    // error: '/authentification/fehler',
-    // verifyRequest: '/authentification/email-bestaetigung',
+    signIn: '/auth/login',
+    signUp: '/auth/register',
+    // error: '/auth/error',
+    // verifyRequest: '/auth/email-verification',
   },
 
   providers: [

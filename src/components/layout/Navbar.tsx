@@ -6,13 +6,14 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Menu, Settings, TestTube2, MapPinCheckInside, Users, MapPinPlusInside, Map } from "lucide-react";
-import { SignInButton, SignedIn, SignedOut } from "@/components/auth/AuthComponents";
+import { useSession } from "next-auth/react";
 import { useUser, useAuth } from "@/context/auth-context";
 import { UserOrganisationButton } from "@/components/UserOrganisation";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 
 export function Navbar() {
+  const { data: session, status } = useSession();
   const { user, isLoaded } = useUser();
   const { signOut } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -228,53 +229,52 @@ export function Navbar() {
                 Unsere Habitate
               </Button>
             </Link>
-            <SignedIn>
-              <Button variant="ghost" className="text-base" onClick={navigateToNewHabitat}>
-                <MapPinPlusInside className="h-4 w-4 mr-2" />
-                Neues Habitat
-              </Button>
-              <Link href="/habitat">
-                <Button variant="ghost" className="text-base">
-                  <MapPinCheckInside className="h-4 w-4 mr-2" />
-                  {isExpert || isAdmin ? "Habitatverwaltung" : "Meine Habitate"}
+            {session?.user && (
+              <>
+                <Button variant="ghost" className="text-base" onClick={navigateToNewHabitat}>
+                  <MapPinPlusInside className="h-4 w-4 mr-2" />
+                  Neues Habitat
                 </Button>
-              </Link>
-            </SignedIn>
-            <SignedIn>
-              {isAdmin && (
-                <>
-                  <Link href="/admin/users">
-                    <Button variant="ghost" className="text-base">
-                      <Users className="h-4 w-4 mr-2" />
-                      Benutzer
-                    </Button>
-                  </Link>
-                  <Link href="/admin/organizations">
-                    <Button variant="ghost" className="text-base">
-                      <TestTube2 className="h-4 w-4 mr-2" />
-                      Organisationen
-                    </Button>
-                  </Link>
-                  <Link href="/admin/config">
-                    <Button variant="ghost" className="text-base">
-                      <Settings className="h-4 w-4 mr-2" />
-                      Admin
-                    </Button>
-                  </Link>
-                </>
-              )}
-              
-            </SignedIn>
-            <SignedOut>
-              <SignInButton mode="modal">
+                <Link href="/habitat">
+                  <Button variant="ghost" className="text-base">
+                    <MapPinCheckInside className="h-4 w-4 mr-2" />
+                    {isExpert || isAdmin ? "Habitatverwaltung" : "Meine Habitate"}
+                  </Button>
+                </Link>
+              </>
+            )}
+            {session?.user && isAdmin && (
+              <>
+                <Link href="/admin/users">
+                  <Button variant="ghost" className="text-base">
+                    <Users className="h-4 w-4 mr-2" />
+                    Benutzer
+                  </Button>
+                </Link>
+                <Link href="/admin/organizations">
+                  <Button variant="ghost" className="text-base">
+                    <TestTube2 className="h-4 w-4 mr-2" />
+                    Organisationen
+                  </Button>
+                </Link>
+                <Link href="/admin/config">
+                  <Button variant="ghost" className="text-base">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Admin
+                  </Button>
+                </Link>
+              </>
+            )}
+            {!session?.user && (
+              <Link href="/auth/login">
                 <Button variant="secondary" className="text-base">
                   Jetzt Anmelden
                 </Button>
-              </SignInButton>
-            </SignedOut>
-            <SignedIn>
+              </Link>
+            )}
+            {session?.user && (
               <UserOrganisationButton />
-            </SignedIn>
+            )}
           </div>
         )}
 
@@ -300,60 +300,62 @@ export function Navbar() {
                   <Map className="h-4 w-4 mr-2" />
                   Unsere Habitate
                 </Button>
-                <SignedIn>
-                  <Button variant="ghost" className="w-full text-base justify-start" onClick={navigateToNewHabitat}>
-                    <MapPinPlusInside className="h-4 w-4 mr-2" />
-                    Neues Habitat
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full text-base justify-start"
-                    onClick={() => handleMobileNavigation('/habitat')}
-                  >
-                    <MapPinCheckInside className="h-4 w-4 mr-2" />
-                    {isExpert || isAdmin ? "Habitatverwaltung" : "Meine Habitate"}
-                  </Button>
-                  {isAdmin && (
-                    <>
-                      <Button 
-                        variant="ghost" 
-                        className="w-full text-base justify-start"
-                        onClick={() => handleMobileNavigation('/admin/users')}
-                      >
-                        <Users className="h-4 w-4 mr-2" />
-                        Benutzer
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        className="w-full text-base justify-start"
-                        onClick={() => handleMobileNavigation('/admin/organizations')}
-                      >
-                        <TestTube2 className="h-4 w-4 mr-2" />
-                        Organisationen
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        className="w-full text-base justify-start"
-                        onClick={() => handleMobileNavigation('/admin/config')}
-                      >
-                        <Settings className="h-4 w-4 mr-2" />
-                        Admin
-                      </Button>
-                    </>
-                  )}
-                </SignedIn>
-                <SignedOut>
-                  <SignInButton mode="modal">
+                {session?.user && (
+                  <>
+                    <Button variant="ghost" className="w-full text-base justify-start" onClick={navigateToNewHabitat}>
+                      <MapPinPlusInside className="h-4 w-4 mr-2" />
+                      Neues Habitat
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      className="w-full text-base justify-start"
+                      onClick={() => handleMobileNavigation('/habitat')}
+                    >
+                      <MapPinCheckInside className="h-4 w-4 mr-2" />
+                      {isExpert || isAdmin ? "Habitatverwaltung" : "Meine Habitate"}
+                    </Button>
+                    {isAdmin && (
+                      <>
+                        <Button 
+                          variant="ghost" 
+                          className="w-full text-base justify-start"
+                          onClick={() => handleMobileNavigation('/admin/users')}
+                        >
+                          <Users className="h-4 w-4 mr-2" />
+                          Benutzer
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          className="w-full text-base justify-start"
+                          onClick={() => handleMobileNavigation('/admin/organizations')}
+                        >
+                          <TestTube2 className="h-4 w-4 mr-2" />
+                          Organisationen
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          className="w-full text-base justify-start"
+                          onClick={() => handleMobileNavigation('/admin/config')}
+                        >
+                          <Settings className="h-4 w-4 mr-2" />
+                          Admin
+                        </Button>
+                      </>
+                    )}
+                  </>
+                )}
+                {!session?.user && (
+                  <Link href="/auth/login">
                     <Button variant="secondary" className="w-full !text-base !p-4 justify-start">
                       Jetzt Anmelden
                     </Button>
-                  </SignInButton>
-                </SignedOut>
-                <SignedIn>
+                  </Link>
+                )}
+                {session?.user && (
                   <div className="pt-4 pl-2 user-button-container mt-auto mb-16">
                     <UserOrganisationButton />
                   </div>
-                </SignedIn>
+                )}
               </div>
             </SheetContent>
           </Sheet>

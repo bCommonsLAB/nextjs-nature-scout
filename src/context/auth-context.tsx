@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } else {
         // Weiterleitung zu Login-Seite
-        window.location.href = '/authentification/anmelden'
+        window.location.href = '/auth/login'
       }
     },
 

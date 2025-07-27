@@ -57,6 +57,7 @@ export interface CreateUserData {
 export interface UpdateUserData {
   email?: string;
   name?: string;
+  password?: string;
   role?: 'user' | 'experte' | 'admin' | 'superadmin';
   image?: string;
   organizationId?: string;

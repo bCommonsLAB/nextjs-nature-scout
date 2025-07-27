@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useUser, useAuth } from '@/context/auth-context';
+import { useSession, signOut } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -23,8 +23,9 @@ import { InfoIcon, AlertTriangle } from "lucide-react";
 
 // Komponente für die Parameter-Verarbeitung
 function ProfileContent() {
-  const { user, isLoaded } = useUser();
-  const { signOut } = useAuth();
+  const { data: session, status } = useSession();
+  const user = session?.user;
+  const isLoaded = status !== 'loading';
   const router = useRouter();
   const searchParams = useSearchParams();
   const [userData, setUserData] = useState<any>(null);
@@ -67,7 +68,7 @@ function ProfileContent() {
       if (!isLoaded || !user) return;
 
       try {
-        const response = await fetch(`/api/users/${encodeURIComponent(user.email)}`);
+        const response = await fetch(`/api/users/${encodeURIComponent(user.email || '')}`);
         
         if (!response.ok) {
           throw new Error('Fehler beim Abrufen der Benutzerdaten');
@@ -177,7 +178,7 @@ function ProfileContent() {
       // "none" in null umwandeln für die Datenbank
       const orgIdToSave = selectedOrg === 'none' ? null : selectedOrg;
       
-      const response = await fetch(`/api/users/${encodeURIComponent(user.email)}`, {
+      const response = await fetch(`/api/users/${encodeURIComponent(user.email || '')}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -227,7 +228,7 @@ function ProfileContent() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/users/${encodeURIComponent(user.email)}`, {
+      const response = await fetch(`/api/users/${encodeURIComponent(user.email || '')}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -280,7 +281,7 @@ function ProfileContent() {
     setLogoutDialogOpen(false);
     
     try {
-      await signOut({ redirectUrl: '/' });
+      await signOut({ redirect: true, callbackUrl: '/' });
     } catch (error) {
       console.error('Fehler beim Abmelden:', error);
       // Fallback, falls signOut fehlschlägt
@@ -291,7 +292,7 @@ function ProfileContent() {
   // Navigiere zur Anmeldeseite, wenn der Benutzer nicht angemeldet ist
   useEffect(() => {
     if (isLoaded && !user) {
-      router.push('/anmelden');
+      router.push('/auth/login');
     }
   }, [isLoaded, user, router]);
 

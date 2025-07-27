@@ -8,29 +8,62 @@ export async function GET(request: Request) {
 
     if (!token) {
       return NextResponse.json(
-        { success: false, message: 'Token fehlt.' },
+        { message: 'Token ist erforderlich.' },
         { status: 400 }
       )
     }
 
-    // Token validieren
+    // Einladung in der Datenbank finden
     const invitation = await UserService.findInvitationByToken(token)
-    
+
     if (!invitation) {
       return NextResponse.json(
-        { success: false, message: 'Ungültiger oder abgelaufener Einladungslink.' },
+        { message: 'Ungültiger Einladungslink.' },
         { status: 404 }
       )
     }
 
-    // Prüfen ob E-Mail bereits registriert ist
-    const existingUser = await UserService.findByEmail(invitation.email)
-    if (existingUser) {
+    // Prüfen ob Einladung bereits verwendet wurde
+    if (invitation.used) {
       return NextResponse.json(
-        { success: false, message: 'Diese E-Mail-Adresse ist bereits registriert.' },
-        { status: 409 }
+        { 
+          message: 'Diese Einladung wurde bereits verwendet.',
+          invitation: {
+            email: invitation.email,
+            name: invitation.name
+          }
+        },
+        { status: 400 }
       )
     }
+
+    // Prüfen ob Einladung abgelaufen ist
+    if (new Date() > invitation.expiresAt) {
+      return NextResponse.json(
+        { message: 'Diese Einladung ist abgelaufen.' },
+        { status: 400 }
+      )
+    }
+
+    // Benutzer erstellen, falls noch nicht vorhanden
+    let user = await UserService.findByEmail(invitation.email)
+    
+    if (!user) {
+      // Neuen Benutzer ohne Passwort erstellen
+      user = await UserService.createUser({
+        email: invitation.email,
+        name: invitation.name,
+        role: 'user',
+        organizationId: invitation.organizationId,
+        organizationName: invitation.organizationName,
+        consent_data_processing: false, // Wird später beim ersten Login gesetzt
+        consent_image_ccby: false, // Wird später beim ersten Login gesetzt
+        habitat_name_visibility: 'public'
+      })
+    }
+
+    // Einladung als verwendet markieren
+    await UserService.markInvitationAsUsed(token)
 
     return NextResponse.json({
       success: true,
@@ -39,13 +72,18 @@ export async function GET(request: Request) {
         email: invitation.email,
         inviterName: invitation.invitedByName,
         organizationName: invitation.organizationName
+      },
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        hasPassword: !!user.password
       }
     })
-
   } catch (error) {
-    console.error('Fehler bei der Token-Validierung:', error)
+    console.error('Einladungs-Validierungsfehler:', error)
     return NextResponse.json(
-      { success: false, message: 'Ein interner Fehler ist aufgetreten.' },
+      { message: 'Ein interner Fehler ist aufgetreten.' },
       { status: 500 }
     )
   }

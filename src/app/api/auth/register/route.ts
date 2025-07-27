@@ -81,7 +81,7 @@ export async function POST(request: Request) {
         to: newUser.email,
         name: newUser.name,
         subject: 'Willkommen bei NatureScout',
-        loginUrl: `${process.env.NEXTAUTH_URL}/authentification/anmelden`
+        loginUrl: `${process.env.NEXTAUTH_URL}/auth/login`
       })
     } catch (emailError) {
       console.error('Fehler beim Senden der Willkommens-E-Mail:', emailError)

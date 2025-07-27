@@ -42,7 +42,7 @@ export async function POST(request: Request) {
         to: user.email,
         name: user.name,
         subject: 'Passwort zurücksetzen',
-        resetUrl: `${process.env.NEXTAUTH_URL}/authentification/passwort-reset?token=${token}`
+        resetUrl: `${process.env.NEXTAUTH_URL}/auth/reset-password?token=${token}`
       })
     } catch (emailError) {
       console.error('Fehler beim Senden der Passwort-Reset-E-Mail:', emailError)

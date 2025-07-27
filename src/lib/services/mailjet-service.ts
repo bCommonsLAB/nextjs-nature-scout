@@ -25,6 +25,7 @@ export interface InvitationEmailData extends EmailData {
   temporaryPassword?: string
   invitationToken?: string
   loginUrl: string
+  personalMessage?: string
 }
 
 export interface LoginCodeEmailData extends EmailData {
@@ -198,6 +199,15 @@ export class MailjetService {
               
               <p>${data.inviterName} hat Sie zu NatureScout eingeladen${data.organizationName ? ` (${data.organizationName})` : ''}.</p>
               
+              ${data.personalMessage ? `
+              <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border-left: 4px solid #2d5016; margin: 20px 0;">
+                <p style="margin: 0; font-style: italic; color: #2d5016;">
+                  <strong>Persönliche Nachricht von ${data.inviterName}:</strong><br>
+                  "${data.personalMessage}"
+                </p>
+              </div>
+              ` : ''}
+              
               <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
                 <h3 style="color: #2d5016; margin-top: 0;">Ihre Registrierung:</h3>
                 <p style="margin: 10px 0;"><strong>E-Mail:</strong> ${data.to}</p>
@@ -206,7 +216,7 @@ export class MailjetService {
               
               <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107; margin: 20px 0;">
                 <p style="margin: 0; color: #856404;">
-                  <strong>Wichtig:</strong> Klicken Sie auf den Link unten, um Ihre Registrierung abzuschließen.
+                  <strong>Einfach & schnell:</strong> Klicken Sie auf den Button unten und starten Sie sofort mit NatureScout!
                 </p>
               </div>
               
@@ -214,7 +224,7 @@ export class MailjetService {
                 <a href="${data.loginUrl}" 
                    style="background-color: #2d5016; color: white; padding: 12px 30px; 
                           text-decoration: none; border-radius: 5px; display: inline-block;">
-                  Registrierung abschließen
+                  Einladung annehmen & direkt starten
                 </a>
               </div>
               
@@ -233,13 +243,15 @@ export class MailjetService {
             
             ${data.inviterName} hat Sie zu NatureScout eingeladen${data.organizationName ? ` (${data.organizationName})` : ''}.
             
+            ${data.personalMessage ? `Persönliche Nachricht von ${data.inviterName}: "${data.personalMessage}"` : ''}
+            
             Ihre Registrierung:
             E-Mail: ${data.to}
             Name: ${data.name}
             
-            Registrierung abschließen: ${data.loginUrl}
+            Einladung annehmen: ${data.loginUrl}
             
-            Wichtig: Klicken Sie auf den Link, um Ihre Registrierung abzuschließen.
+            Wichtig: Klicken Sie auf den Link, um Ihre Einladung anzunehmen.
             
             Das NatureScout Team
           `

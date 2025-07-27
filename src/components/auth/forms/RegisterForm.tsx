@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Eye, EyeOff, Mail, Lock, User, AlertCircle, UserPlus, CheckCircle2, Gift, ArrowLeft } from 'lucide-react'
 
-export function RegistrierungsForm() {
+export default function RegisterForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const inviteToken = searchParams.get('invite')
@@ -100,10 +100,33 @@ export function RegistrierungsForm() {
     return true
   }
 
-  const handleNextStep = () => {
+  const handleNextStep = async () => {
     setError('')
-    if (validateStep1()) {
+    if (!validateStep1()) return
+
+    setIsLoading(true)
+
+    try {
+      // Prüfe, ob die E-Mail-Adresse bereits existiert
+      const response = await fetch('/api/auth/check-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.exists) {
+        setError('Diese E-Mail-Adresse ist bereits registriert. Bitte melden Sie sich an oder verwenden Sie "Passwort vergessen", falls Sie Ihr Passwort nicht mehr wissen.')
+        return
+      }
+
+      // E-Mail ist verfügbar, gehe zu Schritt 2
       setStep(2)
+    } catch (error) {
+      setError('Fehler bei der E-Mail-Prüfung. Bitte versuchen Sie es erneut.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -135,7 +158,7 @@ export function RegistrierungsForm() {
       }
 
       // Erfolgreich registriert - zur Anmeldung weiterleiten
-      router.push('/authentification/anmelden?message=registered')
+      router.push('/auth/login?message=registered')
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten.')
     } finally {
@@ -155,9 +178,35 @@ export function RegistrierungsForm() {
           <CardTitle className="text-3xl font-bold text-[#2D3321] mb-3">
             {invitationData ? 'Einladung annehmen' : 'Registrierung'}
           </CardTitle>
-          <CardDescription className="text-lg text-[#637047]">
+          <CardDescription className="text-lg text-[#637047] mb-4">
             {step === 1 ? 'Schritt 1 von 2' : 'Schritt 2 von 2'}
           </CardDescription>
+          
+          {/* Erklärung der Registrierungsschritte */}
+          <div className="px-6">
+            <p className="text-base text-[#637047] text-center mb-4">
+              Um die Anwendung zu nutzen, müssen Sie sich einmalig registrieren. Die Registrierung erfolgt in zwei einfachen Schritten:
+            </p>
+            <div className="flex justify-center items-center gap-4 text-sm text-[#637047]">
+              <div className={`flex items-center gap-2 ${step === 1 ? 'text-[#2D3321] font-medium' : ''}`}>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
+                  step === 1 ? 'bg-[#637047] text-white' : 'bg-[#D3E0BD] text-[#637047]'
+                }`}>
+                  1
+                </div>
+                <span>Persönliche Daten</span>
+              </div>
+              <div className="w-8 h-px bg-[#D3E0BD]"></div>
+              <div className={`flex items-center gap-2 ${step === 2 ? 'text-[#2D3321] font-medium' : ''}`}>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
+                  step === 2 ? 'bg-[#637047] text-white' : 'bg-[#D3E0BD] text-[#637047]'
+                }`}>
+                  2
+                </div>
+                <span>Passwort & Zustimmung</span>
+              </div>
+            </div>
+          </div>
         </CardHeader>
 
         <CardContent className="space-y-6">
@@ -336,8 +385,16 @@ export function RegistrierungsForm() {
                 <Button 
                   type="submit" 
                   className="w-full h-14 text-lg bg-[#637047] hover:bg-[#2D3321] font-medium shadow-md"
+                  disabled={isLoading}
                 >
-                  Weiter
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      Prüfe E-Mail...
+                    </>
+                  ) : (
+                    'Weiter'
+                  )}
                 </Button>
               ) : (
                 <div className="space-y-4">
@@ -375,7 +432,7 @@ export function RegistrierungsForm() {
           <div className="text-center text-base text-[#637047] border-t border-[#D3E0BD] pt-6">
             <span>Bereits ein Konto? </span>
             <Link 
-              href="/authentification/anmelden" 
+              href="/auth/login" 
               className="text-[#637047] hover:text-[#2D3321] underline font-medium"
             >
               Hier anmelden

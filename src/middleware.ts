@@ -17,10 +17,12 @@ export default withAuth(
           '/api/habitat/public',
           '/api/public-filter-options',
           '/api/organizations',
-          '/authentification/anmelden',
-          '/authentification/registrieren',
-          '/authentification/passwort-vergessen',
-          '/authentification/einladung'
+                    '/auth/login',
+        '/auth/register',
+        '/auth/forgot-password',
+        '/auth/reset-password',
+        '/invite',
+        '/welcome'
         ]
         
         const isPublicRoute = publicRoutes.some(route => 
@@ -41,7 +43,7 @@ export default withAuth(
       }
     },
     pages: {
-      signIn: '/authentification/anmelden'
+              signIn: '/auth/login'
     }
   }
 )

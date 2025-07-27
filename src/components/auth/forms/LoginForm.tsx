@@ -10,9 +10,9 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Eye, EyeOff, Mail, Lock, AlertCircle, CheckCircle, Key, Smartphone, ArrowLeft, HelpCircle, Info, ChevronDown, ChevronUp } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, AlertCircle, CheckCircle, Key, Smartphone, ArrowLeft, HelpCircle, Info, ChevronDown, ChevronUp, Gift } from 'lucide-react'
 
-export function AnmeldeForm() {
+export default function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
@@ -28,6 +28,90 @@ export function AnmeldeForm() {
   const router = useRouter()
   const [firstInputMaxLength, setFirstInputMaxLength] = useState(1)
   
+  // Neue States für Einladungs-Flow
+  const [invitationData, setInvitationData] = useState<{
+    name: string
+    email: string
+    inviterName: string
+    organizationName?: string
+  } | null>(null)
+  const [isNewUser, setIsNewUser] = useState(false)
+  const [showPasswordCreation, setShowPasswordCreation] = useState(false)
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [invitationStatus, setInvitationStatus] = useState<'valid' | 'used' | 'expired' | 'invalid' | null>(null)
+  
+  // URL-Parameter verarbeiten
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const inviteToken = urlParams.get('invite')
+    const message = urlParams.get('message')
+    
+    // Einladungs-Token verarbeiten
+    if (inviteToken) {
+      handleInvitationToken(inviteToken)
+    }
+    
+    // Nachrichten anzeigen
+    if (message === 'registration_disabled') {
+      setError('Öffentliche Registrierung ist derzeit deaktiviert. Sie benötigen eine Einladung, um sich zu registrieren.')
+    } else if (message === 'invite_accepted') {
+      setSuccess('Einladung erfolgreich angenommen! Sie können sich jetzt anmelden.')
+    }
+  }, [])
+
+  // Einladungs-Token verarbeiten
+  const handleInvitationToken = async (token: string) => {
+    setIsLoading(true)
+    setError('')
+    setInvitationStatus(null)
+    
+    try {
+      const response = await fetch(`/api/auth/invite/validate?token=${token}`)
+      const data = await response.json()
+      
+      if (response.ok && data.success) {
+        // Gültige Einladung
+        setInvitationStatus('valid')
+        setInvitationData(data.invitation)
+        setEmail(data.invitation.email)
+        
+        // Prüfen, ob Benutzer bereits ein Passwort hat
+        console.log('🔍 Einladungs-Validierung - Benutzer hat Passwort:', data.user.hasPassword)
+        if (!data.user.hasPassword) {
+          // Neuer Benutzer ohne Passwort
+          console.log('🆕 Neuer Benutzer ohne Passwort - Passwort-Erstellung aktiviert')
+          setIsNewUser(true)
+          setShowPasswordCreation(true)
+          setActiveTab('password') // Passwort-Tab für Passwort-Erstellung
+        } else {
+          console.log('👤 Bestehender Benutzer mit Passwort - Normale Anmeldung')
+        }
+      } else {
+        // Einladung ist ungültig, verwendet oder abgelaufen
+        const status = response.status
+        if (status === 400) {
+          // Bereits verwendet oder abgelaufen
+          if (data.message?.includes('bereits verwendet')) {
+            setInvitationStatus('used')
+            setEmail(data.invitation?.email || '')
+          } else if (data.message?.includes('abgelaufen')) {
+            setInvitationStatus('expired')
+          } else {
+            setInvitationStatus('invalid')
+          }
+        } else {
+          setInvitationStatus('invalid')
+        }
+      }
+    } catch (error) {
+      setInvitationStatus('invalid')
+      console.error('Fehler beim Verarbeiten der Einladung:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   // Debug: Logge maxLength Änderungen
   useEffect(() => {
     console.log('🔧 firstInputMaxLength geändert auf:', firstInputMaxLength)
@@ -60,6 +144,13 @@ export function AnmeldeForm() {
     setIsLoading(true)
 
     try {
+      // Wenn es ein neuer Benutzer ist, erstelle das Passwort
+      if (isNewUser && showPasswordCreation) {
+        await handlePasswordCreation()
+        return
+      }
+
+      // Normale Anmeldung
       const result = await signIn('credentials', {
         email,
         password,
@@ -75,6 +166,57 @@ export function AnmeldeForm() {
       }
     } catch (error) {
       setError('Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Passwort-Erstellung für neue Benutzer
+  const handlePasswordCreation = async () => {
+    if (password.length < 8) {
+      setError('Das Passwort muss mindestens 8 Zeichen lang sein.')
+      setIsLoading(false)
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setError('Die Passwörter stimmen nicht überein.')
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      const response = await fetch('/api/auth/set-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Fehler beim Erstellen des Passworts')
+      }
+
+      // Passwort erfolgreich erstellt, jetzt anmelden
+      const signInResult = await signIn('credentials', {
+        email,
+        password,
+        loginType: 'password',
+        redirect: false,
+      })
+
+      if (signInResult?.error) {
+        setError('Passwort erstellt, aber Anmeldung fehlgeschlagen. Bitte versuchen Sie sich anzumelden.')
+      } else {
+        setSuccess('Passwort erfolgreich erstellt! Sie werden angemeldet...')
+        setTimeout(() => {
+          router.push('/naturescout')
+          router.refresh()
+        }, 2000)
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Fehler beim Erstellen des Passworts')
     } finally {
       setIsLoading(false)
     }
@@ -231,7 +373,7 @@ export function AnmeldeForm() {
             inputRefs.current = new Array(6).fill(null)
           }
         }} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6 bg-[#FAFFF3] border-[#D3E0BD]">
+          <TabsList className="grid w-full grid-cols-2 mb-4 bg-[#FAFFF3] border-[#D3E0BD]">
             <TabsTrigger 
               value="password" 
               className="text-base py-3 px-6 data-[state=active]:bg-[#637047] data-[state=active]:text-white data-[state=active]:shadow-md"
@@ -247,6 +389,16 @@ export function AnmeldeForm() {
               Mit Code
             </TabsTrigger>
           </TabsList>
+
+          {/* Kurze Erklärung der Anmeldemethoden */}
+          <div className="px-6 mb-6">
+            <p className="text-base text-[#637047] text-center">
+              {activeTab === 'password' 
+                ? 'Verwenden Sie Ihre E-Mail-Adresse und Ihr Passwort, um sich anzumelden.'
+                : 'Geben Sie Ihre E-Mail-Adresse ein, um einen 6-stelligen Anmelde-Code zu erhalten.'
+              }
+            </p>
+          </div>
 
           {error && (
             <div className="px-6 mb-6">
@@ -265,6 +417,56 @@ export function AnmeldeForm() {
                 <CheckCircle className="h-5 w-5 text-[#637047]" />
                 <AlertDescription className="text-base text-[#2D3321]">
                   {success}
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
+
+          {/* Einladungs-Status-Banner */}
+          {invitationStatus === 'valid' && invitationData && (
+            <div className="px-6 mb-6">
+              <Alert className="border-[#D3E0BD] bg-[#FAFFF3]">
+                <Gift className="h-5 w-5 text-[#637047]" />
+                <AlertDescription className="text-base text-[#2D3321]">
+                  <strong>Sie wurden eingeladen!</strong><br />
+                  {invitationData.inviterName} hat Sie zu NatureScout eingeladen
+                  {invitationData.organizationName && ` (${invitationData.organizationName})`}.
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
+
+          {invitationStatus === 'used' && (
+            <div className="px-6 mb-6">
+              <Alert className="border-[#D3E0BD] bg-[#FAFFF3]">
+                <CheckCircle className="h-5 w-5 text-[#637047]" />
+                <AlertDescription className="text-base text-[#2D3321]">
+                  <strong>Einladung bereits verwendet</strong><br />
+                  Sie haben diesen Einladungslink bereits verwendet. Melden Sie sich jetzt mit Ihrer E-Mail-Adresse an.
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
+
+          {invitationStatus === 'expired' && (
+            <div className="px-6 mb-6">
+              <Alert className="border-[#D3E0BD] bg-[#FAFFF3]">
+                <AlertCircle className="h-5 w-5 text-[#637047]" />
+                <AlertDescription className="text-base text-[#2D3321]">
+                  <strong>Einladung abgelaufen</strong><br />
+                  Diese Einladung ist leider abgelaufen. Kontaktieren Sie den Einladenden für eine neue Einladung.
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
+
+          {invitationStatus === 'invalid' && (
+            <div className="px-6 mb-6">
+              <Alert className="border-[#D3E0BD] bg-[#FAFFF3]">
+                <AlertCircle className="h-5 w-5 text-[#637047]" />
+                <AlertDescription className="text-base text-[#2D3321]">
+                  <strong>Ungültiger Einladungslink</strong><br />
+                  Der Einladungslink ist nicht gültig. Melden Sie sich mit Ihrer E-Mail-Adresse an oder kontaktieren Sie den Einladenden.
                 </AlertDescription>
               </Alert>
             </div>
@@ -298,7 +500,7 @@ export function AnmeldeForm() {
                 <div className="space-y-3">
                   <Label htmlFor="password" className="text-lg font-medium flex items-center gap-3 text-[#2D3321]">
                     <Lock className="h-5 w-5 text-[#637047]" />
-                    Ihr Passwort
+                    {showPasswordCreation ? 'Passwort erstellen' : 'Ihr Passwort'}
                   </Label>
                   <div className="relative">
                     <Input
@@ -306,10 +508,10 @@ export function AnmeldeForm() {
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Ihr Passwort eingeben"
+                      placeholder={showPasswordCreation ? "Mindestens 8 Zeichen" : "Ihr Passwort eingeben"}
                       required
                       className="h-14 text-lg pr-14 border-[#D3E0BD] focus:border-[#637047] focus:ring-[#637047]"
-                      autoComplete="current-password"
+                      autoComplete={showPasswordCreation ? "new-password" : "current-password"}
                     />
                     <Button
                       type="button"
@@ -326,14 +528,55 @@ export function AnmeldeForm() {
                     </Button>
                   </div>
                   <p className="text-base text-[#637047]">
-                    Klicken Sie auf das Auge-Symbol, um Ihr Passwort sichtbar zu machen.
+                    {showPasswordCreation 
+                      ? 'Das Passwort muss mindestens 8 Zeichen lang sein. Verwenden Sie Buchstaben und Zahlen.'
+                      : 'Klicken Sie auf das Auge-Symbol, um Ihr Passwort sichtbar zu machen.'
+                    }
                   </p>
                 </div>
+
+                {/* Passwort bestätigen für neue Benutzer */}
+                {showPasswordCreation && (
+                  <div className="space-y-3">
+                    <Label htmlFor="confirmPassword" className="text-lg font-medium flex items-center gap-3 text-[#2D3321]">
+                      <CheckCircle className="h-5 w-5 text-[#637047]" />
+                      Passwort bestätigen
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="confirmPassword"
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Passwort erneut eingeben"
+                        required
+                        className="h-14 text-lg pr-14 border-[#D3E0BD] focus:border-[#637047] focus:ring-[#637047]"
+                        autoComplete="new-password"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 h-10 w-10 p-0 text-[#637047] hover:bg-[#FAFFF3]"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      >
+                        {showConfirmPassword ? (
+                          <EyeOff className="h-5 w-5" />
+                        ) : (
+                          <Eye className="h-5 w-5" />
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-base text-[#637047]">
+                      Geben Sie das gleiche Passwort nochmal ein, zur Sicherheit.
+                    </p>
+                  </div>
+                )}
 
                 {/* Passwort vergessen Link */}
                 <div className="text-center pt-2">
                   <Link 
-                    href="/authentification/passwort-vergessen" 
+                    href="/auth/forgot-password" 
                     className="text-[#637047] hover:text-[#2D3321] text-base underline font-medium"
                   >
                     Passwort vergessen?
@@ -347,7 +590,7 @@ export function AnmeldeForm() {
                   className="w-full h-14 text-lg bg-[#637047] hover:bg-[#2D3321] font-medium shadow-md"
                   disabled={isLoading}
                 >
-                  {isLoading ? 'Wird angemeldet...' : 'Jetzt anmelden'}
+                  {isLoading ? 'Wird verarbeitet...' : (showPasswordCreation ? 'Passwort erstellen & anmelden' : 'Jetzt anmelden')}
                 </Button>
               </CardFooter>
             </form>
@@ -615,7 +858,7 @@ export function AnmeldeForm() {
           <div className="text-center text-base text-[#637047] border-t border-[#D3E0BD] pt-6">
             <span>Noch kein Konto? </span>
             <Link 
-              href="/authentification/registrieren" 
+              href="/auth/register" 
               className="text-[#637047] hover:text-[#2D3321] underline font-medium"
             >
               Hier registrieren
