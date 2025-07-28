@@ -1,0 +1,120 @@
+name: ci-master
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'master'
+
+permissions:
+  contents: write
+  packages: write
+  actions: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: prod
+    name: CI Prod
+    outputs:
+      version: ${{ steps.read_version.outputs.VERSION }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'pnpm'
+
+      - name: read version from package.json
+        id: read_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+
+      - name: bump version
+        id: bump
+        uses: cbrgm/semver-bump-action@main
+        with:
+          current-version: ${{steps.read_version.outputs.VERSION}}
+          bump-level: patch
+
+      - name: update package.json version
+        run: |
+          npm version ${{ steps.bump.outputs.new_version }} --no-git-tag-version
+          echo "Updated package.json to version ${{ steps.bump.outputs.new_version }}"
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/${{ github.repository }}:latest,ghcr.io/${{ github.repository }}:${{ steps.bump.outputs.new_version }}
+          build-args: |
+            VERSION=${{ steps.bump.outputs.new_version }}
+            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+            NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
+            MONGODB_URI=${{ secrets.MONGODB_URI }}
+            MONGODB_DATABASE_NAME=${{ secrets.MONGODB_DATABASE_NAME }}
+            MONGODB_COLLECTION_NAME=${{ secrets.MONGODB_COLLECTION_NAME }}
+            MAILJET_API_KEY=${{ secrets.MAILJET_API_KEY }}
+            MAILJET_API_SECRET=${{ secrets.MAILJET_API_SECRET }}
+            MAILJET_FROM_EMAIL=${{ secrets.MAILJET_FROM_EMAIL }}
+            MAILJET_FROM_NAME=${{ secrets.MAILJET_FROM_NAME }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            OPENAI_CHAT_MODEL=${{ secrets.OPENAI_CHAT_MODEL }}
+            OPENAI_VISION_MODEL=${{ secrets.OPENAI_VISION_MODEL }}
+            OPENAI_TRANSCRIPTION_MODEL=${{ secrets.OPENAI_TRANSCRIPTION_MODEL }}
+            AZURE_STORAGE_CONNECTION_STRING=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+            AZURE_STORAGE_CONTAINER_NAME=${{ secrets.AZURE_STORAGE_CONTAINER_NAME }}
+            GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}
+            PLANTNET_API_KEY=${{ secrets.PLANTNET_API_KEY }}
+            NEXT_PUBLIC_MAX_IMAGE_WIDTH=${{ secrets.NEXT_PUBLIC_MAX_IMAGE_WIDTH }}
+            NEXT_PUBLIC_MAX_IMAGE_HEIGHT=${{ secrets.NEXT_PUBLIC_MAX_IMAGE_HEIGHT }}
+            NEXT_PUBLIC_MAX_IMAGE_QUALITY=${{ secrets.NEXT_PUBLIC_MAX_IMAGE_QUALITY }}
+            NEXT_PUBLIC_BASE_URL=${{ secrets.NEXT_PUBLIC_BASE_URL }}
+            HABITAT_TEST_IMAGES_PATH=${{ secrets.HABITAT_TEST_IMAGES_PATH }}
+            
+      - name: Push version and tag
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email github-actions[bot]@users.noreply.github.com
+          git add package.json package-lock.json
+          git commit -m "Bump version to ${{ steps.bump.outputs.new_version }} [skip ci]"
+          git tag -a -m "${{ steps.bump.outputs.new_version }}" v${{ steps.bump.outputs.new_version }}
+          git push --follow-tags
+          
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          prerelease: false
+          generate_release_notes: true
+          tag_name: v${{ steps.bump.outputs.new_version }}
+      # Dokploy Deployment-Trigger
+      - name: Trigger Dokploy deployment
+        run: curl -X GET https://dokploy.bcommonslab.org/api/deploy/compose/vGs3CCx-b1TA7AaA_ySmN
+
+
+
+
