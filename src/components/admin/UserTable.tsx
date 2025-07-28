@@ -20,10 +20,11 @@ import { Button } from '@/components/ui/button';
 import { IUser } from '@/lib/services/user-service';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { Trash2, RefreshCw, AlertCircle, Edit, X, Filter, Search } from 'lucide-react';
+import { Trash2, RefreshCw, AlertCircle, Edit, X, Filter, Search, UserPlus } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -51,6 +52,7 @@ const userFormSchema = z.object({
   email: z.string().email({ message: 'Ungültige E-Mail-Adresse' }).optional(),
   role: z.enum(['user', 'experte', 'admin', 'superadmin']),
   organizationId: z.string().optional(),
+  canInvite: z.boolean().optional(),
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -81,6 +83,7 @@ export function UserTable() {
       email: '',
       role: 'user',
       organizationId: 'none',
+      canInvite: false,
     },
   });
 
@@ -224,6 +227,7 @@ export function UserTable() {
       email: user.email,
       role: user.role as 'user' | 'experte' | 'admin' | 'superadmin',
       organizationId: user.organizationId || 'none',
+      canInvite: user.canInvite || false,
     });
     setIsEditDialogOpen(true);
   };
@@ -365,6 +369,38 @@ export function UserTable() {
     }
   };
 
+  // CanInvite-Flag für Benutzer aktualisieren
+  const updateUserCanInvite = async (email: string, canInvite: boolean) => {
+    try {
+      const response = await fetch(`/api/users/${encodeURIComponent(email)}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ canInvite }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Fehler beim Aktualisieren der Einladungsberechtigung');
+      }
+
+      // Nach erfolgreicher Aktualisierung: Liste neu laden
+      await fetchUsers();
+      
+      toast.success(`Einladungsberechtigung ${canInvite ? 'aktiviert' : 'deaktiviert'}`);
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : 'Fehler beim Aktualisieren der Einladungsberechtigung');
+    }
+  };
+
+  // Benutzer einladen - öffnet Einladungsdialog mit vorausgefüllten Daten
+  const inviteUser = (user: IUser) => {
+    // URL-Parameter für Einladungsseite erstellen
+    const inviteUrl = `/auth/invite?email=${encodeURIComponent(user.email)}&name=${encodeURIComponent(user.name)}`;
+    window.location.href = inviteUrl;
+  };
+
   // Benutzer löschen
   const deleteUser = async (email: string) => {
     setLastAdminError(null);
@@ -450,19 +486,28 @@ export function UserTable() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Benutzerverwaltung</h2>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={fetchUsers}
-          disabled={loading}
-        >
-          {loading ? (
-            <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-          ) : (
-            <RefreshCw className="h-4 w-4 mr-2" />
-          )}
-          Aktualisieren
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => window.location.href = '/auth/invite'}
+            className="bg-[#637047] hover:bg-[#2D3321]"
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            Benutzer einladen
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={fetchUsers}
+            disabled={loading}
+          >
+            {loading ? (
+              <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            Aktualisieren
+          </Button>
+        </div>
       </div>
 
       {/* Filter-Steuerelemente */}
@@ -570,6 +615,7 @@ export function UserTable() {
               <TableHead>E-Mail</TableHead>
               <TableHead>Rolle</TableHead>
               <TableHead>Organisation</TableHead>
+              <TableHead>Einladen</TableHead>
               <TableHead>Registriert</TableHead>
               <TableHead>Aktionen</TableHead>
             </TableRow>
@@ -577,7 +623,7 @@ export function UserTable() {
           <TableBody>
             {filteredUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center">
+                <TableCell colSpan={7} className="text-center">
                   {activeFilters.length > 0 
                     ? 'Keine Benutzer mit diesen Filterkriterien gefunden' 
                     : 'Keine Benutzer gefunden'}
@@ -642,6 +688,25 @@ export function UserTable() {
                     </div>
                   </TableCell>
                   <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <Select 
+                        value={user.canInvite ? 'true' : 'false'} 
+                        onValueChange={(value) => updateUserCanInvite(user.email, value === 'true')}
+                      >
+                        <SelectTrigger className="w-[120px]">
+                          <SelectValue placeholder="Berechtigung" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="true">Ja</SelectItem>
+                          <SelectItem value="false">Nein</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-xs text-gray-500">
+                        {user.canInvite ? 'Kann einladen' : 'Kein Zugriff'}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
                     {user.createdAt ? formatDistanceToNow(new Date(user.createdAt), { 
                       addSuffix: true,
                       locale: de
@@ -653,13 +718,23 @@ export function UserTable() {
                         variant="ghost" 
                         size="icon"
                         onClick={() => openEditDialog(user)}
+                        title="Benutzer bearbeiten"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
                       <Button 
                         variant="ghost" 
                         size="icon"
+                        onClick={() => inviteUser(user)}
+                        title="Benutzer einladen"
+                      >
+                        <UserPlus className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
                         onClick={() => deleteUser(user.email)}
+                        title="Benutzer löschen"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -769,6 +844,30 @@ export function UserTable() {
                     <FormDescription>
                       Organisation des Benutzers
                     </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="canInvite"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>
+                        Einladungsberechtigung
+                      </FormLabel>
+                      <FormDescription>
+                        Benutzer kann andere Personen zu NatureScout einladen
+                      </FormDescription>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}

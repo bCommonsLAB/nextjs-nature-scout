@@ -37,7 +37,8 @@ export async function POST(req: Request) {
       role, 
       organizationId, 
       organizationName, 
-      organizationLogo 
+      organizationLogo,
+      canInvite 
     } = body;
     
     if (!email || !name) {
@@ -54,7 +55,8 @@ export async function POST(req: Request) {
         role, 
         organizationId, 
         organizationName, 
-        organizationLogo 
+        organizationLogo,
+        canInvite 
       });
       return NextResponse.json(updatedUser);
     } else {
@@ -65,7 +67,8 @@ export async function POST(req: Request) {
         role, 
         organizationId, 
         organizationName, 
-        organizationLogo 
+        organizationLogo,
+        canInvite 
       });
       return NextResponse.json(newUser, { status: 201 });
     }

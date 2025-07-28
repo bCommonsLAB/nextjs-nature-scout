@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { UserService } from '@/lib/services/user-service'
 import { MailjetService } from '@/lib/services/mailjet-service'
+import { OrganizationService } from '@/lib/services/organization-service'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const { name, email, message } = await request.json()
+    const { name, email, message, organizationId, canInvite } = await request.json()
 
     // Validierung
     if (!name || !email) {
@@ -36,11 +37,12 @@ export async function POST(request: Request) {
 
     // Prüfen ob E-Mail bereits existiert
     const existingUser = await UserService.findByEmail(email)
-    if (existingUser) {
-      return NextResponse.json(
-        { message: 'Diese E-Mail-Adresse ist bereits registriert.' },
-        { status: 409 }
-      )
+    const isExistingUser = !!existingUser
+
+    // Organisation laden, falls angegeben
+    let targetOrganization = null
+    if (organizationId) {
+      targetOrganization = await OrganizationService.findById(organizationId)
     }
 
     // Einladungs-Token generieren
@@ -52,24 +54,40 @@ export async function POST(request: Request) {
       name: name.trim(),
       invitedBy: session.user.id,
       invitedByName: session.user.name || 'Ein Benutzer',
-      organizationId: session.user.organizationId,
-      organizationName: session.user.organizationName,
+      organizationId: organizationId || session.user.organizationId,
+      organizationName: targetOrganization?.name || session.user.organizationName,
+      canInvite: canInvite || false,
       token: invitationToken,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 Tage gültig
     })
 
     // Einladungs-E-Mail senden
     try {
-      await MailjetService.sendInvitationEmail({
-        to: email,
-        name: name.trim(),
-        subject: 'Einladung zu NatureScout',
-        inviterName: session.user.name || 'Ein Benutzer',
-        organizationName: session.user.organizationName || 'NatureScout',
-        invitationToken,
-        loginUrl: `${process.env.NEXTAUTH_URL}/invite/${invitationToken}`,
-        personalMessage: message?.trim() || ''
-      })
+      if (isExistingUser) {
+        // Erinnerungs-E-Mail für bereits registrierte Benutzer
+        await MailjetService.sendInvitationEmail({
+          to: email,
+          name: name.trim(),
+          subject: 'Erinnerung: Willkommen zurück bei NatureScout',
+          inviterName: session.user.name || 'Ein Benutzer',
+          organizationName: targetOrganization?.name || session.user.organizationName || 'NatureScout',
+          invitationToken,
+          loginUrl: `${process.env.NEXTAUTH_URL}/invite/${invitationToken}`,
+          personalMessage: message?.trim() || 'Wir freuen uns, Sie wieder bei NatureScout zu sehen!'
+        })
+      } else {
+        // Neue Einladungs-E-Mail für neue Benutzer
+        await MailjetService.sendInvitationEmail({
+          to: email,
+          name: name.trim(),
+          subject: 'Einladung zu NatureScout',
+          inviterName: session.user.name || 'Ein Benutzer',
+          organizationName: targetOrganization?.name || session.user.organizationName || 'NatureScout',
+          invitationToken,
+          loginUrl: `${process.env.NEXTAUTH_URL}/invite/${invitationToken}`,
+          personalMessage: message?.trim() || ''
+        })
+      }
     } catch (emailError) {
       console.error('Fehler beim Senden der Einladungs-E-Mail:', emailError)
       return NextResponse.json(
@@ -80,12 +98,15 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       { 
-        message: 'Einladung erfolgreich gesendet!',
+        message: isExistingUser 
+          ? 'Erinnerungs-E-Mail erfolgreich gesendet!' 
+          : 'Einladung erfolgreich gesendet!',
         invitation: {
           id: invitation._id,
           email: invitation.email,
           name: invitation.name,
-          expiresAt: invitation.expiresAt
+          expiresAt: invitation.expiresAt,
+          isExistingUser
         }
       },
       { status: 201 }

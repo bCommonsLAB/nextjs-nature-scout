@@ -7,10 +7,24 @@ interface ImageDisplayProps {
   alt: string;
   width: number;
   height: number;
+  preserveOrientation?: boolean;
 }
 
-export function ImageDisplay({ filename, alt, width, height }: ImageDisplayProps) {
+export function ImageDisplay({ filename, alt, width, height, preserveOrientation = true }: ImageDisplayProps) {
   const imageUrl = `/api/images/${filename}`;
+  
+  if (preserveOrientation) {
+    return (
+      <Image
+        src={imageUrl}
+        alt={alt}
+        width={width}
+        height={height}
+        unoptimized={true}
+        className="habitat-image object-cover"
+      />
+    );
+  }
   
   return (
     <Image

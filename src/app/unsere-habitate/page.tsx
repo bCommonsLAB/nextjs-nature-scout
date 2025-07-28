@@ -120,6 +120,16 @@ function UnsereHabitateContent() {
         }
         
         const result = await response.json();
+        
+        // Debug: Logge die ersten Einträge um das Problem zu identifizieren
+        if (result.entries && result.entries.length > 0) {
+          console.log('Geladene Habitate:', result.entries.slice(0, 3).map((entry: HabitatEntry) => ({
+            jobId: entry.jobId,
+            schutzstatus: entry.result?.schutzstatus,
+            mappedStatus: mapSchutzstatusToStatus(entry.result?.schutzstatus || '')
+          })));
+        }
+        
         setData(result);
         setError(null);
       } catch (err) {
@@ -212,8 +222,10 @@ function UnsereHabitateContent() {
     switch (schutzstatus?.toLowerCase()) {
       case 'gesetzlich geschützt':
         return 'gesetzlich';
-      case 'nicht gesetzlich geschützt, aber schützenswert':
+      case 'schützenswert':
+      case 'ökologisch hochwertig':
         return 'hochwertig';
+      case 'ökologisch niederwertig':
       case 'standardvegetation':
         return 'standard';
       default:
@@ -429,9 +441,9 @@ function UnsereHabitateContent() {
                 {data.pagination.total} {data.pagination.total === 1 ? 'Habitat' : 'Habitate'} gefunden
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
                 {data.entries.map((habitat) => (
-                  <div key={habitat.jobId} className="aspect-[16/9] w-full">
+                  <div key={habitat.jobId} className="aspect-square w-full">
                     <HabitatCard
                       imageSrc={habitat.metadata.bilder?.[0]?.url.replace('.jpg', '_low.jpg') || '/images/habitat-placeholder.jpg'}
                       title={habitat.result?.habitattyp || 'Unbekanntes Habitat'}

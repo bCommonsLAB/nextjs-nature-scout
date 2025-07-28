@@ -382,7 +382,7 @@ export default function HabitateDetailPage() {
                         src={bild.url.replace('.jpg', '_low.jpg')}
                         alt={`Bild ${index + 1}`}
                         fill
-                        className="object-contain"
+                        className="habitat-image"
                       />
                       <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-20 transition-opacity">
                         <SearchIcon className="h-6 w-6 text-white opacity-0 hover:opacity-100" />
@@ -745,7 +745,7 @@ export default function HabitateDetailPage() {
               alt="Große Vorschau"
               width={1800}
               height={1200}
-              className="max-h-[85vh] w-auto object-contain rounded-lg"
+              className="habitat-image max-h-[85vh] w-auto rounded-lg"
             />
           </div>
         </div>

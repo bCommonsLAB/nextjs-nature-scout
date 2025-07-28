@@ -45,6 +45,7 @@ export async function GET(request: Request) {
         role: 'user',
         organizationId: invitation.organizationId,
         organizationName: invitation.organizationName,
+        canInvite: invitation.canInvite || false,
         consent_data_processing: false, // Wird später beim ersten Login gesetzt
         consent_image_ccby: false, // Wird später beim ersten Login gesetzt
         habitat_name_visibility: 'public'

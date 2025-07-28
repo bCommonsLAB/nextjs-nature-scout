@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:ragtempproject.blob.core.windows.net)",
+      "Bash(curl:*)",
+      "Bash(exiftool:*)"
+    ],
+    "deny": []
+  }
+}

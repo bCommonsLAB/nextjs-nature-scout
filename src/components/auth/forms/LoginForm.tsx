@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Eye, EyeOff, Mail, Lock, AlertCircle, CheckCircle, Gift } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Eye, EyeOff, Mail, Lock, AlertCircle, CheckCircle, Gift, RefreshCw } from 'lucide-react'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
@@ -18,6 +19,9 @@ export default function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  
+  // Dialog für Passwort-Aktualisierung
+  const [showPasswordUpdateDialog, setShowPasswordUpdateDialog] = useState(false)
   
   // Neue States für Einladungs-Flow
   const [invitationData, setInvitationData] = useState<{
@@ -136,6 +140,8 @@ export default function LoginForm() {
         if (result?.ok) {
           router.push('/naturescout')
       } else {
+          // Bei falschen Anmeldedaten zeigen wir zuerst den Dialog an
+          setShowPasswordUpdateDialog(true)
           setError('E-Mail-Adresse oder Passwort ist falsch. Bitte versuchen Sie es erneut.')
         }
       }
@@ -419,6 +425,49 @@ export default function LoginForm() {
           </p>
         </div>
       </Card>
+
+      {/* Dialog für Passwort-Aktualisierung */}
+      <Dialog open={showPasswordUpdateDialog} onOpenChange={setShowPasswordUpdateDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex justify-center mb-4">
+              <div className="bg-[#D3E0BD] p-3 rounded-full">
+                <RefreshCw className="h-8 w-8 text-[#637047]" />
+              </div>
+            </div>
+            <DialogTitle className="text-xl font-bold text-[#2D3321] text-center">
+              Authentifizierungssystem aktualisiert
+            </DialogTitle>
+            <DialogDescription className="text-center text-[#637047] space-y-3 pt-2">
+              <p>
+                Wir haben das Authentifizierungssystem aktualisiert und es kann sein, 
+                dass alte Passwörter nicht mehr funktionieren.
+              </p>
+              <p>
+                Können Sie bitte mit "Passwort zurücksetzen" ein neues Passwort erstellen?
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col space-y-3 sm:space-y-0 sm:flex-row sm:space-x-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowPasswordUpdateDialog(false)}
+              className="w-full sm:w-auto border-[#D3E0BD] text-[#637047] hover:bg-[#FAFFF3]"
+            >
+              Erneut versuchen
+            </Button>
+            <Button
+              onClick={() => {
+                setShowPasswordUpdateDialog(false)
+                router.push('/auth/forgot-password')
+              }}
+              className="w-full sm:w-auto bg-[#637047] hover:bg-[#2D3321]"
+            >
+              Passwort zurücksetzen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 } 

@@ -71,6 +71,7 @@ export const authOptions = {
               image: user.image,
               organizationId: user.organizationId,
               organizationName: user.organizationName,
+              canInvite: user.canInvite || false,
             }
           } catch (error) {
             console.error('Code-Login-Fehler:', error)
@@ -129,6 +130,7 @@ export const authOptions = {
               image: user.image,
               organizationId: user.organizationId,
               organizationName: user.organizationName,
+              canInvite: user.canInvite || false,
             }
           } catch (error) {
             console.error('Invite-Login-Fehler:', error)
@@ -167,6 +169,7 @@ export const authOptions = {
               image: user.image,
               organizationId: user.organizationId,
               organizationName: user.organizationName,
+              canInvite: user.canInvite || false,
             }
           } catch (error) {
             console.error('Auth-Fehler:', error)
@@ -185,6 +188,7 @@ export const authOptions = {
         token.role = user.role
         token.organizationId = user.organizationId
         token.organizationName = user.organizationName
+        token.canInvite = user.canInvite
       }
       return token
     },
@@ -197,6 +201,7 @@ export const authOptions = {
         session.user.role = token.role as string
         session.user.organizationId = token.organizationId as string
         session.user.organizationName = token.organizationName as string
+        session.user.canInvite = token.canInvite as boolean
       }
       return session
     }

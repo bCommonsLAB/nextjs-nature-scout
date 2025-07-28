@@ -13,6 +13,7 @@ export interface IUser {
   organizationId?: string;
   organizationName?: string;
   organizationLogo?: string;
+  canInvite?: boolean; // Flag für Berechtigung, andere Benutzer einzuladen
   createdAt?: Date;
   updatedAt?: Date;
   lastAccess?: Date;
@@ -34,6 +35,7 @@ export interface IInvitation {
   invitedByName: string;
   organizationId?: string;
   organizationName?: string;
+  canInvite?: boolean;
   token: string;
   expiresAt: Date;
   used: boolean;
@@ -49,6 +51,7 @@ export interface CreateUserData {
   organizationId?: string;
   organizationName?: string;
   organizationLogo?: string;
+  canInvite?: boolean;
   consent_data_processing?: boolean;
   consent_image_ccby?: boolean;
   habitat_name_visibility?: 'public' | 'members' | null;
@@ -63,6 +66,7 @@ export interface UpdateUserData {
   organizationId?: string;
   organizationName?: string;
   organizationLogo?: string;
+  canInvite?: boolean;
   consent_data_processing?: boolean;
   consent_image_ccby?: boolean;
   habitat_name_visibility?: 'public' | 'members' | null;
@@ -75,6 +79,7 @@ export interface CreateInvitationData {
   invitedByName: string;
   organizationId?: string;
   organizationName?: string;
+  canInvite?: boolean;
   token: string;
   expiresAt: Date;
 }
@@ -337,6 +342,16 @@ export class UserService {
     // Projektion: Nur das role-Feld zurückgeben
     const user = await collection.findOne({ email: email.toLowerCase().trim() }, { projection: { role: 1, _id: 0 } });
     return user?.role === 'experte' || user?.role === 'admin' || user?.role === 'superadmin';
+  }
+
+  /**
+   * Zählt die Anzahl der Administratoren
+   */
+  static async getAdminCount(): Promise<number> {
+    const collection = await this.getUsersCollection();
+    return collection.countDocuments({ 
+      role: { $in: ['admin', 'superadmin'] } 
+    });
   }
 
   /**

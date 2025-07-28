@@ -13,6 +13,7 @@ export interface User {
   organizationId?: string
   organizationName?: string
   organizationLogo?: string
+  canInvite?: boolean
 }
 
 // Generische Auth-Interface
@@ -49,7 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     role: (session.user as any).role || 'user',
     image: session.user.image || undefined,
     organizationId: (session.user as any).organizationId || undefined,
-    organizationName: (session.user as any).organizationName || undefined
+    organizationName: (session.user as any).organizationName || undefined,
+    canInvite: (session.user as any).canInvite || false
   } : null
 
   const authState: AuthState = {

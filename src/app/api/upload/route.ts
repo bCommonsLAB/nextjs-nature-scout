@@ -19,8 +19,18 @@ export async function POST(request: Request) {
     try {
       // Bild-Metadaten ermitteln und verarbeiten
       const metadata = await sharp(buffer).metadata();
-      const width = metadata.width || 0;
-      const height = metadata.height || 0;
+      console.log('Original EXIF metadata:', metadata);
+      
+      // EXIF-Orientierung ermitteln (wichtig für korrekte Bilddarstellung)
+      const orientation = metadata.orientation || 1;
+      
+      // Sharp automatisch rotieren lassen basierend auf EXIF-Orientierung
+      let sharpInstance = sharp(buffer, { failOnError: false }).rotate();
+      
+      // Nach der automatischen Rotation die Dimensionen neu ermitteln
+      const rotatedMetadata = await sharpInstance.metadata();
+      const width = rotatedMetadata.width || 0;
+      const height = rotatedMetadata.height || 0;
       let newWidth = width;
       let newHeight = height;
 
@@ -40,27 +50,34 @@ export async function POST(request: Request) {
       const outputFormat = (metadata.format === 'jpeg' || metadata.format === 'jpg') ? 'jpeg' : 
                           (metadata.format === 'png') ? 'png' : 'jpeg';
       
-      // Bild optimieren mit verbesserter Fehlerbehandlung
+      // Bild optimieren mit EXIF-Orientierung und verbesserter Fehlerbehandlung
       let processedBuffer;
       if (outputFormat === 'jpeg') {
         processedBuffer = await sharp(buffer, { failOnError: false })
+          .rotate() // Automatische Rotation basierend auf EXIF
           .resize(newWidth, newHeight)
-          .jpeg({ quality: Math.round(quality * 100) })
+          .jpeg({ 
+            quality: Math.round(quality * 100)
+          })
           .toBuffer();
       } else if (outputFormat === 'png') {
         processedBuffer = await sharp(buffer, { failOnError: false })
+          .rotate() // Automatische Rotation basierend auf EXIF
           .resize(newWidth, newHeight)
           .png({ quality: Math.round(quality * 100) })
           .toBuffer();
       } else {
         // Fallback zu JPEG
         processedBuffer = await sharp(buffer, { failOnError: false })
+          .rotate() // Automatische Rotation basierend auf EXIF
           .resize(newWidth, newHeight)
-          .jpeg({ quality: Math.round(quality * 100) })
+          .jpeg({ 
+            quality: Math.round(quality * 100)
+          })
           .toBuffer();
       }
 
-      // Low-Resolution Version erstellen (max 360px)
+      // Low-Resolution Version erstellen (max 360px) - mit korrigierter Orientierung
       let lowResWidth = width;
       let lowResHeight = height;
       
@@ -76,21 +93,24 @@ export async function POST(request: Request) {
         }
       }
       
-      // Low-Res Version mit gleichem Format wie Original
+      // Low-Res Version mit gleichem Format wie Original und korrigierter Orientierung
       let lowResBuffer;
       if (outputFormat === 'jpeg') {
         lowResBuffer = await sharp(buffer, { failOnError: false })
+          .rotate() // Automatische Rotation basierend auf EXIF
           .resize(lowResWidth, lowResHeight)
           .jpeg({ quality: Math.round(quality * 80) })
           .toBuffer();
       } else if (outputFormat === 'png') {
         lowResBuffer = await sharp(buffer, { failOnError: false })
+          .rotate() // Automatische Rotation basierend auf EXIF
           .resize(lowResWidth, lowResHeight)
           .png({ quality: Math.round(quality * 80) })
           .toBuffer();
       } else {
         // Fallback zu JPEG
         lowResBuffer = await sharp(buffer, { failOnError: false })
+          .rotate() // Automatische Rotation basierend auf EXIF
           .resize(lowResWidth, lowResHeight)
           .jpeg({ quality: Math.round(quality * 80) })
           .toBuffer();
