@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useSession, signIn } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -17,47 +17,118 @@ export default function WelcomePage() {
     inviterName: string
     organizationName?: string
   } | null>(null)
+  const [isLoadingInvitation, setIsLoadingInvitation] = useState(false)
+  const [hasToken, setHasToken] = useState(false)
+
+  console.log('🔍 WelcomePage - Status:', status, 'Session:', !!session?.user, 'InvitationData:', !!invitationData)
 
   useEffect(() => {
-    // Einladungsdaten aus URL-Parametern oder Session holen
+    console.log('🔍 WelcomePage useEffect - Start')
+    // Token aus URL-Parametern holen
     const urlParams = new URLSearchParams(window.location.search)
-    const inviteToken = urlParams.get('invite')
+    const token = urlParams.get('token')
     
-    if (inviteToken && session?.user) {
-      // Einladungsdaten aus der Session oder localStorage holen
-      const storedInvitation = localStorage.getItem('invitationData')
-      if (storedInvitation) {
-        try {
-          setInvitationData(JSON.parse(storedInvitation))
-        } catch (error) {
-          console.error('Fehler beim Parsen der Einladungsdaten:', error)
-        }
-      }
+    console.log('🔍 WelcomePage - URL Params:', { token })
+    
+    if (token) {
+      setHasToken(true)
+      // Einladungsdaten aus der Datenbank mit Token holen
+      fetchInvitationData(token)
+    } else {
+      console.log('🔍 WelcomePage - Kein Token in URL')
     }
-  }, [session])
+  }, [])
 
-  const handleStartNow = () => {
-    // Einladungsdaten löschen
-    localStorage.removeItem('invitationData')
-    // Zur Hauptseite weiterleiten
-    router.push('/naturescout')
+  const fetchInvitationData = async (token: string) => {
+    try {
+      setIsLoadingInvitation(true)
+      console.log('🔍 WelcomePage - Hole Einladungsdaten für Token:', token)
+      const response = await fetch(`/api/auth/invite/validate?token=${token}`)
+      const data = await response.json()
+      
+      if (response.ok && data.success) {
+        console.log('🔍 WelcomePage - Einladungsdaten erhalten:', data.invitation)
+        setInvitationData(data.invitation)
+      } else {
+        console.log('🔍 WelcomePage - Fehler beim Laden der Einladungsdaten:', data.message)
+      }
+    } catch (error) {
+      console.error('🔍 WelcomePage - Fehler beim API-Call:', error)
+    } finally {
+      setIsLoadingInvitation(false)
+    }
   }
 
-  if (status === 'loading') {
+  // Separater useEffect für Navigation
+  useEffect(() => {
+    console.log('🔍 WelcomePage - Navigation useEffect:', { status, invitationData })
+    // KEINE automatische Weiterleitung mehr - Willkommensseite ist für nicht angemeldete Benutzer
+    // Die Benutzer können selbst entscheiden, ob sie sich anmelden möchten
+  }, [status, invitationData, router])
+
+  // KEINE Fallback-Navigation mehr - wenn Token vorhanden ist, warten wir auf die Daten
+  // Nur zur Login-Seite weiterleiten, wenn weder Token noch Einladungsdaten vorhanden sind
+
+  const handleStartNow = async () => {
+    console.log('🔍 WelcomePage - handleStartNow aufgerufen')
+    
+    // Token aus URL holen
+    const urlParams = new URLSearchParams(window.location.search)
+    const token = urlParams.get('token')
+    
+    if (!token) {
+      console.log('🔍 WelcomePage - Kein Token vorhanden, direkte Weiterleitung')
+      router.push('/naturescout')
+      return
+    }
+
+    try {
+      console.log('🔍 WelcomePage - Automatische Anmeldung mit Token:', token)
+      
+      // NextAuth signIn mit Token
+      const result = await signIn('credentials', {
+        token: token,
+        loginType: 'invite',
+        redirect: false
+      })
+
+      if (result?.ok) {
+        console.log('🔍 WelcomePage - Automatische Anmeldung erfolgreich')
+        // Weiterleitung zur Hauptseite
+        router.push('/naturescout')
+      } else {
+        console.log('🔍 WelcomePage - Automatische Anmeldung fehlgeschlagen:', result?.error)
+        router.push('/auth/login')
+      }
+    } catch (error) {
+      console.error('🔍 WelcomePage - Fehler bei automatischer Anmeldung:', error)
+      router.push('/auth/login')
+    }
+  }
+
+  if (status === 'loading' || isLoadingInvitation) {
+    console.log('🔍 WelcomePage - Loading State')
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#FAFFF3] to-[#E9F5DB] flex items-center justify-center px-4 py-8">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#637047] mx-auto"></div>
-          <p className="mt-4 text-[#637047]">Lade...</p>
+          <p className="mt-4 text-[#637047]">
+            {isLoadingInvitation ? 'Lade Einladungsdaten...' : 'Lade...'}
+          </p>
         </div>
       </div>
     )
   }
 
-  if (!session?.user) {
-    router.push('/auth/login')
+  // Nur zur Login-Seite weiterleiten, wenn keine Einladung vorhanden ist
+  // Willkommensseite wird auch für nicht angemeldete Benutzer angezeigt, wenn Einladungsdaten vorhanden sind
+  // ODER wenn ein Token in der URL vorhanden ist (Daten werden noch geladen)
+  if (!invitationData && !hasToken) {
+    console.log('🔍 WelcomePage - Keine Einladungsdaten und kein Token, return null')
     return null
   }
+
+  console.log('🔍 WelcomePage - Rendering Willkommensseite (hasToken:', hasToken, ', invitationData:', !!invitationData, ')')
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FAFFF3] to-[#E9F5DB] flex items-center justify-center px-4 py-8">
@@ -103,11 +174,20 @@ export default function WelcomePage() {
                 <div className="bg-[#D3E0BD] p-2 rounded-full mt-0.5">
                   <Key className="h-4 w-4 text-[#637047]" />
                 </div>
-                <div>
+                <div className="flex-1">
                   <h4 className="font-medium text-[#2D3321]">Mit Passwort</h4>
-                  <p className="text-[#637047] text-sm">
+                  <p className="text-[#637047] text-sm mb-2">
                     Erstellen Sie ein persönliches Passwort für einfache Anmeldung über die Login-Seite.
                   </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => router.push(`/auth/reset-password?email=${encodeURIComponent(invitationData?.email || '')}&invite=true`)}
+                    className="text-[#637047] border-[#D3E0BD] hover:bg-[#D3E0BD] hover:text-[#2D3321]"
+                  >
+                    <Key className="h-3 w-3 mr-1" />
+                    Passwort erstellen
+                  </Button>
                 </div>
               </div>
               
@@ -118,7 +198,7 @@ export default function WelcomePage() {
                 <div>
                   <h4 className="font-medium text-[#2D3321]">Mit Code</h4>
                   <p className="text-[#637047] text-sm">
-                    Lassen Sie sich einen 6-stelligen Code per E-Mail zusenden - sicher und ohne Passwort.
+                    Lassen Sie sich über die Login-Seite einen 6-stelligen Code per E-Mail zusenden - sicher und ohne Passwort.
                   </p>
                 </div>
               </div>
@@ -138,7 +218,7 @@ export default function WelcomePage() {
           </div>
 
           {/* Prominenter Button */}
-          <div className="text-center pt-4">
+          <div className="text-center pt-4 space-y-4">
             <Button 
               onClick={handleStartNow}
               className="h-16 text-xl bg-[#637047] hover:bg-[#2D3321] font-semibold shadow-lg px-8"
@@ -146,6 +226,18 @@ export default function WelcomePage() {
               <ArrowRight className="h-6 w-6 mr-3" />
               Jetzt sofort loslegen!
             </Button>
+            
+            {!session?.user && (
+              <Button 
+                variant="outline"
+                onClick={() => router.push(`/auth/login?email=${encodeURIComponent(invitationData?.email || '')}&message=invite_accepted`)}
+                className="h-12 text-lg border-[#D3E0BD] hover:bg-[#D3E0BD] hover:text-[#2D3321]"
+              >
+                <Key className="h-4 w-4 mr-2" />
+                Jetzt anmelden
+              </Button>
+            )}
+            
             <p className="text-[#637047] text-sm mt-3">
               Sie können jederzeit über das Menü zu Ihren Anmeldeoptionen gelangen
             </p>

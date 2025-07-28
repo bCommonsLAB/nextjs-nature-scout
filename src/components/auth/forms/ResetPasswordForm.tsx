@@ -27,12 +27,20 @@ export default function ResetPasswordForm() {
 
   useEffect(() => {
     const tokenParam = searchParams.get('token')
+    const emailParam = searchParams.get('email')
+    const inviteParam = searchParams.get('invite')
+    
     if (tokenParam) {
+      // Normaler Passwort-Reset Flow
       setToken(tokenParam)
-      // Token validieren
       validateToken(tokenParam)
+    } else if (emailParam && inviteParam === 'true') {
+      // Einladungsflow - kein Token erforderlich
+      setTokenValid(true)
+      // E-Mail für späteren Gebrauch speichern
+      localStorage.setItem('inviteEmail', emailParam)
     } else {
-      setError('Ungültiger Link. Token fehlt.')
+      setError('Ungültiger Link. Token oder E-Mail fehlt.')
       setTokenValid(false)
     }
   }, [searchParams])
@@ -75,16 +83,33 @@ export default function ResetPasswordForm() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password })
-      })
+      let response
+      
+      if (token) {
+        // Normaler Passwort-Reset Flow
+        response = await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, password })
+        })
+      } else {
+        // Einladungsflow - Passwort für Benutzer ohne Passwort setzen
+        const inviteEmail = localStorage.getItem('inviteEmail')
+        if (!inviteEmail) {
+          throw new Error('E-Mail-Adresse nicht gefunden.')
+        }
+        
+        response = await fetch('/api/auth/set-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: inviteEmail, password })
+        })
+      }
 
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.message || 'Fehler beim Zurücksetzen des Passworts')
+        throw new Error(result.message || 'Fehler beim Setzen des Passworts')
       }
 
       setSuccess(true)
@@ -94,6 +119,10 @@ export default function ResetPasswordForm() {
       setIsLoading(false)
     }
   }
+
+  // Bestimme, ob es sich um einen Einladungsflow handelt
+  const isInviteFlow = !token && searchParams.get('invite') === 'true'
+  const inviteEmail = searchParams.get('email')
 
   if (tokenValid === null) {
     return (
@@ -121,10 +150,13 @@ export default function ResetPasswordForm() {
               </div>
             </div>
             <CardTitle className="text-3xl font-bold text-[#2D3321] mb-3">
-              Passwort erfolgreich geändert!
+              {isInviteFlow ? 'Passwort erfolgreich erstellt!' : 'Passwort erfolgreich geändert!'}
             </CardTitle>
             <CardDescription className="text-lg text-[#637047]">
-              Ihr Passwort wurde erfolgreich zurückgesetzt. Sie können sich jetzt anmelden.
+              {isInviteFlow 
+                ? 'Ihr Passwort wurde erfolgreich erstellt. Sie können sich jetzt anmelden.'
+                : 'Ihr Passwort wurde erfolgreich zurückgesetzt. Sie können sich jetzt anmelden.'
+              }
             </CardDescription>
           </CardHeader>
 
@@ -132,7 +164,10 @@ export default function ResetPasswordForm() {
             <Alert className="border-[#D3E0BD] bg-[#FAFFF3]">
               <CheckCircle className="h-5 w-5 text-[#637047]" />
               <AlertDescription className="text-base text-[#2D3321]">
-                Ihr neues Passwort ist jetzt aktiv. Sie können sich mit Ihrer E-Mail-Adresse und dem neuen Passwort anmelden.
+                {isInviteFlow 
+                  ? 'Ihr neues Passwort ist jetzt aktiv. Sie können sich mit Ihrer E-Mail-Adresse und dem neuen Passwort anmelden.'
+                  : 'Ihr neues Passwort ist jetzt aktiv. Sie können sich mit Ihrer E-Mail-Adresse und dem neuen Passwort anmelden.'
+                }
               </AlertDescription>
             </Alert>
 
@@ -185,10 +220,13 @@ export default function ResetPasswordForm() {
               </div>
             </div>
             <CardTitle className="text-3xl font-bold text-[#2D3321] mb-3">
-              Ungültiger Link
+              {isInviteFlow ? 'Ungültige Einladung' : 'Ungültiger Link'}
             </CardTitle>
             <CardDescription className="text-lg text-[#637047]">
-              Der Link zum Zurücksetzen des Passworts ist ungültig oder abgelaufen.
+              {isInviteFlow 
+                ? 'Die Einladung konnte nicht verarbeitet werden.'
+                : 'Der Link zum Zurücksetzen des Passworts ist ungültig oder abgelaufen.'
+              }
             </CardDescription>
           </CardHeader>
 
@@ -203,18 +241,35 @@ export default function ResetPasswordForm() {
             <div className="bg-[#FAFFF3] p-4 rounded-lg border border-[#D3E0BD]">
               <h4 className="font-medium text-[#2D3321] mb-2">Was können Sie tun?</h4>
               <div className="text-sm text-[#637047] space-y-2">
-                <p><strong>Neuen Link anfordern:</strong> Gehen Sie zur Passwort-vergessen-Seite und fordern Sie einen neuen Link an.</p>
-                <p><strong>Code-Anmeldung:</strong> Falls Sie sich an Ihre E-Mail-Adresse erinnern, können Sie auch die Code-Anmeldung verwenden.</p>
+                {isInviteFlow ? (
+                  <>
+                    <p><strong>Neue Einladung anfordern:</strong> Bitten Sie den Administrator um eine neue Einladung.</p>
+                    <p><strong>Code-Anmeldung:</strong> Falls Sie sich an Ihre E-Mail-Adresse erinnern, können Sie auch die Code-Anmeldung verwenden.</p>
+                  </>
+                ) : (
+                  <>
+                    <p><strong>Neuen Link anfordern:</strong> Gehen Sie zur Passwort-vergessen-Seite und fordern Sie einen neuen Link an.</p>
+                    <p><strong>Code-Anmeldung:</strong> Falls Sie sich an Ihre E-Mail-Adresse erinnern, können Sie auch die Code-Anmeldung verwenden.</p>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>
 
           <CardFooter className="flex flex-col space-y-4">
-            <Link href="/auth/forgot-password" className="w-full">
-              <Button className="w-full h-14 text-lg bg-[#637047] hover:bg-[#2D3321] font-medium shadow-md">
-                Neuen Link anfordern
-              </Button>
-            </Link>
+            {isInviteFlow ? (
+              <Link href="/auth/login" className="w-full">
+                <Button className="w-full h-14 text-lg bg-[#637047] hover:bg-[#2D3321] font-medium shadow-md">
+                  Zur Anmeldung
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/auth/forgot-password" className="w-full">
+                <Button className="w-full h-14 text-lg bg-[#637047] hover:bg-[#2D3321] font-medium shadow-md">
+                  Neuen Link anfordern
+                </Button>
+              </Link>
+            )}
             <Link href="/auth/login" className="w-full">
               <Button variant="outline" className="w-full h-14 text-lg border-[#D3E0BD] hover:bg-[#FAFFF3] text-[#2D3321]">
                 <ArrowLeft className="h-5 w-5 mr-2" />
@@ -237,10 +292,13 @@ export default function ResetPasswordForm() {
             </div>
           </div>
           <CardTitle className="text-3xl font-bold text-[#2D3321] mb-3">
-            Neues Passwort erstellen
+            {isInviteFlow ? 'Passwort erstellen' : 'Neues Passwort erstellen'}
           </CardTitle>
           <CardDescription className="text-lg text-[#637047]">
-            Erstellen Sie ein neues Passwort für Ihr Konto. Es muss mindestens 8 Zeichen lang sein.
+            {isInviteFlow 
+              ? `Erstellen Sie ein Passwort für ${inviteEmail}. Es muss mindestens 8 Zeichen lang sein.`
+              : 'Erstellen Sie ein neues Passwort für Ihr Konto. Es muss mindestens 8 Zeichen lang sein.'
+            }
           </CardDescription>
         </CardHeader>
 

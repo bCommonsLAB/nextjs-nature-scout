@@ -365,14 +365,15 @@ export class UserService {
 
   /**
    * Findet eine Einladung anhand des Tokens
+   * WICHTIG: "used" Status wird ignoriert - Link bleibt immer gültig
    */
   static async findInvitationByToken(token: string): Promise<IInvitation | null> {
     const db = await connectToDatabase();
     const collection = db.collection<IInvitation>('invitations');
     
+    // WICHTIG: "used: false" entfernt - nur Token und Ablauf prüfen
     return collection.findOne({ 
       token, 
-      used: false, 
       expiresAt: { $gt: new Date() } 
     });
   }

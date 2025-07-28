@@ -47,7 +47,8 @@ export default function InviteAcceptPage({ token }: InviteAcceptPageProps) {
         setInvitation(data.invitation)
         
         // Automatisch anmelden oder Benutzer erstellen
-        await autoLogin(data.invitation.email, data.user)
+        // WICHTIG: Einladungsdaten direkt übergeben, nicht auf State warten
+        await autoLogin(data.invitation.email, data.user, data.invitation)
       } else {
         setError(data.message || 'Ungültiger Einladungslink')
       }
@@ -59,68 +60,30 @@ export default function InviteAcceptPage({ token }: InviteAcceptPageProps) {
     }
   }
 
-  const autoLogin = async (email: string, user: any) => {
+  const autoLogin = async (email: string, user: any, invitationData: any) => {
     try {
-      // Wenn Benutzer bereits ein Passwort hat, versuche automatische Anmeldung
+      console.log('🔍 InviteAcceptPage - autoLogin startet:', { email, hasPassword: user.hasPassword })
+      
+      // Wenn Benutzer bereits ein Passwort hat, zur Login-Seite weiterleiten
       if (user.hasPassword) {
-        // Hier könnten wir einen automatischen Login-Code senden
-        // Für jetzt leiten wir zur Login-Seite weiter
-        router.push(`/auth/login?email=${encodeURIComponent(email)}&message=invite_accepted`)
+        console.log('👤 Benutzer hat bereits Passwort - zur Login-Seite weiterleiten')
+        router.push(`/auth/login?email=${encodeURIComponent(email)}&token=${token}`)
         return
       }
 
-      // Benutzer ohne Passwort - erstelle automatisch ein temporäres Passwort
-      const tempPassword = generateTempPassword()
+      // Benutzer ohne Passwort - KEIN automatisches Passwort setzen!
+      // Stattdessen direkt zur Willkommensseite weiterleiten
+      console.log('🆕 Benutzer ohne Passwort - direkte Weiterleitung zur Willkommensseite')
       
-      // Passwort setzen
-      const passwordResponse = await fetch('/api/auth/set-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: tempPassword }),
-      })
-
-      if (passwordResponse.ok) {
-        // Automatisch anmelden
-        const result = await signIn('credentials', {
-          email,
-          password: tempPassword,
-          loginType: 'password',
-          redirect: false,
-        })
-
-        if (result?.error) {
-          console.log('Auto-Login fehlgeschlagen, Fallback zur Login-Seite')
-          // Fallback: Zur Login-Seite weiterleiten
-          router.push(`/auth/login?email=${encodeURIComponent(email)}&message=invite_accepted`)
-        } else {
-          console.log('Auto-Login erfolgreich, Weiterleitung zur Begrüßungsseite')
-          // Einladungsdaten für die Begrüßungsseite speichern
-          if (invitation) {
-            localStorage.setItem('invitationData', JSON.stringify(invitation))
-          }
-          // Zur Begrüßungsseite weiterleiten
-          router.push('/welcome?invite=true')
-        }
-      } else {
-        console.log('Passwort-Set fehlgeschlagen, Fallback zur Login-Seite')
-        // Fallback: Zur Login-Seite weiterleiten
-        router.push(`/auth/login?email=${encodeURIComponent(email)}&message=invite_accepted`)
-      }
+      // Nur den Token weitergeben - Daten werden in WelcomePage aus der Datenbank geholt
+      console.log('🔍 InviteAcceptPage - Weiterleitung mit Token:', token)
+      router.push(`/welcome?token=${token}`)
+      
     } catch (error) {
       console.error('Auto-Login Fehler:', error)
       // Fallback: Zur Login-Seite weiterleiten
-      router.push(`/auth/login?email=${encodeURIComponent(email)}&message=invite_accepted`)
+      router.push(`/auth/login?email=${encodeURIComponent(email)}&token=${token}`)
     }
-  }
-
-  const generateTempPassword = () => {
-    // Generiere ein sicheres temporäres Passwort
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*'
-    let password = ''
-    for (let i = 0; i < 12; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length))
-    }
-    return password
   }
 
   if (isLoading) {

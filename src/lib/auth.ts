@@ -25,7 +25,8 @@ export const authOptions = {
         email: { label: "E-Mail", type: "email" },
         password: { label: "Passwort", type: "password" },
         code: { label: "Code", type: "text" },
-        loginType: { label: "Login Type", type: "text" }
+        loginType: { label: "Login Type", type: "text" },
+        token: { label: "Token", type: "text" }
       },
       async authorize(credentials) {
         // Prüfe Login-Typ
@@ -73,6 +74,64 @@ export const authOptions = {
             }
           } catch (error) {
             console.error('Code-Login-Fehler:', error)
+            return null
+          }
+        } else if (credentials?.loginType === 'invite') {
+          // Token-basierte Einladungs-Anmeldung
+          if (!credentials?.token) {
+            return null
+          }
+
+          try {
+            // Einladung validieren
+            const invitation = await UserService.findInvitationByToken(credentials.token)
+            
+            if (!invitation) {
+              return null
+            }
+
+            // Prüfen ob Einladung abgelaufen ist
+            if (new Date() > invitation.expiresAt) {
+              return null
+            }
+
+            // Benutzer finden oder erstellen
+            let user = await UserService.findByEmail(invitation.email)
+            
+            if (!user) {
+              // Neuen Benutzer ohne Passwort erstellen
+              user = await UserService.createUser({
+                email: invitation.email,
+                name: invitation.name,
+                role: 'user',
+                organizationId: invitation.organizationId,
+                organizationName: invitation.organizationName,
+                consent_data_processing: false,
+                consent_image_ccby: false,
+                habitat_name_visibility: 'public'
+              })
+            }
+
+            // Prüfen, ob Benutzer ein Passwort hat
+            if (user.password) {
+              return null // Benutzer mit Passwort müssen normal anmelden
+            }
+
+            // Last Access aktualisieren
+            await UserService.updateLastAccess(invitation.email)
+
+            // User-Objekt für Session zurückgeben
+            return {
+              id: user._id?.toString() || '',
+              email: user.email,
+              name: user.name,
+              role: user.role,
+              image: user.image,
+              organizationId: user.organizationId,
+              organizationName: user.organizationName,
+            }
+          } catch (error) {
+            console.error('Invite-Login-Fehler:', error)
             return null
           }
         } else {

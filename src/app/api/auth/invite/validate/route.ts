@@ -23,19 +23,8 @@ export async function GET(request: Request) {
       )
     }
 
-    // Prüfen ob Einladung bereits verwendet wurde
-    if (invitation.used) {
-      return NextResponse.json(
-        { 
-          message: 'Diese Einladung wurde bereits verwendet.',
-          invitation: {
-            email: invitation.email,
-            name: invitation.name
-          }
-        },
-        { status: 400 }
-      )
-    }
+    // WICHTIG: "used" Status wird ignoriert - Link bleibt immer gültig
+    // Der "used" Status dient nur für Tracking-Zwecke, nicht für Zugriffskontrolle
 
     // Prüfen ob Einladung abgelaufen ist
     if (new Date() > invitation.expiresAt) {
@@ -62,8 +51,10 @@ export async function GET(request: Request) {
       })
     }
 
-    // Einladung als verwendet markieren
-    await UserService.markInvitationAsUsed(token)
+    // Einladung als verwendet markieren (nur beim ersten Mal)
+    if (!invitation.used) {
+      await UserService.markInvitationAsUsed(token)
+    }
 
     return NextResponse.json({
       success: true,
