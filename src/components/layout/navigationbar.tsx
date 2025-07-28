@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'; //das ist neu
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
