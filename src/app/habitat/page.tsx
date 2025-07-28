@@ -393,18 +393,6 @@ function HabitatPageContent() {
                 <Download className="h-4 w-4" />
                 Daten herunterladen
               </Button>
-              
-              {/* Button zum Löschen aller Einträge des Benutzers 
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                onClick={handleCleanupData}
-              >
-                <Trash2 className="h-4 w-4" />
-                Leere Einträge löschen
-              </Button>
-              */}
             </>
           )}
           {hasAdvancedPermissions && isExpert && (
