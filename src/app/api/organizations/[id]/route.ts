@@ -1,23 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuth } from '@clerk/nextjs/server';
-import { UserService } from '@/lib/services/user-service';
 import { OrganizationService } from '@/lib/services/organization-service';
+import { UserService } from '@/lib/services/user-service';
+import { requireAuth } from '@/lib/server-auth';
 
 // GET /api/organizations/[id] - Holt eine bestimmte Organisation
 export async function GET(
-  req: NextRequest,
+  req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const auth = getAuth(req);
-    const userId = auth.userId;
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    }
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
     
     // Hole die ID mit await
-    const id = params.id;
+    const { id } = await params;
     
     // Hol die Organisation nach ID
     const organization = await OrganizationService.findById(id);
@@ -35,26 +32,17 @@ export async function GET(
 
 // PATCH /api/organizations/[id] - Aktualisiert eine Organisation (nur für Admins)
 export async function PATCH(
-  req: NextRequest,
+  req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const auth = getAuth(req);
-    const userId = auth.userId;
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    }
-    
-    // Prüfe, ob der anfragende Benutzer ein Admin ist
-    const isAdmin = await UserService.isAdmin(userId);
-    
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
-    }
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
+    const isAdmin = await UserService.isAdmin(currentUser.email);
     
     // Hole die ID mit await
-    const id = params.id;
+    const { id } = await params;
     
     const body = await req.json();
     
@@ -77,26 +65,17 @@ export async function PATCH(
 
 // DELETE /api/organizations/[id] - Löscht eine Organisation (nur für Admins)
 export async function DELETE(
-  req: NextRequest,
+  req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const auth = getAuth(req);
-    const userId = auth.userId;
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    }
-    
-    // Prüfe, ob der anfragende Benutzer ein Admin ist
-    const isAdmin = await UserService.isAdmin(userId);
-    
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
-    }
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
+    const isAdmin = await UserService.isAdmin(currentUser.email);
     
     // Hole die ID mit await
-    const id = params.id;
+    const { id } = await params;
     
     // Prüfe, ob Organisation existiert
     const organization = await OrganizationService.findById(id);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useUser } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 
 interface UserConsent {
@@ -40,11 +40,10 @@ export function useUserConsent(redirectToProfile = true): UseUserConsentResult {
       }
 
       try {
-        const response = await fetch(`/api/users/${user.id}`);
+        const response = await fetch(`/api/users/${encodeURIComponent(user.email)}`);
         
         if (!response.ok) {
           if (response.status === 404) {
-            // Benutzer existiert noch nicht in der Datenbank
             setConsents(null);
             return;
           }

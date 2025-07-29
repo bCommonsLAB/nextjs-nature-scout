@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useUser, useClerk } from '@clerk/nextjs';
+import { useSession, signOut } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -23,8 +23,9 @@ import { InfoIcon, AlertTriangle } from "lucide-react";
 
 // Komponente für die Parameter-Verarbeitung
 function ProfileContent() {
-  const { user, isLoaded } = useUser();
-  const { signOut } = useClerk();
+  const { data: session, status } = useSession();
+  const user = session?.user;
+  const isLoaded = status !== 'loading';
   const router = useRouter();
   const searchParams = useSearchParams();
   const [userData, setUserData] = useState<any>(null);
@@ -67,7 +68,7 @@ function ProfileContent() {
       if (!isLoaded || !user) return;
 
       try {
-        const response = await fetch(`/api/users/${user.id}`);
+        const response = await fetch(`/api/users/${encodeURIComponent(user.email || '')}`);
         
         if (!response.ok) {
           throw new Error('Fehler beim Abrufen der Benutzerdaten');
@@ -105,7 +106,7 @@ function ProfileContent() {
         }
         
         const response = await fetch('/api/organizations', {
-          // Credentials mitschicken für Cookie-basierte Auth (Clerk Session)
+          // Credentials mitschicken für Cookie-basierte Auth
           credentials: 'include'
         });
         
@@ -177,7 +178,7 @@ function ProfileContent() {
       // "none" in null umwandeln für die Datenbank
       const orgIdToSave = selectedOrg === 'none' ? null : selectedOrg;
       
-      const response = await fetch(`/api/users/${user.id}`, {
+      const response = await fetch(`/api/users/${encodeURIComponent(user.email || '')}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -227,7 +228,7 @@ function ProfileContent() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/users/${user.id}`, {
+      const response = await fetch(`/api/users/${encodeURIComponent(user.email || '')}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -280,9 +281,7 @@ function ProfileContent() {
     setLogoutDialogOpen(false);
     
     try {
-      await signOut(() => {
-        router.push('/');
-      });
+      await signOut({ redirect: true, callbackUrl: '/' });
     } catch (error) {
       console.error('Fehler beim Abmelden:', error);
       // Fallback, falls signOut fehlschlägt
@@ -293,7 +292,7 @@ function ProfileContent() {
   // Navigiere zur Anmeldeseite, wenn der Benutzer nicht angemeldet ist
   useEffect(() => {
     if (isLoaded && !user) {
-      router.push('/anmelden');
+      router.push('/auth/login');
     }
   }, [isLoaded, user, router]);
 
@@ -338,11 +337,11 @@ function ProfileContent() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Name</h3>
-                <p className="mt-1">{userData?.name || user.fullName}</p>
+                <p className="mt-1">{userData?.name || user.name}</p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-gray-500">E-Mail</h3>
-                <p className="mt-1">{userData?.email || user.primaryEmailAddress?.emailAddress}</p>
+                <p className="mt-1">{userData?.email || user.email}</p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Rolle</h3>
@@ -456,7 +455,7 @@ function ProfileContent() {
           }} 
           disabled={isSubmitting}
         >
-          {isSubmitting ? 'Speichere...' : 'Organisationseinstellungen speichern'}
+          {isSubmitting ? 'Speichere...' : 'Profildaten speichern'}
         </Button>      
       </div>
 

@@ -47,10 +47,10 @@ export const HabitatCard: React.FC<HabitatCardProps> = ({
         <Image 
           src={imageSrc} 
           alt={title}
-          width={340}
-          height={240}
-          className="object-cover"
+          fill
+          className="habitat-image object-cover"
           priority={false}
+          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
         />
       </div>
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />

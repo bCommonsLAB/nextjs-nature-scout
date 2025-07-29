@@ -1,22 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuth } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
+import { requireAuth } from '@/lib/server-auth';
 
 /**
- * GET /api/users/isExpert - Überprüft, ob der aktuelle Benutzer ein Experte ist
+ * GET /api/users/isExpert - Prüft Experten-Rechte des aktuellen Benutzers
  */
-export async function GET(req: NextRequest) {
+export async function GET(req: Request) {
   try {
-    // Erhalte die Benutzer-ID aus der Clerk-Authentifizierung
-    const auth = getAuth(req);
-    const userId = auth.userId;
-    
-    if (!userId) {
-      return NextResponse.json({ isExpert: false }, { status: 401 });
-    }
-
-    // Überprüfe, ob der Benutzer Experte ist
-    const isExpert = await UserService.isExpert(userId);
+    const currentUser = await requireAuth();
+    const isExpert = await UserService.isExpert(currentUser.email);
     
     return NextResponse.json({ isExpert });
   } catch (error) {

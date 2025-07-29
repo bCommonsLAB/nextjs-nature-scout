@@ -1,12 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getPrompt, updatePrompt } from '@/lib/services/analysis-config-service';
 
 export async function GET(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { type: string } }
 ) {
   try {
-    const prompt = await getPrompt(params.type);
+    const { type } = await params;
+    const prompt = await getPrompt(type);
     if (!prompt) {
       return NextResponse.json(
         { error: 'Prompt nicht gefunden' },
@@ -24,7 +25,7 @@ export async function GET(
 }
 
 export async function POST(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { type: string } }
 ) {
   try {
@@ -39,7 +40,8 @@ export async function POST(
     }
 
     // Stelle sicher, dass der Name mit dem Typ übereinstimmt
-    if (promptData.name !== params.type) {
+    const { type } = await params;
+    if (promptData.name !== type) {
       return NextResponse.json(
         { error: 'Der Prompt-Name muss mit dem Typ übereinstimmen' },
         { status: 400 }

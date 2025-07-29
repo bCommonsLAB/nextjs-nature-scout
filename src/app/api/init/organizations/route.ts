@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuth } from '@clerk/nextjs/server';
-import { UserService } from '@/lib/services/user-service';
 import { OrganizationService } from '@/lib/services/organization-service';
+import { UserService } from '@/lib/services/user-service';
+import { requireAuth } from '@/lib/server-auth';
 import fs from 'fs';
 import path from 'path';
 
@@ -25,21 +25,22 @@ interface ImportStats {
  * GET /api/init/organizations - Importiert Organisationen aus der JSON-Datei
  * Nur für Admins zugänglich
  */
-export async function GET(req: NextRequest) {
+export async function GET(req: Request) {
   try {
-    // Auth-Check: Nur Admins dürfen Organisationen importieren
-    const auth = getAuth(req);
-    const userId = auth.userId;
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
+    const isAdmin = await UserService.isAdmin(currentUser.email);
     
-    if (!userId) {
-      return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    }
-    
-    const isAdmin = await UserService.isAdmin(userId);
-    
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
-    }
+    // const auth = getAuth(req);
+    // const userId = auth.userId;
+    // if (!userId) {
+    //   return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
+    // }
+    // const isAdmin = await UserService.isAdmin(userId);
+    // if (!isAdmin) {
+    //   return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
+    // }
     
     // Lese die JSON-Datei
     const filePath = path.join(process.cwd(), 'data', 'organisations.json');

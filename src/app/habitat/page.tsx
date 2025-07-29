@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
+import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { ShieldCheck, Plus, ShieldAlert, X, Download, Trash2 } from 'lucide-react';
 import { HabitateList } from './components/HabitateList';
@@ -66,6 +66,7 @@ interface HabitateData {
 function HabitatPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session, status } = useSession();
   
   const [data, setData] = useState<HabitateData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -392,18 +393,6 @@ function HabitatPageContent() {
                 <Download className="h-4 w-4" />
                 Daten herunterladen
               </Button>
-              
-              {/* Button zum Löschen aller Einträge des Benutzers 
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                onClick={handleCleanupData}
-              >
-                <Trash2 className="h-4 w-4" />
-                Leere Einträge löschen
-              </Button>
-              */}
             </>
           )}
           {hasAdvancedPermissions && isExpert && (
@@ -413,14 +402,15 @@ function HabitatPageContent() {
             </Button>
           )}
           
-          <SignedOut>
-            <SignInButton mode="modal">
-              <Button size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Anmelden zum Habitaterfassen
-              </Button>
-            </SignInButton>
-          </SignedOut>
+          {!session?.user && (
+            <Button 
+              size="sm"
+              onClick={() => router.push('/auth/login')}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Anmelden zum Habitaterfassen
+            </Button>
+          )}
         </div>
       </div>
       
@@ -571,20 +561,17 @@ function HabitatPageContent() {
               ? 'Es wurden keine Einträge gefunden, die Ihren Suchkriterien entsprechen.' 
               : 'Sie haben noch keine Habitaterfassungen durchgeführt.'}
           </p>
-          <SignedIn>
+          {session?.user ? (
             <Button onClick={() => router.push('/naturescout')}>
               <Plus className="mr-2 h-4 w-4" />
               Neues Habitat erfassen
             </Button>
-          </SignedIn>
-          <SignedOut>
-            <SignInButton mode="modal">
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Anmelden zum Habitaterfassen
-              </Button>
-            </SignInButton>
-          </SignedOut>
+          ) : (
+            <Button onClick={() => router.push('/auth/login')}>
+              <Plus className="mr-2 h-4 w-4" />
+              Anmelden zum Habitaterfassen
+            </Button>
+          )}
         </div>
       )}
       

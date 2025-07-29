@@ -1,46 +1,52 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server'
+import { withAuth } from 'next-auth/middleware'
 
-// Definiere öffentliche Routen mit createRouteMatcher
-const isPublicRoute = createRouteMatcher([
-  // Öffentliche Seiten
-  "/",
-  "/habitat/karte",
-  "/unsere-habitate",
-  "/api/public-filter-options",
-  
-  // API-Routen
-  "/api/habitat/public",
-  "/api/habitat/search",
-  "/api/habitat/categories",
-  "/api/habitat/categoriesDict",
-  "/api/organizations",
-  "/api/init/db-indexes",
-  
-  // Webhook-Routen
-  "/api/webhook/clerk",
-  
-  // Debug-Routen
-  "/api/debug/log",
-  
-  // Statische Assets
-  "/(.*).png",
-  "/(.*).jpg",
-  "/(.*).jpeg",
-  "/(.*).svg",
-  "/(.*).ico",
-  "/favicon.ico"
-]);
-
-// Verwende den Handler-Ansatz für die Middleware
-export default clerkMiddleware((auth, req) => {
-  // Wenn es eine öffentliche Route ist, schütze sie nicht
-  if (isPublicRoute(req)) {
-    return;
+// **AUTH.JS INTEGRIERTE** Middleware mit Authentifizierung
+export default withAuth(
+  function middleware(req) {
+    console.log(`[MIDDLEWARE] User: ${req.nextauth.token?.email}`)
+    return NextResponse.next()
+  },
+  {
+    callbacks: {
+      authorized: ({ token, req }) => {
+        // Öffentliche Routen erlauben
+        const publicRoutes = [
+          '/',
+          '/habitat/karte',
+          '/api/habitat/public',
+          '/api/public-filter-options',
+          '/api/organizations',
+                    '/auth/login',
+        '/auth/register',
+        '/auth/forgot-password',
+        '/auth/reset-password',
+        '/invite',
+        '/welcome'
+        ]
+        
+        const isPublicRoute = publicRoutes.some(route => 
+          req.nextUrl.pathname.startsWith(route)
+        )
+        
+        if (isPublicRoute) {
+          return true
+        }
+        
+        // Admin-Routen erfordern Admin-Rolle
+        if (req.nextUrl.pathname.startsWith('/admin')) {
+          return token?.role === 'admin' || token?.role === 'superadmin'
+        }
+        
+        // Alle anderen Routen erfordern Authentifizierung
+        return !!token
+      }
+    },
+    pages: {
+              signIn: '/auth/login'
+    }
   }
-  
-  // Alle anderen Routen sind geschützt
-  auth.protect();
-});
+)
 
 export const config = {
   matcher: [
@@ -49,4 +55,4 @@ export const config = {
     // Always run for API routes
     '/(api|trpc)(.*)',
   ],
-}; 
+} 

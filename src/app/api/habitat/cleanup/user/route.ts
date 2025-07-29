@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
-import { auth } from '@clerk/nextjs/server';
+import { requireAuth } from '@/lib/server-auth';
 import { UserService } from '@/lib/services/user-service';
 
 /**
@@ -8,25 +8,11 @@ import { UserService } from '@/lib/services/user-service';
  */
 export async function DELETE() {
   try {
-    // Authentifizierung überprüfen
-    const { userId } = await auth();
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Nicht autorisiert' },
-        { status: 401 }
-      );
-    }
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
+    const user = { email: currentUser.email };
     
-    // Benutzer-E-Mail-Adresse ermitteln
-    const user = await UserService.findByClerkId(userId);
-    
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Benutzer nicht gefunden' },
-        { status: 404 }
-      );
-    }
     
     // Verbindung zur Datenbank herstellen
     const db = await connectToDatabase();

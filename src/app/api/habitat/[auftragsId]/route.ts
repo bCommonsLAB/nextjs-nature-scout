@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
-import { auth } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
+import { requireAuth } from '@/lib/server-auth';
 
 export async function GET(
   request: Request, 
@@ -11,32 +11,15 @@ export async function GET(
   const jobId = auftragsId;
   
   try {
-    // Hole den aktuellen Benutzer und prüfe seine Berechtigungen
-    const { userId } = await auth();
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Nicht autorisiert' },
-        { status: 401 }
-      );
-    }
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userEmail = currentUser.email;
     
     // Überprüfen, ob Benutzer erweiterte Rechte hat (Admin oder Experte)
-    const isAdmin = await UserService.isAdmin(userId);
-    const isExpert = await UserService.isExpert(userId);
+    const isAdmin = await UserService.isAdmin(userEmail);
+    const isExpert = await UserService.isExpert(userEmail);
     const hasAdvancedPermissions = isAdmin || isExpert;
     
-    // Holen des Benutzers, um die E-Mail für die Filterung zu bekommen
-    const currentUser = await UserService.findByClerkId(userId);
-    
-    if (!currentUser) {
-      return NextResponse.json(
-        { error: 'Benutzer nicht gefunden' },
-        { status: 404 }
-      );
-    }
-    
-    const userEmail = currentUser.email;
     
     const db = await connectToDatabase();
     const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
@@ -77,23 +60,14 @@ export async function DELETE(
   const jobId = auftragsId;
   
   try {
-    // Hole den aktuellen Benutzer und prüfe seine Berechtigungen
-    const { userId } = await auth();
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Nicht autorisiert' },
-        { status: 401 }
-      );
-    }
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
     
     // Überprüfen, ob Benutzer erweiterte Rechte hat (Admin oder Experte)
     const isAdmin = await UserService.isAdmin(userId);
     const isExpert = await UserService.isExpert(userId);
     const hasAdvancedPermissions = isAdmin || isExpert;
-    
-    // Hole den Benutzer und den Eintrag
-    const currentUser = await UserService.findByClerkId(userId);
     
     if (!currentUser) {
       return NextResponse.json(
@@ -166,30 +140,14 @@ export async function POST(
   const jobId = auftragsId;
   
   try {
-    // Hole den aktuellen Benutzer und prüfe seine Berechtigungen
-    const { userId } = await auth();
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Nicht autorisiert' },
-        { status: 401 }
-      );
-    }
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
     
     // Überprüfen, ob Benutzer berechtigt ist (Admin oder Experte oder Ersteller)
     const isAdmin = await UserService.isAdmin(userId);
     const isExpert = await UserService.isExpert(userId);
     const hasAdvancedPermissions = isAdmin || isExpert;
-    
-    // Holen des Benutzers
-    const currentUser = await UserService.findByClerkId(userId);
-    
-    if (!currentUser) {
-      return NextResponse.json(
-        { error: 'Benutzer nicht gefunden' },
-        { status: 404 }
-      );
-    }
     
     const userEmail = currentUser.email;
     

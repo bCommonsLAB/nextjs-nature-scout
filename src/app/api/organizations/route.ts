@@ -1,20 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuth } from '@clerk/nextjs/server';
-import { UserService } from '@/lib/services/user-service';
 import { OrganizationService } from '@/lib/services/organization-service';
+import { UserService } from '@/lib/services/user-service';
+import { requireAuth } from '@/lib/server-auth';
 
 // GET /api/organizations - Holt alle Organisationen (für alle authentifizierten Benutzer)
 export async function GET(request: Request) {
   try {
-    const auth = getAuth(request);
-    const userId = auth.userId;
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    }
-    
-    // Prüfe, ob der anfragende Benutzer ein Admin ist - für erweiterte Informationen
-    const isAdmin = await UserService.isAdmin(userId);
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
+    const isAdmin = await UserService.isAdmin(currentUser.email);
     
     // Alle authentifizierten Benutzer können Organisationen sehen, ohne Admin-Überprüfung
     const organizations = await OrganizationService.getAllOrganizations();
@@ -35,15 +30,10 @@ export async function GET(request: Request) {
 // POST /api/organizations - Erstellt eine neue Organisation (nur für Admins)
 export async function POST(request: Request) {
   try {
-    const auth = getAuth(request);
-    const userId = auth.userId;
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    }
-    
-    // Nur Admins dürfen Organisationen erstellen
-    const isAdmin = await UserService.isAdmin(userId);
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
+    const isAdmin = await UserService.isAdmin(currentUser.email);
     
     if (!isAdmin) {
       return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });

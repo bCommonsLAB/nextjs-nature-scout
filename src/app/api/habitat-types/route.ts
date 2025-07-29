@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
-import { auth } from '@clerk/nextjs/server';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { validateHabitatType } from '@/lib/services/habitat-service';
-import { Document, WithId } from 'mongodb';
 
 // Typdefinitionen
 interface TestCase {
@@ -288,14 +285,6 @@ async function updateHabitatTypesWithMissingPlants(): Promise<UpdateResult> {
 
 export async function GET() {
   try {
-    // Authentifizierung prüfen
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Nicht autorisiert' },
-        { status: 401 }
-      );
-    }
     
     const db = await connectToDatabase();
     const collection = db.collection('habitatTypes');
@@ -335,14 +324,6 @@ export async function GET() {
 
 export async function POST() {
   try {
-    // Authentifizierung prüfen
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Nicht autorisiert' },
-        { status: 401 }
-      );
-    }
     
     // Prüfen, ob der Test-Images-Pfad existiert
     if (!process.env.HABITAT_TEST_IMAGES_PATH) {

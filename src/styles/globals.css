@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom CSS für Bildorientierung */
+@layer utilities {
+  /* Klasse für korrekte EXIF-Orientierung */
+  .image-orientation-correct {
+    image-orientation: from-image !important;
+  }
+  
+  /* Spezifische Klasse für Habitat-Bilder */
+  .habitat-image {
+    image-orientation: from-image !important;
+    object-fit: contain;
+    object-position: center;
+  }
+  
+  /* Klasse für Portrait-Bilder */
+  .image-portrait {
+    object-fit: contain;
+    object-position: center;
+  }
+  
+  /* Klasse für Landscape-Bilder */
+  .image-landscape {
+    object-fit: cover;
+    object-position: center;
+  }
+  
+  /* Responsive Bildanpassung */
+  .image-responsive {
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+  }
+}
+
+/* Globale Regel für alle Bilder - korrigiert EXIF-Orientierung */
+@layer base {
+  img {
+    image-orientation: from-image;
+  }
+  
+  /* Spezifisch für Next.js Image-Komponenten */
+  img[src*="ragtempproject.blob.core.windows.net"] {
+    image-orientation: from-image !important;
+  }
+}
+
+/* Weitere bestehende Styles... */ 

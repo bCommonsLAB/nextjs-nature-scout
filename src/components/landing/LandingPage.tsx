@@ -10,7 +10,7 @@ import { ArrowDown, ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Info, Sparkles } from "lucide-react";
 import Link from 'next/link';
-import { useUser } from "@clerk/nextjs";
+import { useUser } from "@/context/auth-context";
 //console.log('LandingPage wird gerendert');
 
 const colors = {
@@ -77,45 +77,6 @@ interface HabitatEntry {
   };
 }
 
-// Demohabitate, die durch echte Daten ersetzt werden
-const demoHabitats = [
-  { 
-    imageSrc: "/panoramasamples/magerwiese-artenreich.jpg", 
-    title: "Magerwiese artenreich", 
-    location: "Meran", 
-    recorder: "Anna Mayer",
-    status: "hochwertig",
-    org: "AVS Meran",
-    orgLogo: "/images/habitat-placeholder.jpg"
-  },
-  { 
-    imageSrc: "/panoramasamples/fettwiese-standard.jpg", 
-    title: "Fettwiese", 
-    location: "Brixen", 
-    recorder: "Thomas Hofer",
-    status: "standard",
-    org: "Heimatpflegeverband Südtirol",
-    orgLogo: "/images/habitat-placeholder.jpg"
-  },
-  { 
-    imageSrc: "/panoramasamples/verlandungsmoor.jpg", 
-    title: "Verlandungsmoor", 
-    location: "Bozen", 
-    recorder: "Lisa Pichler",
-    status: "gesetzlich",
-    org: "Klima Club Südtirol",
-    orgLogo: "/images/habitat-placeholder.jpg"
-  },
-  { 
-    imageSrc: "/panoramasamples/trockenrasen-kurzgrasig.jpg", 
-    title: "Trockenrasen kurzgrasig", 
-    location: "Schlanders", 
-    recorder: "Michael Gruber",
-    status: "gesetzlich",
-    org: "Umweltschutzgruppe Vinschgau",
-    orgLogo: "/images/habitat-placeholder.jpg"
-  }
-];
 
 export function NatureScoutPage() {
   //console.log('NatureScoutPage Component wird gerendert');
@@ -130,8 +91,10 @@ export function NatureScoutPage() {
     switch (schutzstatus?.toLowerCase()) {
       case 'gesetzlich geschützt':
         return 'gesetzlich';
-      case 'nicht gesetzlich geschützt, aber schützenswert':
+      case 'schützenswert':
+      case 'ökologisch hochwertig':
         return 'hochwertig';
+      case 'ökologisch niederwertig':
       case 'standardvegetation':
         return 'standard';
       default:
@@ -142,7 +105,8 @@ export function NatureScoutPage() {
   useEffect(() => {
     const fetchVerifiedHabitats = async () => {
       try {
-        const response = await fetch('/api/habitat/public?limit=4&sortBy=updatedAt&sortOrder=desc&verifizierungsstatus=verifiziert');
+        // Nur gesetzlich geschützte oder hochwertige Habitate laden
+        const response = await fetch('/api/habitat/public?limit=8&sortBy=updatedAt&sortOrder=desc&verifizierungsstatus=verifiziert&schutzstatus=gesetzlich geschützt,schützenswert,ökologisch hochwertig');
         
         if (!response.ok) {
           throw new Error('Fehler beim Laden der Habitat-Daten');
@@ -151,11 +115,18 @@ export function NatureScoutPage() {
         const data = await response.json();
         
         if (data.entries && data.entries.length > 0) {
+          // Debug: Logge die geladenen Habitate
+          console.log('Homepage - Geladene Habitate:', data.entries.map((entry: HabitatEntry) => ({
+            jobId: entry.jobId,
+            schutzstatus: entry.result?.schutzstatus,
+            mappedStatus: mapSchutzstatusToStatus(entry.result?.schutzstatus || '')
+          })));
+          
+          // Alle geladenen Habitate anzeigen (bis zu 8)
           setVerifiedHabitats(data.entries);
         }
       } catch (error) {
         console.error('Fehler beim Laden der verifizierten Habitate:', error);
-        // Fallback zu Demo-Daten bei Fehler
         setVerifiedHabitats([]);
       } finally {
         setIsLoading(false);
@@ -229,9 +200,9 @@ export function NatureScoutPage() {
           </section>
 
           <section className="landing-section flex overflow-hidden flex-col px-16 py-16 w-full bg-[#FAFFF3] max-md:px-5">
-            <h2>Zuletzt verifizierte Habitate</h2>
+            <h2>Wertvolle Habitate in Südtirol</h2>
             <div>
-              Diese Habitate wurden von engagierten Mitbürgern und Experten erfasst und verifiziert
+              Diese gesetzlich geschützten und ökologisch hochwertigen Habitate wurden von engagierten Mitbürgern und Experten erfasst und verifiziert
             </div>
             <div className="flex flex-col mt-10 w-full max-md:max-w-full">
               {isLoading ? (
@@ -240,9 +211,9 @@ export function NatureScoutPage() {
                 </div>
               ) : (
                 <div className="max-w-[1400px] mx-auto w-full">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 w-full max-md:max-w-full">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full max-md:max-w-full">
                     {verifiedHabitats.length > 0 && verifiedHabitats.map((habitat: HabitatEntry) => (
-                        <div key={habitat.jobId} className="aspect-w-16 aspect-h-9 w-full">
+                        <div key={habitat.jobId} className="aspect-square w-full">
                           <HabitatCard
                             imageSrc={habitat.metadata.bilder?.[0]?.url.replace('.jpg', '_low.jpg') || '/images/habitat-placeholder.jpg'}
                             title={habitat.result?.habitattyp || 'Unbekanntes Habitat'}

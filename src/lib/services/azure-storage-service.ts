@@ -25,14 +25,22 @@ export class AzureStorageService {
   }
 
   async uploadImage(filename: string, buffer: Buffer): Promise<string> {
-    const blobPath = `${this.uploadDir}/${filename}`;
-    const blockBlobClient = this.containerClient.getBlockBlobClient(blobPath);
-    
-    await blockBlobClient.upload(buffer, buffer.length, {
-      blobHTTPHeaders: { blobContentType: 'image/jpeg' }
-    });
-    
-    return `${this.baseUrl}/${blobPath}`;
+    try {
+      const blobName = `${this.uploadDir}/${filename}`;
+      const blockBlobClient = this.containerClient.getBlockBlobClient(blobName);
+      
+      await blockBlobClient.uploadData(buffer, {
+        blobHTTPHeaders: {
+          blobContentType: 'image/jpeg',
+          blobCacheControl: 'no-cache, no-store, must-revalidate' // Cache-Control Header
+        }
+      });
+      
+      return `${this.baseUrl}/${blobName}`;
+    } catch (error) {
+      console.error('Fehler beim Upload des Bildes:', error);
+      throw new Error(`Upload fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
+    }
   }
 
   getImageUrl(filename: string): string {
@@ -40,7 +48,7 @@ export class AzureStorageService {
   }
 
   // Neue Methode: Alle gespeicherten Bilder im angegebenen Verzeichnis abrufen
-  async getStoredImages(): Promise<Array<{ url: string; filename: string }>> {
+  async getStoredImages(): Promise<Array<{ url: string; filename: string; size: number; lastModified: string }>> {
     const images = [];
     
     // Nur Dateien im Upload-Verzeichnis auflisten
@@ -55,7 +63,12 @@ export class AzureStorageService {
         // Dateiname extrahieren (ohne Pfad)
         const filename = blob.name.substring(dirPrefix.length);
         
-        images.push({ url, filename });
+        images.push({ 
+          url, 
+          filename,
+          size: blob.properties.contentLength || 0,
+          lastModified: blob.properties.lastModified?.toISOString() || new Date().toISOString()
+        });
       }
     } catch (error) {
       console.error('Fehler beim Abrufen der gespeicherten Bilder:', error);

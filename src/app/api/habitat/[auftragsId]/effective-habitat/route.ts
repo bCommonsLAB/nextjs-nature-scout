@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
-import { auth } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
+import { requireAuth } from '@/lib/server-auth';
 
 export async function PATCH(
   request: Request,
@@ -12,19 +12,11 @@ export async function PATCH(
   const jobId = auftragsId;
   
   try {
-    // Hole den aktuellen Benutzer und prüfe seine Berechtigungen
-    const { userId } = await auth();
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Nicht autorisiert' },
-        { status: 401 }
-      );
-    }
-    
-    // Nur Experten und Admins dürfen den effektiven Habitat bearbeiten
-    const isAdmin = await UserService.isAdmin(userId);
-    const isExpert = await UserService.isExpert(userId);
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
+    const isAdmin = await UserService.isAdmin(currentUser.email);
+    const isExpert = await UserService.isExpert(currentUser.email);
     
     if (!isAdmin && !isExpert) {
       return NextResponse.json(
@@ -47,9 +39,7 @@ export async function PATCH(
     const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
     const habitatTypesCollection = db.collection('habitatTypes');
     
-    // Für die Protokollierung den Benutzer und den aktuellen Eintrag abrufen
-    const currentUser = await UserService.findByClerkId(userId);
-    const userName = currentUser ? currentUser.name : 'Unbekannter Benutzer';
+    const userName = currentUser.name;
     
     // Aktuellen Eintrag abrufen
     const entry = await collection.findOne({ jobId });

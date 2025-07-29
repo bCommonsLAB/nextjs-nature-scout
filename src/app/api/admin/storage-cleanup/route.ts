@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
-import { auth } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
 import { AzureStorageService } from '@/lib/services/azure-storage-service';
+import { requireAuth } from '@/lib/server-auth';
 import sharp from 'sharp';
 
 // Interface für die Bildmetadaten
@@ -15,19 +15,18 @@ interface StorageImage {
 
 // Nur Admin-Zugriff
 async function checkAdminAccess() {
-  const { userId } = await auth();
-  
-  if (!userId) {
+  try {
+    const currentUser = await requireAuth();
+    const isAdmin = await UserService.isAdmin(currentUser.email);
+    
+    if (!isAdmin) {
+      return { isAdmin: false, error: 'Keine Administratorrechte' };
+    }
+    
+    return { isAdmin: true, error: null, user: currentUser };
+  } catch (error) {
     return { isAdmin: false, error: 'Nicht angemeldet' };
   }
-  
-  const isAdmin = await UserService.isAdmin(userId);
-  
-  if (!isAdmin) {
-    return { isAdmin: false, error: 'Keine Administratorrechte' };
-  }
-  
-  return { isAdmin: true, error: null };
 }
 
 // Liste aller Bilder aus Azure Storage abrufen

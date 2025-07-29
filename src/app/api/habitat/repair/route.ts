@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
-import { auth } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
+import { requireAuth } from '@/lib/server-auth';
 
 /**
  * POST /api/habitat/repair
@@ -10,25 +10,25 @@ import { UserService } from '@/lib/services/user-service';
  */
 export async function POST(request: Request) {
   try {
-    // Hole den aktuellen Benutzer und prüfe seine Berechtigungen
-    const { userId } = await auth();
+    // Echte Authentifizierung
+    const currentUser = await requireAuth();
+    const userId = currentUser.email;
+    const isAdmin = await UserService.isAdmin(currentUser.email);
     
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Nicht autorisiert' },
-        { status: 401 }
-      );
-    }
-    
-    // Überprüfen, ob Benutzer Admin-Rechte hat
-    const isAdmin = await UserService.isAdmin(userId);
-    
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Diese Funktion ist nur für Administratoren verfügbar' },
-        { status: 403 }
-      );
-    }
+    // const { userId } = await auth();
+    // if (!userId) {
+    //   return NextResponse.json(
+    //     { error: 'Nicht autorisiert' },
+    //     { status: 401 }
+    //   );
+    // }
+    // const isAdmin = await UserService.isAdmin(userId);
+    // if (!isAdmin) {
+    //   return NextResponse.json(
+    //     { error: 'Diese Funktion ist nur für Administratoren verfügbar' },
+    //     { status: 403 }
+    //   );
+    // }
     
     const db = await connectToDatabase();
     const habitats = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');

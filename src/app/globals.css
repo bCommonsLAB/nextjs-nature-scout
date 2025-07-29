@@ -6,49 +6,6 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Fix: Clerk-Komponenten müssen einen höheren z-index als Radix-Dialoge haben */
-.cl-userButtonPopoverCard,
-.cl-userButtonPopoverFooter,
-.cl-userButtonPopoverActions,
-.cl-userButtonPopover,
-.cl-popoverCard,
-.cl-internal-b3fm6y {
-  z-index: 200 !important;
-}
-
-/* Fix für das Sheet-Dialog-Overlay */
-[data-state="open"].fixed.inset-0.z-50 {
-  z-index: 49 !important; /* Verringere den z-index des Overlays unter dem von Clerk */
-}
-
-/* Fix für SheetContent, um Clerk-Komponenten nicht zu überlagern */
-div[role="dialog"][data-state="open"].fixed.z-50 {
-  z-index: 49 !important;
-}
-
-/* Fix: Clerk-Button sollte Pointer-Events erhalten, auch innerhalb des Sheet-Dialogs */
-[data-clerk-component="UserButton"],
-.cl-userButtonTrigger,
-.cl-rootBox,
-[data-clerk-component-wrapper] *,
-.cl-userButtonPopoverCard *,
-.cl-internal-b3fm6y * {
-  position: relative;
-  z-index: 200 !important;
-  pointer-events: auto !important;
-}
-
-/* Spezifischer Fix für den Clerk-Button im mobilen Menü */
-.clerk-user-button-container {
-  isolation: isolate;
-  z-index: 200 !important;
-  position: relative;
-}
-
-/* Stelle sicher, dass der SheetContent dem Clerk-Dropdown Platz lässt */
-div[role="dialog"][data-state="open"] .clerk-user-button-container {
-  margin-bottom: 120px; /* Genug Platz für das Clerk-Dropdown */
-}
 
 .leaflet-crosshair {
   display: block;

@@ -211,7 +211,8 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
                             alt="Vorschaubild"
                             width={120}
                             height={90}
-                            className="object-cover rounded"
+                            unoptimized={true}
+                            className="habitat-image rounded"
                           />
                           <button 
                             onClick={(e) => {
@@ -341,7 +342,8 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
               alt="Große Vorschau"
               width={1200}
               height={800}
-              className="max-h-[85vh] object-contain"
+              unoptimized={true}
+              className="habitat-image max-h-[85vh]"
             />
           </div>
         </div>

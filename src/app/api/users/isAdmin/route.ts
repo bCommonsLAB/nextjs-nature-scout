@@ -1,22 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuth } from '@clerk/nextjs/server';
 import { UserService } from '@/lib/services/user-service';
+import { requireAuth } from '@/lib/server-auth';
 
 /**
- * GET /api/users/isAdmin - Überprüft, ob der aktuelle Benutzer Admin-Rechte hat
+ * GET /api/users/isAdmin - Prüft Admin-Rechte des aktuellen Benutzers
  */
-export async function GET(req: NextRequest) {
+export async function GET(req: Request) {
   try {
-    // Erhalte die Benutzer-ID aus der Clerk-Authentifizierung
-    const auth = getAuth(req);
-    const userId = auth.userId;
-    
-    if (!userId) {
-      return NextResponse.json({ isAdmin: false }, { status: 401 });
-    }
-
-    // Überprüfe, ob der Benutzer Admin-Rechte hat
-    const isAdmin = await UserService.isAdmin(userId);
+    const currentUser = await requireAuth();
+    const isAdmin = await UserService.isAdmin(currentUser.email);
     
     return NextResponse.json({ isAdmin });
   } catch (error) {

@@ -1,16 +1,6 @@
-import { SignIn } from "@clerk/nextjs";
+import { redirect } from 'next/navigation'
 
 export default function SignInPage() {
-  return (
-    <div className="flex justify-center items-center py-12">
-      <SignIn 
-        appearance={{
-          elements: {
-            rootBox: "mx-auto",
-            card: "shadow-lg rounded-lg",
-          }
-        }}
-      />
-    </div>
-  );
+  // Weiterleitung zur neuen Anmeldeseite
+  redirect('/auth/login')
 } 

@@ -3,7 +3,13 @@
 import { useState, useEffect } from 'react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2 } from 'lucide-react';
+import { Loader2, Info } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface FilterOption {
   value: string;
@@ -15,6 +21,7 @@ interface MultiSelectFilterProps {
   value: string[];
   onValueChange: (values: string[]) => void;
   placeholder: string;
+  showInfoTooltip?: boolean;
 }
 
 export function MultiSelectFilter({
@@ -22,6 +29,7 @@ export function MultiSelectFilter({
   value,
   onValueChange,
   placeholder,
+  showInfoTooltip = false,
 }: MultiSelectFilterProps) {
   const [options, setOptions] = useState<FilterOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -93,10 +101,31 @@ export function MultiSelectFilter({
   // Berechne die Höhe basierend auf der Anzahl der Optionen (26px pro Option, maximal 7 Optionen)
   const height = Math.min(options.length, 7) * 25;
   
+  // Wenn keine Optionen vorhanden sind und nicht geladen wird, nichts anzeigen
+  if (!loading && options.length === 0 && !error) {
+    return null;
+  }
+  
   return (
     <div className="space-y-2">
       <div className="flex justify-between items-center mb-1">
-        <h3 className="text-sm font-medium">{placeholder} ({totalCount})</h3>
+        <div className="flex items-center gap-1">
+          <h3 className="text-sm font-medium">{placeholder} ({totalCount})</h3>
+          {showInfoTooltip && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-xs">
+                    Erfasser werden nur angezeigt, wenn sie dies ausdrücklich in ihrem Profil wünschen.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
       </div>
       
       {loading ? (
