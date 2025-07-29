@@ -58,6 +58,29 @@ jobs:
 
       - name: Build application
         run: pnpm build
+        env:
+          OPENAI_API_KEY: dummy-key
+          NEXTAUTH_SECRET: dummy-secret-for-build
+          NEXTAUTH_URL: http://localhost:3000
+          MONGODB_URI: mongodb://localhost:27017
+          MONGODB_DATABASE_NAME: naturescout
+          MONGODB_COLLECTION_NAME: analyseJobs
+          MAILJET_API_KEY: dummy-key
+          MAILJET_API_SECRET: dummy-secret
+          MAILJET_FROM_EMAIL: noreply@example.com
+          MAILJET_FROM_NAME: NatureScout
+          OPENAI_CHAT_MODEL: gpt-4
+          OPENAI_VISION_MODEL: gpt-4-vision-preview
+          OPENAI_TRANSCRIPTION_MODEL: whisper-1
+          AZURE_STORAGE_CONNECTION_STRING: dummy-connection
+          AZURE_STORAGE_CONTAINER_NAME: naturescout
+          GOOGLE_MAPS_API_KEY: dummy-key
+          PLANTNET_API_KEY: dummy-key
+          NEXT_PUBLIC_MAX_IMAGE_WIDTH: 2000
+          NEXT_PUBLIC_MAX_IMAGE_HEIGHT: 2000
+          NEXT_PUBLIC_MAX_IMAGE_QUALITY: 0.8
+          NEXT_PUBLIC_BASE_URL: http://localhost:3000
+          HABITAT_TEST_IMAGES_PATH: /app/public/test-images
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
