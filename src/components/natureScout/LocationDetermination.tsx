@@ -4,12 +4,12 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { NatureScoutData, GeocodingResult } from "@/types/nature-scout";
 import dynamic from 'next/dynamic';
 import { Button } from "@/components/ui/button";
-import { MoveIcon, MapPinCheck, RefreshCw, CircleDashed, LocateFixed } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { LocateFixed, AlertTriangle, X } from "lucide-react";
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
-import { InstructionDialog } from "@/components/ui/instruction-dialog";
+
 import type { MapNoSSRHandle } from "@/components/map/MapNoSSR";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useRouter, useSearchParams } from "next/navigation";
 
 // Dynamisch geladene Karte ohne SSR
@@ -227,16 +227,22 @@ function convertToMapHabitat(apiHabitat: HabitatFromAPI): MapHabitat | null {
 export function LocationDetermination({ 
   metadata, 
   setMetadata,
-  showHelp,
-  onHelpShown,
-  scrollToNext
+  scrollToNext,
+  mapMode: forcedMapMode
 }: { 
   metadata: NatureScoutData; 
   setMetadata: React.Dispatch<React.SetStateAction<NatureScoutData>>;
-  showHelp?: boolean;
-  onHelpShown?: () => void;
   scrollToNext?: () => void;
+  mapMode?: 'navigation' | 'polygon';
 }) {
+  // Debug: Component Mount/Unmount tracking
+  useEffect(() => {
+    console.log('🏔️ LocationDetermination MOUNTED mit mapMode:', forcedMapMode);
+    return () => {
+      console.log('🏔️ LocationDetermination UNMOUNTED');
+    };
+  }, []);
+
   // Grundlegende Zustände für die Map
   // GPS-Standort des Nutzers - unabhängig vom Habitat
   const [currentPosition, setCurrentPosition] = useState<[number, number]>([0, 0]);
@@ -258,12 +264,17 @@ export function LocationDetermination({
   // Zustand für das Anzeigen des GPS-Statusbadges
   const [showGpsStatus, setShowGpsStatus] = useState<boolean>(true);
   
-  // Initialposition für die Karte - kann vom Habitat oder Standard-Fallback kommen
-  const initialMapPosition: [number, number] = [
-    // Für die Kartenzentriernung bei Bearbeitung eines Habitats
-    metadata.latitude && metadata.latitude !== 0 ? metadata.latitude : 46.724212, 
-    metadata.longitude && metadata.longitude !== 0 ? metadata.longitude : 11.65555
-  ];
+  // Initialposition für die Karte - kann vom Habitat oder Standard-Fallback kommen  
+  // WICHTIG: Mit useMemo memoized, um Neuinitialisierung der Karte zu verhindern
+  const initialMapPosition: [number, number] = useMemo(() => {
+    const position: [number, number] = [
+      // Für die Kartenzentriernung bei Bearbeitung eines Habitats
+      metadata.latitude && metadata.latitude !== 0 ? metadata.latitude : 46.724212, 
+      metadata.longitude && metadata.longitude !== 0 ? metadata.longitude : 11.65555
+    ];
+    console.log('🎯 initialMapPosition berechnet:', position);
+    return position;
+  }, [metadata.latitude, metadata.longitude]);
   
   // Flag, das bestimmt, ob bereits auf GPS-Position gezoomt wurde
   const [hasZoomedToGPS, setHasZoomedToGPS] = useState(false);
@@ -301,10 +312,18 @@ export function LocationDetermination({
     return hasExistingCoordinates ? 20 : 13;
   });
   
-  const [mapMode, setMapMode] = useState<MapMode>('navigation');
+  const [mapMode, setMapMode] = useState<MapMode>(forcedMapMode || 'navigation');
   const [polygonPoints, setPolygonPoints] = useState<Array<[number, number]>>(
     metadata.polygonPoints || []
   );
+  
+  // MapMode bei Änderung des forcedMapMode aktualisieren
+  useEffect(() => {
+    if (forcedMapMode) {
+      console.log(`🗺️ MapMode wechselt von "${mapMode}" zu "${forcedMapMode}" (ohne Karten-Neuinitialisierung)`);
+      setMapMode(forcedMapMode);
+    }
+  }, [forcedMapMode, mapMode]);
   
   // Zustände für bestehende Habitate
   const [existingHabitats, setExistingHabitats] = useState<MapHabitat[]>([]);
@@ -324,6 +343,9 @@ export function LocationDetermination({
   const [areaInSqMeters, setAreaInSqMeters] = useState<number>(
     metadata.plotsize || 0
   );
+  
+  // Zustand für schöne Polygon-Warnung
+  const [showPolygonWarning, setShowPolygonWarning] = useState<boolean>(false);
   
   // Hilfsdialog-Zustände
   const [dontShowWelcomeAgain, setDontShowWelcomeAgain] = useState<boolean>(
@@ -742,28 +764,7 @@ export function LocationDetermination({
     }
   };
 
-  // Modus wechseln
-  const toggleMapMode = (mode: MapMode) => {
-    // Wenn der aktuelle Modus bereits der gewählte Modus ist, auf 'none' setzen
-    const newMode = mapMode === mode ? 'none' : mode;
-    
-    setMapMode(newMode);
-    
-    // Standortinformationen im 'none'-Modus immer anzeigen
-    if (newMode === 'none') {
-      setShowLocationInfo(true);
-    }
-    
-    // Habitat-Auswahl zurücksetzen beim Moduswechsel
-    if (selectedHabitatId) {
-      setSelectedHabitatId(null);
-    }
-    
-    // Dialog für Polygon-Modus anzeigen, nur wenn "Nicht mehr anzeigen" nicht aktiviert ist
-    if (newMode === 'polygon' && !dontShowPolygonAgain) {
-      setShowPolygonPopup(true);
-    }
-  };
+  // MapMode wird jetzt extern gesteuert - keine interne Toggle-Funktion mehr nötig
 
   // Polygon abschließen
   const savePolygon = async () => {
@@ -774,15 +775,10 @@ export function LocationDetermination({
       // Im Bearbeitungsmodus die aktuellen Punkte direkt aus der Karte extrahieren
       const currentPoints = mapRef.current?.getCurrentPolygonPoints() || [];
       
-      const message = 
-          "Der Habitat-Umriss ist noch nicht geschlossen.\n\n" +
-          "Bitte klicken Sie zum Abschluss wieder auf den ersten Punkt, damit ein geschlossenes Polygon entsteht. " +
-          "Ein korrekt geschlossener Umriss ist wichtig für die Berechnung der Fläche und die Lagebestimmung.";
-        
       // Prüfen, ob genug Punkte vorhanden sind
       if (currentPoints.length < 3) {
         setIsSavingPolygon(false);
-        alert(message);
+        setShowPolygonWarning(true); // Schöne UI-Warnung anzeigen
         return;
       }
       
@@ -810,9 +806,6 @@ export function LocationDetermination({
       
       // Standortinformationen für das Habitat abrufen (nicht für den Nutzerstandort)
       await getGeoDataFromCoordinates(centerLat, centerLng);
-      
-      // Explizit den "none"-Modus setzen, um anzuzeigen, dass wir fertig sind
-      setMapMode('none');
       
       // Zum Weiter-Button scrollen, nachdem alles gespeichert wurde
       if (scrollToNext) {
@@ -888,6 +881,16 @@ export function LocationDetermination({
     // Debugging-Information in der Konsole ausgeben
     console.log('Neuer Status showGpsStatus:', !showGpsStatus);
   }, [showGpsStatus]);
+
+  // Effekt zum automatischen Ausblenden der Polygon-Warnung
+  useEffect(() => {
+    if (showPolygonWarning) {
+      const timer = setTimeout(() => {
+        setShowPolygonWarning(false);
+      }, 5000); // 5 Sekunden
+      return () => clearTimeout(timer);
+    }
+  }, [showPolygonWarning]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)]">
@@ -1194,63 +1197,32 @@ export function LocationDetermination({
           </div>
         )}
         
-        {/* UI-Overlay: Modus-Buttons (unten links) mit Aktions-Buttons */}
-        <div className="absolute bottom-0 left-0 right-0 z-[9999] bg-white/20 backdrop-blur-sm p-1 shadow-lg">
-          <div className="text-sm font-medium mb-0 px-3">Modus</div>
-          <div className="flex items-center justify-between px-3 p-2">
-            <div className="flex items-center">
-              <ToggleGroup type="single" value={mapMode === 'none' ? undefined : mapMode} className="bg-muted/30 p-1 rounded-md">
-                <ToggleGroupItem 
-                  value="navigation"
-                  onClick={() => toggleMapMode('navigation')}
-                  size="icon"
-                  className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=off]:bg-secondary data-[state=off]:text-secondary-foreground hover:bg-accent hover:text-accent-foreground h-8 w-8"
-                  aria-label="Navigation"
-                >
-                  <MoveIcon className="h-4 w-4" />
-                </ToggleGroupItem>
-                
-                <ToggleGroupItem 
-                  value="polygon"
-                  onClick={() => toggleMapMode('polygon')}
-                  size="icon"
-                  className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=off]:bg-secondary data-[state=off]:text-secondary-foreground hover:bg-accent hover:text-accent-foreground h-8 w-8"
-                  aria-label="Polygon"
-                >
-                  <CircleDashed className="h-4 w-4" />
-                </ToggleGroupItem>
-              </ToggleGroup>
-
-              {/* Speichern und Neu als normale Buttons auf der gleichen Höhe */}
-              {mapMode === 'polygon' && (
-                <>
-                  <div className="mx-2" />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={savePolygon}
-                    disabled={isSavingPolygon}
-                    className="h-8 text-xs"
-                  >
-                    {isSavingPolygon ? 'Speichern...' : 'Speichern'}
-                  </Button>
-                  
-                  <div className="ml-1" />
-                  
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={restartPolygon}
-                    disabled={isSavingPolygon}
-                    className="h-8 text-xs"
-                  >
-                    Neu
-                  </Button>
-                </>
-              )}
+        {/* UI-Overlay: Aktions-Buttons für Polygon-Modus (unten zentriert) */}
+        {mapMode === 'polygon' && (
+          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-[9999] bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={savePolygon}
+                disabled={isSavingPolygon}
+                className="h-8 text-xs"
+              >
+                {isSavingPolygon ? 'Speichern...' : 'Umriss speichern'}
+              </Button>
+              
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={restartPolygon}
+                disabled={isSavingPolygon}
+                className="h-8 text-xs"
+              >
+                Neu beginnen
+              </Button>
             </div>
           </div>
-        </div>
+        )}
         
         {/* UI-Overlay: Aktions-Buttons (oben links) */}
         {mapMode !== 'polygon' && (
@@ -1285,43 +1257,37 @@ export function LocationDetermination({
         )}
         {/* Entferne alte Buttons für Speichern/Neu (wurden nach oben verschoben) */}
         {!showLocationInfo && (
-          <></>
+          <>
+            {/* Schöne Polygon-Warnung */}
+            {showPolygonWarning && (
+              <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-[9999] max-w-sm">
+                <Alert className="bg-amber-50 border-amber-200 text-amber-800 shadow-lg">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <div className="flex justify-between items-start">
+                    <AlertDescription className="flex-grow pr-2">
+                      <div className="font-semibold mb-1">Polygon nicht geschlossen</div>
+                      <div className="text-sm">
+                        Bitte klicken Sie zum Abschluss wieder auf den ersten Punkt, 
+                        damit ein geschlossenes Polygon entsteht.
+                      </div>
+                    </AlertDescription>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-amber-600 hover:text-amber-800 hover:bg-amber-100"
+                      onClick={() => setShowPolygonWarning(false)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </Alert>
+              </div>
+            )}
+          </>
         )}
       </div>
       
-      {/* Willkommens-Dialog */}
-      <InstructionDialog
-        open={showWelcomePopup}
-        onOpenChange={(open) => {
-          setShowWelcomePopup(open);
-          // Wenn der Dialog geschlossen wird und es war ein Hilfe-Klick, den onHelpShown-Callback aufrufen
-          if (!open && showHelp && onHelpShown) {
-            onHelpShown();
-          }
-        }}
-        title="Modus 'Karte verschieben'"
-        content="Verschieben Sie den Kartenausschnitt zu Ihrem Habitat und zoomen Sie so weit wie möglich hinein. Wechsel Sie unten links dann den Modus 'Habitat eingrenzen'."
-        dontShowAgain={dontShowWelcomeAgain}
-        onDontShowAgainChange={saveWelcomePreference}
-        skipDelay={!!showHelp}
-      />
-      
-      {/* Polygon-Dialog */}
-      <InstructionDialog
-        open={showPolygonPopup}
-        onOpenChange={(open) => {
-          setShowPolygonPopup(open);
-          // Wenn der Dialog geschlossen wird und es war ein Hilfe-Klick, den onHelpShown-Callback aufrufen
-          if (!open && showHelp && onHelpShown) {
-            onHelpShown();
-          }
-        }}
-        title="Modus 'Habitat eingrenzen'"
-        content="Klicken Sie auf die Karte, um Eckpunkte des Habitat-Umrisses im Uhrzeigersinn zu setzen. Sie benötigen mindestens 3 Punkte. Abschließend klicken Sie auf das 'Speichern'-Symbol."
-        dontShowAgain={dontShowPolygonAgain}
-        onDontShowAgainChange={savePolygonPreference}
-        skipDelay={!!showHelp}
-      />
+
       
       {/* Vollbild-Overlay während des Speichervorgangs */}
       {isSavingPolygon && (

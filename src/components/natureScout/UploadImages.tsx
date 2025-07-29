@@ -2,14 +2,12 @@
 
 import { NatureScoutData, Bild, PlantNetResult } from "@/types/nature-scout";
 import { GetImage } from "./GetImage";
-import { InstructionDialog } from "@/components/ui/instruction-dialog";
+
 import { useState, useEffect } from "react";
 
 interface UploadImagesProps {
   metadata: NatureScoutData;
   setMetadata: React.Dispatch<React.SetStateAction<NatureScoutData>>;
-  showHelp?: boolean;
-  onHelpShown?: () => void;
   scrollToNext?: () => void;
   onUploadActiveChange?: (isActive: boolean) => void;
 }
@@ -17,8 +15,6 @@ interface UploadImagesProps {
 export function UploadImages({ 
   metadata, 
   setMetadata, 
-  showHelp, 
-  onHelpShown,
   scrollToNext,
   onUploadActiveChange
 }: UploadImagesProps) {
@@ -30,34 +26,7 @@ export function UploadImages({
     "Detailbild_2": false
   });
   
-  // States für den Dialog
-  const [showBilderPopup, setShowBilderPopup] = useState(false);
-  const [dontShowBilderAgain, setDontShowBilderAgain] = useState(false);
-  
-  // Bei erstem Rendern prüfen, ob der Dialog bereits angezeigt wurde
-  useEffect(() => {
-    const dontShowDialogAgain = localStorage.getItem('dontShowBilderUploadDialog') === 'true';
-    setDontShowBilderAgain(dontShowDialogAgain);
-    
-    // Beim ersten Laden die Einstellung berücksichtigen
-    if (!dontShowDialogAgain) {
-      setShowBilderPopup(true);
-    }
-  }, []); // Leere Abhängigkeitsliste -> wird nur einmal beim Mounten ausgeführt
-  
-  // Separater useEffect für showHelp-Änderungen
-  useEffect(() => {
-    // Wenn der Hilfe-Button geklickt wurde, Dialog anzeigen
-    if (showHelp === true) {
-      setShowBilderPopup(true);
-    }
-  }, [showHelp]);
-  
-  // Speichere die Benutzereinstellung für "Nicht mehr anzeigen"
-  const saveBilderDialogPreference = (dontShowAgain: boolean) => {
-    setDontShowBilderAgain(dontShowAgain);
-    localStorage.setItem('dontShowBilderUploadDialog', dontShowAgain.toString());
-  };
+
 
   const setUploadStatus = (imageKey: string, isUploading: boolean) => {
     setActiveUploads(prev => ({
@@ -159,23 +128,7 @@ export function UploadImages({
         </div>
       </div>
       
-      {/* Bilder-Upload-Dialog */}
-      <InstructionDialog
-        open={showBilderPopup}
-        onOpenChange={(open) => {
-          setShowBilderPopup(open);
-          // Wenn der Dialog geschlossen wird und es war ein Hilfe-Klick, den onHelpShown-Callback aufrufen
-          if (!open && showHelp && onHelpShown) {
-            onHelpShown();
-          }
-        }}
-        title="Bilder erfassen"
-        content="Klicken sie auf ein Bild und fotografieren es mit der Kamera oder laden sie ein Bild hoch. Das Prozedere ist je nach Gerät unterschiedlich. Manchmal müssen sie der Anwendung auch Zugriff auf ihre Kamera erlauben. Bitte ein Panoramabild, eine Detailansicht und zwei typische Pflanzenarten hoch. Die Detailbilder von Pflanzen werden automatisch analysiert, um bei der Bestimmung des Habitattyps zu helfen."
-        dontShowAgain={dontShowBilderAgain}
-        onDontShowAgainChange={saveBilderDialogPreference}
-        skipDelay={showHelp === true}
-        showDontShowAgain={true}
-      />
+
     </div>
   );
 } 

@@ -5,55 +5,21 @@ import Image from "next/image";
 import { useUser } from "@/context/auth-context";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NatureScoutData } from "@/types/nature-scout";
-import { InstructionDialog } from "@/components/ui/instruction-dialog";
+
 import { Button } from "@/components/ui/button";
 
 export function Welcome({ 
   metadata, 
   setMetadata, 
-  showHelp, 
-  onHelpShown,
   scrollToNext,
   onSkipToImages
 }: { 
   metadata: NatureScoutData; 
   setMetadata: React.Dispatch<React.SetStateAction<NatureScoutData>>;
-  showHelp?: boolean;
-  onHelpShown?: () => void;
   scrollToNext?: () => void;
   onSkipToImages?: () => void;
 }) {
   const { user, isLoaded } = useUser();
-  
-  // State für den Willkommens-Dialog
-  const [showWelcomeGuide, setShowWelcomeGuide] = useState<boolean>(false);
-  
-  // Status für "Nicht mehr anzeigen" Checkbox
-  const [dontShowWelcomeGuideAgain, setDontShowWelcomeGuideAgain] = useState<boolean>(
-    // Versuche aus localStorage zu laden
-    typeof window !== 'undefined' ? localStorage.getItem('dontShowWelcomeGuideAgain') === 'true' : false
-  );
-  
-  // Beim ersten Laden Dialog anzeigen, wenn "Nicht mehr anzeigen" nicht aktiviert ist
-  useEffect(() => {
-    // Wenn "Nicht mehr anzeigen" aktiviert ist, Dialog nicht anzeigen
-    if (dontShowWelcomeGuideAgain) return;
-    
-    // Sonst den Dialog sofort aktivieren, die Verzögerung erfolgt in der InstructionDialog-Komponente
-    setShowWelcomeGuide(true);
-  }, [dontShowWelcomeGuideAgain]);
-  
-  // useEffect um dontShowWelcomeGuideAgain im localStorage zu speichern
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('dontShowWelcomeGuideAgain', dontShowWelcomeGuideAgain.toString());
-      
-      // Wenn "Nicht mehr anzeigen" aktiviert ist, Popup nicht anzeigen
-      if (dontShowWelcomeGuideAgain) {
-        setShowWelcomeGuide(false);
-      }
-    }
-  }, [dontShowWelcomeGuideAgain]);
   
   // Lade Benutzerdaten aus der MongoDB über den API-Endpunkt
   useEffect(() => {
@@ -89,14 +55,7 @@ export function Welcome({
     fetchUserData();
   }, [setMetadata, isLoaded, user]);
 
-  // Effekt für den Hilfe-Button
-  useEffect(() => {
-    if (showHelp) {
-      setShowWelcomeGuide(true);
-      // Den onHelpShown-Callback nicht sofort aufrufen!
-      // Er wird später durch onOpenChange in InstructionDialog aufgerufen
-    }
-  }, [showHelp]);
+
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -131,23 +90,6 @@ export function Welcome({
           priority
         />
       </div>
-      
-      {/* Anleitung Popup */}
-      <InstructionDialog
-        open={showWelcomeGuide}
-        onOpenChange={(open) => {
-          setShowWelcomeGuide(open);
-          // Wenn der Dialog angezeigt wurde und es war ein Hilfe-Klick, den onHelpShown-Callback aufrufen
-          if (!open && showHelp && onHelpShown) {
-            onHelpShown();
-          }
-        }}
-        title="Schritt für Schritt"
-        content="Gehen sie ganz einfach jeden Schritt durch und beenden sie ihn mit der Taste 'Weiter' am unteren Seitenende."
-        dontShowAgain={dontShowWelcomeGuideAgain}
-        onDontShowAgainChange={setDontShowWelcomeGuideAgain}
-        skipDelay={!!showHelp} // Verzögerung überspringen wenn über Hilfe-Button geöffnet
-      />
     </div>
   );
 }

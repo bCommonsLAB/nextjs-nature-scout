@@ -131,7 +131,7 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
   schutzstatus = 'niederwertig'  // Standardwert: niederwertig
 }, ref) => {
   // Debug-Log für Rendering und Zustandsänderungen
-  console.log('MapNoSSR RENDER', { 
+  console.log('🗺️ MapNoSSR RENDER', { 
     position, 
     zoom, 
     initialPolygon: initialPolygon.length,
@@ -360,7 +360,7 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
   useEffect(() => {
     // Nur ausführen, wenn die Karte noch nicht initialisiert wurde
     if (mapRef.current === null && mapContainerRef.current !== null) {
-      console.log('Map wird initialisiert', {
+      console.log('Map wird initialisiert (sollte nur einmal passieren!)', {
         editMode,
         position,
         zoom,
@@ -907,22 +907,22 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
     }
   }, [calculateArea, onAreaChange, onPolygonChange]);
 
-  // Aktualisiere Position und Zoom nur wenn nötig
-  useEffect(() => {
-    if (mapRef.current) {
-      const currentZoom = mapRef.current.getZoom();
-      console.log(`Position/Zoom-Update: aktueller Zoom=${currentZoom}, neuer Zoom=${zoom}`);
-      
-      if (currentZoom !== zoom) {
-        mapRef.current.setView(position, zoom);
-        // Nach Zoom-Änderung die Habitat-Anzeige aktualisieren
-        updateHabitatDisplay();
-      }
-      
-      // ENTFERNT: Positionsmarker wird NICHT mehr bei Map-Position-Updates angepasst
-      // Die Position des Markers wird nur durch explizite updatePositionMarker-Aufrufe geändert
-    }
-  }, [position, zoom, updateHabitatDisplay]);
+  // DEAKTIVIERT: Automatische Position/Zoom-Updates verhindern Map-Reset beim Schrittwechsel
+  // useEffect(() => {
+  //   if (mapRef.current) {
+  //     const currentZoom = mapRef.current.getZoom();
+  //     console.log(`Position/Zoom-Update: aktueller Zoom=${currentZoom}, neuer Zoom=${zoom}`);
+  //     
+  //     if (currentZoom !== zoom) {
+  //       mapRef.current.setView(position, zoom);
+  //       // Nach Zoom-Änderung die Habitat-Anzeige aktualisieren
+  //       updateHabitatDisplay();
+  //     }
+  //     
+  //     // ENTFERNT: Positionsmarker wird NICHT mehr bei Map-Position-Updates angepasst
+  //     // Die Position des Markers wird nur durch explizite updatePositionMarker-Aufrufe geändert
+  //   }
+  // }, [position, zoom, updateHabitatDisplay]);
 
   // Aktualisiere den Polygon, wenn sich initialPolygon ändert
   useEffect(() => {

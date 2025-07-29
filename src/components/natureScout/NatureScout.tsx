@@ -11,17 +11,45 @@ import { HabitatAnalysis } from "./HabitatAnalysis";
 import { UploadImages } from "./UploadImages";
 import { Bild, NatureScoutData, AnalyseErgebnis, llmInfo, PlantNetResult } from "@/types/nature-scout";
 import { LocationDetermination } from './LocationDetermination';
-import { ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNatureScoutState } from "@/context/nature-scout-context";
-import { InstructionDialog } from "@/components/ui/instruction-dialog";
 
 const schritte = [
   "Willkommen",
-  "Standort bestimmen",
+  "Standort finden",
+  "Umriss zeichnen",
   "Bilder erfassen",
   "Habitat analysieren",
   "Verifizierung"
+];
+
+// Schritt-Erklärungen für den festen Erklärbereich (basierend auf den echten Hilfetexten)
+const schrittErklaerungen = [
+  {
+    title: "Schritt für Schritt",
+    description: "Gehen Sie ganz einfach jeden Schritt durch und beenden Sie ihn mit der Taste 'Weiter' am unteren Seitenende."
+  },
+  {
+    title: "Standort finden",
+    description: "Verschieben Sie den Kartenausschnitt zu Ihrem Habitat und zoomen Sie so weit wie möglich hinein, bis Sie das Habitat deutlich sehen können."
+  },
+  {
+    title: "Umriss zeichnen",
+    description: "Klicken Sie auf die Karte, um Eckpunkte des Habitat-Umrisses im Uhrzeigersinn zu setzen. Sie benötigen mindestens 3 Punkte. Die Fläche wird automatisch berechnet."
+  },
+  {
+    title: "Bilder erfassen",
+    description: "Klicken Sie auf ein Bild und fotografieren Sie es mit der Kamera oder laden Sie ein Bild hoch. Das Prozedere ist je nach Gerät unterschiedlich. Manchmal müssen Sie der Anwendung auch Zugriff auf Ihre Kamera erlauben. Bitte ein Panoramabild, eine Detailansicht und zwei typische Pflanzenarten hochladen. Die Detailbilder von Pflanzen werden automatisch analysiert."
+  },
+  {
+    title: "Habitat analysieren",
+    description: "Die KI analysiert Ihre Bilder und Standortdaten, um den Habitattyp zu bestimmen. Pflanzenarten werden automatisch erkannt und bewertet. Sie können auch einen Kommentar hinzufügen."
+  },
+  {
+    title: "Verifizierung",
+    description: "Überprüfen Sie alle erfassten Daten und das Analyseergebnis. Sie können Änderungen vornehmen, bevor das Habitat gespeichert wird."
+  }
 ];
 
 function isNextButtonDisabled(schritt: number, metadata: NatureScoutData, isAnyUploadActive: boolean): boolean {
@@ -32,13 +60,16 @@ function isNextButtonDisabled(schritt: number, metadata: NatureScoutData, isAnyU
     case 0: // Willkommen
       return false;
     
-    case 1: // Standort bestimmen
+    case 1: // Standort finden
+      return false; // Immer möglich zu "Umriss zeichnen" zu wechseln
+    
+    case 2: // Umriss zeichnen
       return !metadata.gemeinde || !metadata.flurname || !metadata.latitude || !metadata.longitude;
     
-    case 2: // Bilder hochladen
+    case 3: // Bilder hochladen
       return !metadata.bilder.some(b => b.imageKey === "Panoramabild");
     
-    case 3: // Habitat analysieren
+    case 4: // Habitat analysieren
       return !metadata.analyseErgebnis || !metadata.llmInfo;
 
     default:
@@ -66,7 +97,6 @@ export default function NatureScout() {
     analyseErgebnis: undefined
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
   const [shouldScrollToNext, setShouldScrollToNext] = useState(false);
   const [isAnyUploadActive, setIsAnyUploadActive] = useState(false);
   
@@ -194,10 +224,6 @@ export default function NatureScout() {
     }));
   };
 
-  const handleHelpClick = () => {
-    setShowHelp(prev => !prev);
-  };
-
   // Debug-Funktion zum direkten Springen zum Bilder-Upload-Schritt
   const skipToImagesUpload = useCallback(() => {
     // Für Debug-Zwecke fülle eine minimale Konfiguration der Standortdaten aus
@@ -257,29 +283,17 @@ export default function NatureScout() {
         return <Welcome 
           metadata={metadata} 
           setMetadata={setMetadata} 
-          showHelp={showHelp} 
-          onHelpShown={() => setShowHelp(false)} 
           scrollToNext={scrollToNext}
           onSkipToImages={skipToImagesUpload}
         />;
-      case 1:
-        console.log("LocationDetermination wird gerendert mit:", { 
-          latitude: metadata.latitude, 
-          longitude: metadata.longitude,
-          polygonPoints: metadata.polygonPoints,
-          hasPolygonPoints: metadata.polygonPoints && metadata.polygonPoints.length > 0
-        });
-        return <LocationDetermination metadata={metadata} setMetadata={setMetadata} showHelp={showHelp} onHelpShown={() => setShowHelp(false)} scrollToNext={scrollToNext} />;
-      case 2:
+      case 3:
         return <UploadImages 
           metadata={metadata} 
           setMetadata={setMetadata} 
-          showHelp={showHelp} 
-          onHelpShown={() => setShowHelp(false)} 
           scrollToNext={scrollToNext}
           onUploadActiveChange={handleUploadActiveChange}
         />;
-      case 3:
+      case 4:
         return (
           <div className="space-y-4">
             <div>
@@ -292,42 +306,18 @@ export default function NatureScout() {
                 onKommentarChange={handleKommentarChange}
               />
             </div>
-            {showHelp && (
-              <InstructionDialog
-                open={showHelp}
-                onOpenChange={(open) => {
-                  if (!open) setShowHelp(false);
-                }}
-                title="Habitat analysieren"
-                content="Starten Sie die Analyse, um das Habitat zu bestimmen. Die hochgeladenen Bilder und Standortdaten werden für die Analyse verwendet. Sie können auch einen Kommentar hinzufügen."
-                showDontShowAgain={false}
-                skipDelay={true}
-              />
-            )}
           </div>
         );
-      case 4:
+      case 5:
         return (
           <>
             <Summary 
               metadata={metadata}
             />
-            {showHelp && (
-              <InstructionDialog
-                open={showHelp}
-                onOpenChange={(open) => {
-                  if (!open) setShowHelp(false);
-                }}
-                title="Zusammenfassung"
-                content="Hier sehen Sie eine Zusammenfassung aller erfassten Daten und das Ergebnis der Habitatanalyse. Sie können nun den Vorgang abschließen."
-                showDontShowAgain={false}
-                skipDelay={true}
-              />
-            )}
           </>
         );
       default:
-        return "Unbekannter Schritt";
+        return null; // Für Schritte 1 und 2 wird LocationDetermination separat gerendert
     }
   };
 
@@ -366,7 +356,7 @@ export default function NatureScout() {
                 </CardTitle>
               </CardHeader>
               ) : (
-                aktiverSchritt !== 1 ? (
+                aktiverSchritt !== 1 && aktiverSchritt !== 2 ? (
                   <CardHeader>
                     <CardTitle>
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -376,19 +366,26 @@ export default function NatureScout() {
                 </CardHeader>
                 ) : null
               )}
-            {aktiverSchritt === 1 ? (
+            
+            {/* Persistente LocationDetermination für Schritte 1 und 2 */}
+            {(aktiverSchritt === 1 || aktiverSchritt === 2) ? (
               <div className="p-0">
                 {isLoading ? (
                   <div className="flex justify-center py-12">
                     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
                   </div>
                 ) : (
-                  renderSchrittInhalt(aktiverSchritt)
+                  <LocationDetermination 
+                    key="persistent-location-determination" // Feste Key für persistence
+                    metadata={metadata} 
+                    setMetadata={setMetadata} 
+                    scrollToNext={scrollToNext}
+                    mapMode={aktiverSchritt === 1 ? 'navigation' : 'polygon'}
+                  />
                 )}
               </div>
             ) : (
               <div className="p-0">
-              
               <CardContent>
                 {isLoading ? (
                   <div className="flex justify-center py-12">
@@ -403,6 +400,7 @@ export default function NatureScout() {
           </Card>
         </div>
       </div>
+      
       <div className="flex justify-between items-center mt-4 gap-4">
         <div className="flex gap-2">
           <Button 
@@ -415,15 +413,7 @@ export default function NatureScout() {
             Zurück
           </Button>
           
-          <Button
-            onClick={handleHelpClick}
-            variant="outline"
-            size="icon"
-            className="h-9 w-9"
-            title="Hilfe anzeigen"
-          >
-            <HelpCircle className="h-5 w-5" />
-          </Button>
+
         </div>
 
         <Button 
@@ -435,6 +425,23 @@ export default function NatureScout() {
           Weiter
           <ChevronRight className="h-4 w-4" />
         </Button>
+      </div>
+      
+      {/* Fester Erklärbereich unterhalb der Navigation */}
+      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 mt-1">
+            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-blue-900 mb-1">
+              {schrittErklaerungen[aktiverSchritt]?.title || "Schritt"}
+            </h3>
+            <p className="text-sm text-blue-800 leading-relaxed">
+              {schrittErklaerungen[aktiverSchritt]?.description || "Beschreibung wird geladen..."}
+            </p>
+          </div>
+        </div>
       </div>
       
     </div>
