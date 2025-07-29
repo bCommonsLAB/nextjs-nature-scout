@@ -21,7 +21,11 @@ Das Dockerfile ist für Next Auth.js optimiert und enthält alle notwendigen Umg
 
 ## GitHub Secrets
 
-Folgende Secrets müssen in den GitHub Repository-Einstellungen konfiguriert werden:
+**Hinweis:** Das Workflow verwendet Dummy-Werte für den Build. Die echten Umgebungsvariablen werden zur Runtime über das Docker Compose oder Kubernetes Deployment gesetzt.
+
+**Keine GitHub Secrets erforderlich für den Build!** 🎉
+
+Die folgenden Umgebungsvariablen werden zur Runtime gesetzt:
 
 ### NextAuth.js
 - `NEXTAUTH_SECRET`: Geheimer Schlüssel für NextAuth.js Sessions

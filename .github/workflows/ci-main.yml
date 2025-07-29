@@ -75,28 +75,28 @@ jobs:
           tags: ghcr.io/${{ github.repository }}:latest,ghcr.io/${{ github.repository }}:${{ steps.bump.outputs.new_version }}
           build-args: |
             VERSION=${{ steps.bump.outputs.new_version }}
-            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
-            NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
-            MONGODB_URI=${{ secrets.MONGODB_URI }}
-            MONGODB_DATABASE_NAME=${{ secrets.MONGODB_DATABASE_NAME }}
-            MONGODB_COLLECTION_NAME=${{ secrets.MONGODB_COLLECTION_NAME }}
-            MAILJET_API_KEY=${{ secrets.MAILJET_API_KEY }}
-            MAILJET_API_SECRET=${{ secrets.MAILJET_API_SECRET }}
-            MAILJET_FROM_EMAIL=${{ secrets.MAILJET_FROM_EMAIL }}
-            MAILJET_FROM_NAME=${{ secrets.MAILJET_FROM_NAME }}
-            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-            OPENAI_CHAT_MODEL=${{ secrets.OPENAI_CHAT_MODEL }}
-            OPENAI_VISION_MODEL=${{ secrets.OPENAI_VISION_MODEL }}
-            OPENAI_TRANSCRIPTION_MODEL=${{ secrets.OPENAI_TRANSCRIPTION_MODEL }}
-            AZURE_STORAGE_CONNECTION_STRING=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
-            AZURE_STORAGE_CONTAINER_NAME=${{ secrets.AZURE_STORAGE_CONTAINER_NAME }}
-            GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}
-            PLANTNET_API_KEY=${{ secrets.PLANTNET_API_KEY }}
-            NEXT_PUBLIC_MAX_IMAGE_WIDTH=${{ secrets.NEXT_PUBLIC_MAX_IMAGE_WIDTH }}
-            NEXT_PUBLIC_MAX_IMAGE_HEIGHT=${{ secrets.NEXT_PUBLIC_MAX_IMAGE_HEIGHT }}
-            NEXT_PUBLIC_MAX_IMAGE_QUALITY=${{ secrets.NEXT_PUBLIC_MAX_IMAGE_QUALITY }}
-            NEXT_PUBLIC_BASE_URL=${{ secrets.NEXT_PUBLIC_BASE_URL }}
-            HABITAT_TEST_IMAGES_PATH=${{ secrets.HABITAT_TEST_IMAGES_PATH }}
+            NEXTAUTH_SECRET=dummy-secret-for-build
+            NEXTAUTH_URL=http://localhost:3000
+            MONGODB_URI=mongodb://localhost:27017
+            MONGODB_DATABASE_NAME=naturescout
+            MONGODB_COLLECTION_NAME=analyseJobs
+            MAILJET_API_KEY=dummy-key
+            MAILJET_API_SECRET=dummy-secret
+            MAILJET_FROM_EMAIL=noreply@example.com
+            MAILJET_FROM_NAME=NatureScout
+            OPENAI_API_KEY=dummy-key
+            OPENAI_CHAT_MODEL=gpt-4
+            OPENAI_VISION_MODEL=gpt-4-vision-preview
+            OPENAI_TRANSCRIPTION_MODEL=whisper-1
+            AZURE_STORAGE_CONNECTION_STRING=dummy-connection
+            AZURE_STORAGE_CONTAINER_NAME=naturescout
+            GOOGLE_MAPS_API_KEY=dummy-key
+            PLANTNET_API_KEY=dummy-key
+            NEXT_PUBLIC_MAX_IMAGE_WIDTH=2000
+            NEXT_PUBLIC_MAX_IMAGE_HEIGHT=2000
+            NEXT_PUBLIC_MAX_IMAGE_QUALITY=0.8
+            NEXT_PUBLIC_BASE_URL=http://localhost:3000
+            HABITAT_TEST_IMAGES_PATH=/app/public/test-images
             
       - name: Push version and tag
         run: |
