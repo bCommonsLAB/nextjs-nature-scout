@@ -95,7 +95,7 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          tags: ghcr.io/${{ github.repository }}:latest,ghcr.io/${{ github.repository }}:${{ steps.bump.outputs.new_version }}
+          tags: ghcr.io/bcommonslab/nextjs-nature-scout:latest,ghcr.io/bcommonslab/nextjs-nature-scout:${{ steps.bump.outputs.new_version }}
           build-args: |
             VERSION=${{ steps.bump.outputs.new_version }}
             NEXTAUTH_SECRET=dummy-secret-for-build
