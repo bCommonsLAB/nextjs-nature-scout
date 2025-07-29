@@ -4,7 +4,7 @@ Diese Skripte helfen beim lokalen Testen des Docker-Builds für NatureScout.
 
 ## Voraussetzungen
 
-- Docker Desktop installiert und gestartet
+- Docker Desktop installiert und gestartet.
 - Mindestens 4GB freier RAM für den Build
 - Internetverbindung für das Herunterladen der Base-Images
 
