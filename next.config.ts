@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
     // Standalone output für Docker-Build
     output: 'standalone',
+
     images: {
         remotePatterns: [
             {
@@ -48,7 +49,7 @@ const nextConfig: NextConfig = {
               pathname: '/**',
             },
         ],
-        unoptimized: false,
+        unoptimized: true, // Temporär deaktiviert für Debugging
         // EXIF-Orientierung automatisch korrigieren
         dangerouslyAllowSVG: true,
         contentDispositionType: 'attachment',
