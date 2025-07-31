@@ -8,7 +8,7 @@ import { Welcome } from "./Welcome";
 import { Summary } from "./Summary";
 import { UploadedImageList } from "./UploadedImageList";
 import { HabitatAnalysis } from "./HabitatAnalysis";
-import { UploadImages } from "./UploadImages";
+import { SingleImageUpload } from "./SingleImageUpload";
 import { Bild, NatureScoutData, AnalyseErgebnis, llmInfo, PlantNetResult } from "@/types/nature-scout";
 import { LocationDetermination } from './LocationDetermination';
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -17,9 +17,12 @@ import { useNatureScoutState } from "@/context/nature-scout-context";
 
 const schritte = [
   "Willkommen",
-  "Standort finden",
+  "Standort finden", 
   "Umriss zeichnen",
-  "Bilder erfassen",
+  "Panoramabild",
+  "Detailbild", 
+  "Pflanzenbild 1",
+  "Pflanzenbild 2",
   "Habitat analysieren",
   "Verifizierung"
 ];
@@ -39,8 +42,20 @@ const schrittErklaerungen = [
     description: "Klicken Sie auf die Karte, um Eckpunkte des Habitat-Umrisses im Uhrzeigersinn zu setzen. Sie benötigen mindestens 3 Punkte. Die Fläche wird automatisch berechnet."
   },
   {
-    title: "Bilder erfassen",
-    description: "Klicken Sie auf ein Bild und fotografieren Sie es mit der Kamera oder laden Sie ein Bild hoch. Das Prozedere ist je nach Gerät unterschiedlich. Manchmal müssen Sie der Anwendung auch Zugriff auf Ihre Kamera erlauben. Bitte ein Panoramabild, eine Detailansicht und zwei typische Pflanzenarten hochladen. Die Detailbilder von Pflanzen werden automatisch analysiert."
+    title: "Panoramabild",
+    description: "Legen Sie das Handy quer und erfassen Sie das gesamte Habitat mit einem Panoramabild. Halten Sie etwas Himmel mit ein für einen besseren Überblick."
+  },
+  {
+    title: "Detailbild", 
+    description: "Halten Sie das Handy aufrecht und machen Sie eine Nahaufnahme des Habitats. Fokussieren Sie auf interessante Details im Vordergrund, lassen aber etwas Hintergrund sichtbar."
+  },
+  {
+    title: "Pflanzenbild 1",
+    description: "Fotografieren Sie eine typische Pflanze des Habitats. Fokussieren Sie scharf auf die Pflanze und achten Sie auf gute Beleuchtung für die automatische Pflanzenbestimmung."
+  },
+  {
+    title: "Pflanzenbild 2", 
+    description: "Fotografieren Sie eine weitere typische Pflanze des Habitats. Wählen Sie eine andere Art als beim ersten Pflanzenbild für eine bessere Habitatcharakterisierung."
   },
   {
     title: "Habitat analysieren",
@@ -66,10 +81,27 @@ function isNextButtonDisabled(schritt: number, metadata: NatureScoutData, isAnyU
     case 2: // Umriss zeichnen
       return !metadata.gemeinde || !metadata.flurname || !metadata.latitude || !metadata.longitude;
     
-    case 3: // Bilder hochladen
-      return !metadata.bilder.some(b => b.imageKey === "Panoramabild");
+    case 3: // Panoramabild
+      const hasPanorama = metadata.bilder.some(b => b.imageKey === "Panoramabild");
+      console.log('Panoramabild check:', hasPanorama, metadata.bilder);
+      return !hasPanorama;
     
-    case 4: // Habitat analysieren
+    case 4: // Detailbild
+      const hasDetail = metadata.bilder.some(b => b.imageKey === "Detailansicht");
+      console.log('Detailbild check:', hasDetail, metadata.bilder);
+      return !hasDetail;
+    
+    case 5: // Pflanzenbild 1
+      const hasPlant1 = metadata.bilder.some(b => b.imageKey === "Detailbild_1");
+      console.log('Pflanzenbild 1 check:', hasPlant1, metadata.bilder);
+      return !hasPlant1;
+    
+    case 6: // Pflanzenbild 2
+      const hasPlant2 = metadata.bilder.some(b => b.imageKey === "Detailbild_2");
+      console.log('Pflanzenbild 2 check:', hasPlant2, metadata.bilder);
+      return !hasPlant2;
+    
+    case 7: // Habitat analysieren
       return !metadata.analyseErgebnis || !metadata.llmInfo;
 
     default:
@@ -236,8 +268,8 @@ export default function NatureScout() {
       standort: prev.standort || "Debug-Standort"
     }));
 
-    // Direkt zu Schritt 2 springen (Bilder hochladen)
-    setAktiverSchritt(2);
+    // Direkt zu Schritt 3 springen (Panoramabild)
+    setAktiverSchritt(3);
   }, []);
 
   // Funktion zum Scrollen zum Weiter-Button
@@ -286,14 +318,51 @@ export default function NatureScout() {
           scrollToNext={scrollToNext}
           onSkipToImages={skipToImagesUpload}
         />;
-      case 3:
-        return <UploadImages 
+      case 3: // Panoramabild
+        return <SingleImageUpload 
           metadata={metadata} 
           setMetadata={setMetadata} 
-          scrollToNext={scrollToNext}
+          imageKey="Panoramabild"
+          title="Panoramabild"
+          instruction="Gesamtüberblick des Habitats"
+          doAnalyzePlant={false}
+          schematicBg="/images/schema-panorama.svg"
           onUploadActiveChange={handleUploadActiveChange}
         />;
-      case 4:
+      case 4: // Detailbild
+        return <SingleImageUpload 
+          metadata={metadata} 
+          setMetadata={setMetadata} 
+          imageKey="Detailansicht"
+          title="Detailbild"
+          instruction="Nahaufnahme mit Hintergrund"
+          doAnalyzePlant={false}
+          schematicBg="/images/schema-detail.svg"
+          onUploadActiveChange={handleUploadActiveChange}
+        />;
+      case 5: // Pflanzenbild 1
+        return <SingleImageUpload 
+          metadata={metadata} 
+          setMetadata={setMetadata} 
+          imageKey="Detailbild_1"
+          title="Pflanzenbild 1"
+          instruction="Erste typische Pflanzenart"
+          doAnalyzePlant={true}
+          schematicBg="/images/schema-plant1.svg"
+          onUploadActiveChange={handleUploadActiveChange}
+        />;
+      case 6: // Pflanzenbild 2
+        return <SingleImageUpload 
+          metadata={metadata} 
+          setMetadata={setMetadata} 
+          imageKey="Detailbild_2"
+          title="Pflanzenbild 2"
+          instruction="Zweite typische Pflanzenart"
+          doAnalyzePlant={true}
+          schematicBg="/images/schema-plant2.svg"
+          onUploadActiveChange={handleUploadActiveChange}
+        />;
+      case 7: // Habitat analysieren
         return (
           <div className="space-y-4">
             <div>
@@ -308,7 +377,7 @@ export default function NatureScout() {
             </div>
           </div>
         );
-      case 5:
+      case 8: // Verifizierung
         return (
           <>
             <Summary 

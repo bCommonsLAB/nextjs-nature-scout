@@ -8,48 +8,7 @@ import { toast } from "sonner";
 import Image from 'next/image';
 import { Button } from "../ui/button";
 
-let SAMPLE_IMAGES = [
-  {
-    src: '/habitatsamples/trockenrasen-kurzgrasig.jpg',
-    title: 'Trockenrasen kurzgrasig',
-    type: 'habitat'
-  },
-  {
-    src: '/habitatsamples/verlandungsmoor.jpg',
-    title: 'Moor Verlandungsmoor',
-    type: 'habitat'
-  },
-  {
-    src: '/habitatsamples/magerwiese-artenreich.jpg',
-    title: 'Magerwiese artenreich',
-    type: 'habitat'
-  },
-  {
-    src: '/habitatsamples/fettwiese-standard.jpg',
-    title: 'Fettwiese',
-    type: 'habitat'
-  },
-  {
-    src: '/plantsamples/arnika.jpg',
-    title: 'Arnika (typisch für Magerwiese)',
-    type: 'plant'
-  },
-  {
-    src: '/plantsamples/salvia-pratensis.jpg',
-    title: 'Salvia pratensis (typisch für Magerwiese)',
-    type: 'plant'
-  },
-  {
-    src: '/plantsamples/trifolium-montanum.jpg',
-    title: 'Trifolium montanum (typisch für Magerwiese)',
-    type: 'plant'
-  },
-  {
-    src: '/plantsamples/fumana-ericoides.jpg',
-    title: 'Fumana ericoides (typisch für Trockenrasen)',
-    type: 'plant'
-  },
-];
+
 
 interface GetImageProps {
   imageTitle: string;
@@ -67,6 +26,8 @@ interface GetImageProps {
   doAnalyzePlant?: boolean;
   isUploading: boolean;
   setIsUploading: (value: boolean) => void;
+  schematicBg?: string;
+  fullHeight?: boolean;
 }
 
 export function GetImage({ 
@@ -77,19 +38,31 @@ export function GetImage({
   existingImage, 
   doAnalyzePlant = false,
   isUploading,
-  setIsUploading 
+  setIsUploading,
+  schematicBg,
+  fullHeight = false
 }: GetImageProps) {
-  SAMPLE_IMAGES=[]
+  // Prüfe ob es sich um ein Panoramabild handelt
+  const isPanorama = imageTitle.toLowerCase().includes('panorama');
+  // Prüfe ob es sich um ein Hochformat-Bild handelt (Detailbild und Pflanzenbilder)
+  const isPortrait = imageTitle.toLowerCase().includes('detail') || imageTitle.toLowerCase().includes('pflanzenbild');
+  
   const [localUploadProgress, setLocalUploadProgress] = useState(0);
   const [uploadedImage, setUploadedImage] = useState<string | null>(existingImage?.url || null);
   const [progressPhase, setProgressPhase] = useState<'upload' | 'analyze' | 'complete'>('upload');
   const [backgroundImageStyle, setBackgroundImageStyle] = useState<React.CSSProperties>(
     existingImage?.url ? {
-      backgroundImage: `url("${existingImage.url}")`,
+      backgroundImage: `url("${existingImage.lowResUrl || existingImage.url}")`,
+      backgroundSize: isPortrait ? 'cover' : 'contain',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      opacity: 0.3
+    } : schematicBg ? {
+      backgroundImage: `url("${schematicBg}")`,
       backgroundSize: 'contain',
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat',
-      opacity: 1
+      opacity: 0.08
     } : {}
   );
 
@@ -97,14 +70,22 @@ export function GetImage({
     if (existingImage?.url) {
       setUploadedImage(existingImage.url);
       setBackgroundImageStyle({
-        backgroundImage: `url("${existingImage.url.replace('.jpg', '_low.jpg')}")`,
+        backgroundImage: `url("${existingImage.lowResUrl || existingImage.url}")`,
         backgroundSize: 'contain',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
-        opacity: 1
+        opacity: 0.3 // Dezenter für bessere Sichtbarkeit der Upload-Elemente
+      });
+    } else if (schematicBg) {
+      setBackgroundImageStyle({
+        backgroundImage: `url("${schematicBg}")`,
+        backgroundSize: 'contain',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        opacity: 0.08
       });
     }
-  }, [existingImage]);
+  }, [existingImage, schematicBg]);
 
   // Timer für kontinuierliche Fortschrittsanzeige
   useEffect(() => {
@@ -303,12 +284,13 @@ export function GetImage({
     }
   ) {
     setUploadedImage(url);
+    // Für hochgeladene Bilder verwenden wir die Low-Res Version als Hintergrund
     setBackgroundImageStyle({
-      backgroundImage: `url("${url}")`,
+      backgroundImage: `url("${data.lowResUrl || url}")`,
       backgroundSize: 'contain',
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat',
-      opacity: 1
+      opacity: 0.3 // Dezenter für bessere Sichtbarkeit der Upload-Elemente
     });
 
     onBildUpload(
@@ -336,77 +318,92 @@ export function GetImage({
   }
 
   return (
-    <div>
-      <div className="relative max-w-xs mx-auto">
+    <div className={fullHeight ? "h-screen max-h-[70vh] flex flex-col" : ""}>
+      <div className={`relative ${
+        fullHeight 
+          ? isPanorama 
+            ? "flex-1 max-w-4xl" 
+            : "flex-1 max-w-2xl" 
+          : "max-w-xs"
+      } mx-auto`}>
         <div 
-          className={`flex flex-col items-center justify-center h-[150px] w-[150px] border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-100 hover:bg-gray-200 p-2 ${uploadedImage ? "" : "space-y-1"}`}
-          style={backgroundImageStyle}
+          className={`flex flex-col items-center justify-center ${
+            fullHeight 
+              ? isPanorama
+                ? "h-full min-h-[50vh] w-full aspect-video max-h-[60vh]" 
+                : isPortrait
+                  ? "h-full min-h-[60vh] w-full aspect-[9/16] max-w-md mx-auto"
+                  : "h-full min-h-[60vh] w-full" 
+              : "h-[150px] w-[150px]"
+          } border-2 border-dashed border-gray-300 rounded-xl cursor-pointer bg-gray-100 hover:bg-gray-200 p-6 ${uploadedImage ? "" : "space-y-2"} relative overflow-hidden`}
         >
+          {/* Hintergrundbild Container */}
+          {backgroundImageStyle.backgroundImage && (
+            <div 
+              className={`absolute rounded-lg ${
+                isPanorama 
+                  ? "inset-6" 
+                  : isPortrait 
+                    ? "inset-8 top-8 bottom-8 left-1/2 transform -translate-x-1/2 w-3/4"
+                    : "inset-6"
+              }`}
+              style={{
+                ...backgroundImageStyle,
+                zIndex: 1
+              }}
+            />
+          )}
+          
           {uploadedImage && (
             <Button
               variant="destructive"
               size="icon"
-              className="absolute top-2 right-2 z-10"
+              className="absolute top-2 right-2 z-20"
               onClick={(e) => {
                 e.preventDefault();
                 onDeleteImage(imageTitle);
                 setUploadedImage(null);
-                setBackgroundImageStyle({});
+                // Zurück zum Schema-Bild falls vorhanden
+                if (schematicBg) {
+                  setBackgroundImageStyle({
+                    backgroundImage: `url("${schematicBg}")`,
+                    backgroundSize: 'contain',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    opacity: 0.08
+                  });
+                } else {
+                  setBackgroundImageStyle({});
+                }
               }}
             >
               <X className="h-4 w-4" />
             </Button>
           )}
           
-          <label htmlFor={`dropzone-file-${imageTitle}`} className="flex flex-col items-center justify-center w-full h-full">
+          <label htmlFor={`dropzone-file-${imageTitle}`} className="flex flex-col items-center justify-center w-full h-full relative z-10">
             {isUploading ? (
-              <div className="w-full px-4">
+              <div className="w-full px-6 bg-white/95 rounded-lg py-6 shadow-md">
                 <Progress value={localUploadProgress} className="w-full" />
-                <p className="text-xs text-center mt-2">
+                <p className="text-base text-center mt-3 text-black font-semibold">
                   {Math.round(localUploadProgress)}% 
                   {progressPhase === 'analyze' ? ' analysiert' : ' hochgeladen'}
                 </p>
               </div>
-            ) : !uploadedImage ? (
+            ) : (
               <>
-                <h2 className="text-sm font-semibold">{imageTitle.replace(/_/g, ' ')}</h2>
-                <p className="text-xs text-center text-gray-500">{anweisung}</p>
-                <Upload className="w-8 h-8 my-1 text-gray-400" />
-                <p className="text-xs text-gray-500">Klicken zum Hochladen</p>
-                {SAMPLE_IMAGES.length > 0 && (
-                  <div className="mt-1">
-                    <p className="text-xs text-gray-600">Beispielbilder:</p>
-                    <div className="grid grid-cols-4 gap-1 mt-1">
-                    {SAMPLE_IMAGES
-                      .filter(sample => 
-                        doAnalyzePlant ? sample.type === 'plant' 
-                          : sample.type === 'habitat'
-                      )
-                      .map((sample, index) => (
-                        <button
-                          key={index}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            handleSampleImageClick(sample.src);
-                          }}
-                          className="relative w-[30px] h-[30px] rounded overflow-hidden hover:opacity-90 transition-opacity"
-                          title={sample.title}
-                        >
-                          <Image
-                            src={sample.src.replace('.jpg', '_low.jpg')}
-                            alt={sample.title}
-                            width={30}
-                            height={30}
-                            className="object-cover"
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <h2 className={`${fullHeight ? "text-2xl" : "text-sm"} font-bold text-center text-black bg-white/95 px-4 py-2 rounded-lg shadow-md`}>
+                  {imageTitle.replace(/_/g, ' ')}
+                </h2>
+                <p className={`${fullHeight ? "text-lg" : "text-xs"} text-center text-black max-w-md bg-white/95 px-3 py-2 rounded-lg shadow-md mt-3`}>
+                  {uploadedImage ? "Bild ersetzen" : anweisung}
+                </p>
+                <Upload className={`${fullHeight ? "w-20 h-20" : "w-8 h-8"} my-6 text-black`} />
+                <p className={`${fullHeight ? "text-lg" : "text-xs"} text-black bg-white/95 px-3 py-2 rounded-lg shadow-md`}>
+                  {uploadedImage ? "Klicken zum Ersetzen" : "Klicken zum Hochladen"}
+                </p>
               </>
-            ) : null}
+            )}
             <input 
               id={`dropzone-file-${imageTitle}`} 
               type="file" 

@@ -77,7 +77,7 @@ export function UploadImages({
   return (
     <div>
       <div className="mb-6">
-        <h2 className="text-lg font-medium mb-3">Habitat übersicht erfassen</h2>
+        <h2 className="text-lg font-medium mb-3 text-black">Habitat übersicht erfassen</h2>
         <div className="flex flex-wrap justify-center gap-4">
           <GetImage 
             imageTitle="Panoramabild" 
@@ -88,6 +88,7 @@ export function UploadImages({
             doAnalyzePlant={false}
             isUploading={activeUploads["Panoramabild"] ?? false}
             setIsUploading={(value) => setUploadStatus("Panoramabild", value)}
+            schematicBg="/images/schema-panorama.svg"
           />
           <GetImage 
             imageTitle="Detailansicht" 
@@ -98,12 +99,13 @@ export function UploadImages({
             doAnalyzePlant={false}
             isUploading={activeUploads["Detailansicht"] ?? false}
             setIsUploading={(value) => setUploadStatus("Detailansicht", value)}
+            schematicBg="/images/schema-detail.svg"
           />
         </div>
       </div>
       
       <div>
-        <h2 className="text-lg font-medium mb-3">Typische Pflanzen erfassen</h2>
+        <h2 className="text-lg font-medium mb-3 text-black">Typische Pflanzen erfassen</h2>
         <div className="flex flex-wrap justify-center gap-4">
           <GetImage 
             imageTitle="Detailbild_1" 
@@ -114,6 +116,7 @@ export function UploadImages({
             doAnalyzePlant={true}
             isUploading={activeUploads["Detailbild_1"] ?? false}
             setIsUploading={(value) => setUploadStatus("Detailbild_1", value)}
+            schematicBg="/images/schema-plant1.svg"
           />
           <GetImage 
             imageTitle="Detailbild_2" 
@@ -124,6 +127,7 @@ export function UploadImages({
             doAnalyzePlant={true}
             isUploading={activeUploads["Detailbild_2"] ?? false}
             setIsUploading={(value) => setUploadStatus("Detailbild_2", value)}
+            schematicBg="/images/schema-plant2.svg"
           />
         </div>
       </div>
