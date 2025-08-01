@@ -40,7 +40,7 @@ const schrittErklaerungen = [
   },
   {
     title: "Umriss zeichnen",
-    description: "Klicken Sie auf die Karte mindestens 3 Eckpunkte des Habitats. Wählen als letzen den ersten Punkt erneut aus und 'Speichern' sie die Fläche."
+    description: "Klicken Sie auf die Karte mindestens 3 Eckpunkte des Habitats. Wählen als letzen den ersten Punkt erneut aus klicken auf 'Umriss speichern'."
   },
   {
     title: "Panoramabild",
