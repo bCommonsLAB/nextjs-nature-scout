@@ -14,6 +14,7 @@ import { LocationDetermination } from './LocationDetermination';
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNatureScoutState } from "@/context/nature-scout-context";
+import { toast } from "sonner";
 
 const schritte = [
   "Willkommen",
@@ -55,7 +56,7 @@ const schrittErklaerungen = [
   },
   {
     title: "Pflanzenbild 2", 
-    description: "Fotografieren Sie eine weitere typische Pflanze des Habitats. Wählen Sie eine andere Art als beim ersten Pflanzenbild für eine bessere Habitatcharakterisierung."
+    description: "Fotografieren Sie evtl. eine weitere typische Pflanze des Habitats. Wählen Sie eine andere Art als beim ersten Pflanzenbild für eine bessere Habitatcharakterisierung."
   },
   {
     title: "Habitat analysieren",
@@ -65,6 +66,19 @@ const schrittErklaerungen = [
     title: "Verifizierung",
     description: "Überprüfen Sie alle erfassten Daten und das Analyseergebnis. Sie können Änderungen vornehmen, bevor das Habitat gespeichert wird."
   }
+];
+
+// Weiter-Button-Labels für jeden Schritt
+const weiterButtonLabels = [
+  "Weiter zum Standort finden",      // Von Schritt 0 (Willkommen) 
+  "Weiter zum Umriss zeichnen",      // Von Schritt 1 (Standort finden)
+  "Weiter zum Panoramabild",         // Von Schritt 2 (Umriss zeichnen)
+  "Weiter zum Detailbild",           // Von Schritt 3 (Panoramabild)
+  "Weiter zum Pflanzenbild 1",       // Von Schritt 4 (Detailbild)
+  "Weiter zum Pflanzenbild 2",       // Von Schritt 5 (Pflanzenbild 1)
+  "Weiter zur Analyse",              // Von Schritt 6 (Pflanzenbild 2)
+  "Habitat speichern und analysieren", // Von Schritt 7 (Habitat analysieren)
+  "Neuen Habitat erfassen"           // Von Schritt 8 (Verifizierung)
 ];
 
 // Schwebende Sprechblasen-Komponente
@@ -156,10 +170,9 @@ function isNextButtonDisabled(schritt: number, metadata: NatureScoutData, isAnyU
       return !hasPlant1;
     
     case 6: // Pflanzenbild 2
-      const hasPlant2 = metadata.bilder.some(b => b.imageKey === "Detailbild_2");
-      return !hasPlant2;
+      return false;
     
-    case 7: // Habitat analysieren
+    case 7: // Habitat speicher & analysieren
       return !metadata.analyseErgebnis || !metadata.llmInfo;
 
     default:
@@ -360,6 +373,39 @@ export default function NatureScout() {
       ...prev,
       kommentar
     }));
+  };
+
+  // Handler für "Neuen Habitat erfassen" - setzt alles zurück für einen neuen Habitat
+  const handleNeuerHabitat = () => {
+    // Metadaten auf Anfangswerte zurücksetzen
+    setMetadata({
+      erfassungsperson: "",
+      organizationId: "",
+      organizationName: "",
+      organizationLogo: "",
+      email: "",
+      gemeinde: "",
+      flurname: "",
+      latitude: 0,
+      longitude: 0,
+      standort: "",
+      bilder: [],
+      analyseErgebnis: undefined
+    });
+    
+    // Zum ersten Schritt zurückkehren
+    setAktiverSchritt(0);
+    
+    // Upload-Status zurücksetzen
+    setIsAnyUploadActive(false);
+    
+    // Hilfe-Sprechblase wieder anzeigen
+    setShowHelpBubble(true);
+    
+    // Erfolgs-Toast anzeigen
+    toast.success('Bereit für einen neuen Habitat! 🌱', {
+      description: 'Alle Daten wurden zurückgesetzt. Sie können jetzt einen weiteren Habitat erfassen.'
+    });
   };
 
   // Debug-Funktion zum direkten Springen zum Bilder-Upload-Schritt
@@ -627,11 +673,19 @@ export default function NatureScout() {
 
           <Button 
             ref={nextButtonRef}
-            onClick={() => setAktiverSchritt(prev => prev + 1)} 
+            onClick={() => {
+              if (aktiverSchritt === 8) {
+                // Letzter Schritt: Neuen Habitat erfassen
+                handleNeuerHabitat();
+              } else {
+                // Normale Navigation zum nächsten Schritt
+                setAktiverSchritt(prev => prev + 1);
+              }
+            }} 
             disabled={isNextButtonDisabled(aktiverSchritt, metadata, isAnyUploadActive)}
             className="gap-1"
           >
-            Weiter
+            {weiterButtonLabels[aktiverSchritt] || "Weiter"}
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
