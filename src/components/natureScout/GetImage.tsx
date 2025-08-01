@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Upload, X, RotateCw, Smartphone } from "lucide-react";
+import { Upload, X, RotateCw, Smartphone, Camera, AlertTriangle } from "lucide-react";
 import { Progress } from "../ui/progress";
 import { Bild, PlantNetResponse, PlantNetResult } from "@/types/nature-scout";
 import { toast } from "sonner";
@@ -56,6 +56,8 @@ export function GetImage({
   const [isLandscape, setIsLandscape] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [showOrientationDialog, setShowOrientationDialog] = useState(false);
+  const [cameraAvailable, setCameraAvailable] = useState<boolean | null>(null); // null = noch nicht geprüft
+  const [showCameraHint, setShowCameraHint] = useState(false);
   const [backgroundImageStyle, setBackgroundImageStyle] = useState<React.CSSProperties>(
     existingImage?.url ? {
       backgroundImage: `url("${existingImage.lowResUrl || existingImage.url}")`,
@@ -159,6 +161,57 @@ export function GetImage({
     };
   }, [requiredOrientation, imageTitle]);
 
+  // Kamera-Verfügbarkeitsprüfung
+  useEffect(() => {
+    async function checkCameraAvailability() {
+      try {
+        // Überprüfe ob MediaDevices API verfügbar ist
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          console.log('📱 MediaDevices API nicht verfügbar');
+          setCameraAvailable(false);
+          return;
+        }
+
+        // Überprüfe verfügbare Geräte
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const hasCamera = devices.some(device => device.kind === 'videoinput');
+        
+        if (!hasCamera) {
+          console.log('📱 Keine Videoeingabegeräte gefunden');
+          setCameraAvailable(false);
+          return;
+        }
+
+        // Teste ob wir tatsächlich auf die Kamera zugreifen können
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'environment' } // Rückkamera bevorzugen
+          });
+          
+          // Stream sofort wieder freigeben
+          stream.getTracks().forEach(track => track.stop());
+          
+          console.log('📱 Kamera verfügbar und zugänglich');
+          setCameraAvailable(true);
+        } catch (permissionError) {
+          console.log('📱 Kamera vorhanden, aber Zugriff verweigert:', permissionError);
+          // Auch bei Berechtigung-verweigerung ist die Kamera technisch verfügbar
+          setCameraAvailable(true);
+        }
+      } catch (error) {
+        console.error('📱 Fehler bei Kamera-Verfügbarkeitsprüfung:', error);
+        setCameraAvailable(false);
+      }
+    }
+
+    // Nur auf mobilen Geräten prüfen
+    if (isMobile) {
+      checkCameraAvailability();
+    } else {
+      setCameraAvailable(true); // Desktop hat normalerweise eine Kamera oder Dateizugriff
+    }
+  }, [isMobile]);
+
   // Orientierungsdialog Komponente
   const OrientationDialog = () => {
     if (!showOrientationDialog) return null;
@@ -197,6 +250,54 @@ export function GetImage({
           <p className="text-sm text-gray-500">
             Dieser Dialog verschwindet automatisch, wenn Sie das Handy richtig halten.
           </p>
+        </div>
+      </div>
+    );
+  };
+
+  // Kamera-Hinweis-Komponente
+  const CameraHintDialog = () => {
+    if (!showCameraHint || !isMobile) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000] p-4">
+        <div className="bg-white rounded-lg p-6 max-w-sm text-center shadow-xl">
+          <div className="flex justify-center mb-4">
+            {cameraAvailable === false ? (
+              <AlertTriangle className="h-8 w-8 text-amber-500" />
+            ) : (
+              <Camera className="h-8 w-8 text-blue-500" />
+            )}
+          </div>
+          
+          <h3 className="text-lg font-semibold mb-2 text-gray-900">
+            {cameraAvailable === false ? "Keine Kamera verfügbar" : "Kamera-Hinweis"}
+          </h3>
+          
+          <div className="text-gray-600 mb-4 space-y-2">
+            {cameraAvailable === false ? (
+              <>
+                <p>Auf diesem Gerät wurde keine Kamera gefunden.</p>
+                <p className="text-sm">Sie können trotzdem Bilder aus der Galerie auswählen.</p>
+              </>
+            ) : (
+              <>
+                <p>Wenn die Kamera nicht funktioniert:</p>
+                <ul className="text-sm text-left space-y-1">
+                  <li>• Kamera-Berechtigung erteilen</li>
+                  <li>• Browser neu laden</li>
+                  <li>• Bilder aus Galerie wählen</li>
+                </ul>
+              </>
+            )}
+          </div>
+          
+          <Button 
+            onClick={() => setShowCameraHint(false)}
+            className="w-full"
+          >
+            Verstanden
+          </Button>
         </div>
       </div>
     );
@@ -251,6 +352,124 @@ export function GetImage({
     return await uploadResponse.json();
   }
 
+  // Clientseitige Bildkomprimierung
+  async function compressImageOnClient(file: File): Promise<File> {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new window.Image();
+      
+      img.onload = () => {
+        try {
+          // Dynamische Komprimierung basierend auf Dateigröße
+          const fileSizeMB = file.size / 1024 / 1024;
+          
+          // Aggressive Komprimierung für sehr große Dateien
+          let MAX_WIDTH, MAX_HEIGHT, COMPRESSION_QUALITY;
+          
+          if (fileSizeMB > 15) {
+            // Sehr große Dateien: Starke Komprimierung
+            MAX_WIDTH = 1200;
+            MAX_HEIGHT = 1200; 
+            COMPRESSION_QUALITY = 0.75;
+          } else if (fileSizeMB > 8) {
+            // Große Dateien: Mittlere Komprimierung
+            MAX_WIDTH = 1400;
+            MAX_HEIGHT = 1400;
+            COMPRESSION_QUALITY = 0.8;
+          } else {
+            // Normale Dateien: Schonende Komprimierung
+            MAX_WIDTH = 1600;
+            MAX_HEIGHT = 1600;
+            COMPRESSION_QUALITY = 0.85;
+          }
+          
+          let { width, height } = img;
+          
+          // Seitenverhältnis beibehalten
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width = Math.round((width * MAX_HEIGHT) / height);
+              height = MAX_HEIGHT;
+            }
+          }
+          
+          // Canvas-Größe setzen
+          canvas.width = width;
+          canvas.height = height;
+          
+          // Bildqualität verbessern
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            
+            // Bild auf Canvas zeichnen
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Als Blob mit Komprimierung exportieren
+            canvas.toBlob(
+              (blob) => {
+                if (blob) {
+                  // Neuen File aus Blob erstellen
+                  const compressedFile = new File(
+                    [blob], 
+                    file.name, 
+                    { 
+                      type: 'image/jpeg', // Immer JPEG für bessere Komprimierung
+                      lastModified: Date.now() 
+                    }
+                  );
+                  
+                  const originalSizeMB = (file.size / 1024 / 1024).toFixed(1);
+                  const compressedSizeMB = (compressedFile.size / 1024 / 1024).toFixed(1);
+                  const compressionRatio = Math.round(compressedFile.size / file.size * 100);
+                  
+                  console.log(`📱 Bildkomprimierung: ${originalSizeMB}MB → ${compressedSizeMB}MB (${compressionRatio}%)`);
+                  
+                  // Benutzer über signifikante Komprimierung informieren
+                  if (compressionRatio < 30 && file.size > 5 * 1024 * 1024) {
+                    toast.success(`Bild komprimiert: ${originalSizeMB}MB → ${compressedSizeMB}MB`);
+                  }
+                  
+                  resolve(compressedFile);
+                } else {
+                  reject(new Error('Bildkomprimierung fehlgeschlagen'));
+                }
+              },
+              'image/jpeg',
+              COMPRESSION_QUALITY
+            );
+          } else {
+            reject(new Error('Canvas-Kontext nicht verfügbar'));
+          }
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      img.onerror = () => {
+        reject(new Error('Bild konnte nicht geladen werden'));
+      };
+      
+      // File als Data URL laden
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          img.src = e.target.result as string;
+        }
+      };
+      reader.onerror = () => {
+        reject(new Error('Datei konnte nicht gelesen werden'));
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   async function processImage(
     imageSource: File | string,
     originalFileName: string,
@@ -268,8 +487,22 @@ export function GetImage({
     if (typeof imageSource === 'string') {
       uploadResult = await uploadImage(imageSource, originalFileName);
     } else {
+      // Clientseitige Komprimierung für Dateien > 1MB
+      let fileToUpload = imageSource;
+      if (imageSource.size > 1024 * 1024) { // Größer als 1MB
+        try {
+          setLocalUploadProgress(10);
+          fileToUpload = await compressImageOnClient(imageSource);
+          setLocalUploadProgress(20);
+        } catch (compressionError) {
+          console.warn('⚠️ Clientseitige Komprimierung fehlgeschlagen, verwende Original:', compressionError);
+          // Fallback: Original verwenden
+          fileToUpload = imageSource;
+        }
+      }
+      
       const formData = new FormData();
-      formData.append("image", imageSource);
+      formData.append("image", fileToUpload);
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
@@ -308,6 +541,15 @@ export function GetImage({
     const file = event.target.files?.[0];
     if (!file) return;
     
+    // Informiere über große Dateien
+    const fileSizeMB = file.size / 1024 / 1024;
+    if (fileSizeMB > 5) {
+      console.log(`📱 Große Datei erkannt: ${fileSizeMB.toFixed(1)}MB - Komprimierung wird angewendet`);
+      if (fileSizeMB > 10) {
+        toast.info(`Großes Bild (${fileSizeMB.toFixed(1)}MB) wird komprimiert...`);
+      }
+    }
+    
     setIsUploading(true);
     setProgressPhase('upload');
     setLocalUploadProgress(5);
@@ -335,6 +577,18 @@ export function GetImage({
       );
     } catch (error) {
       console.error("❌ Fehler beim Hochladen oder Analysieren:", error);
+      
+      // Bei bestimmten Fehlern Kamera-Hinweis anzeigen
+      if (isMobile && error instanceof Error) {
+        const errorMessage = error.message.toLowerCase();
+        if (errorMessage.includes('permission') || 
+            errorMessage.includes('camera') || 
+            errorMessage.includes('access') ||
+            errorMessage.includes('denied')) {
+          setShowCameraHint(true);
+        }
+      }
+      
       // Detaillierte Fehlermeldung anzeigen
       toast.error(
         error instanceof Error 
@@ -377,6 +631,18 @@ export function GetImage({
       );
     } catch (error) {
       console.error("Fehler beim Verarbeiten des Beispielbildes:", error);
+      
+      // Bei bestimmten Fehlern Kamera-Hinweis anzeigen
+      if (isMobile && error instanceof Error) {
+        const errorMessage = error.message.toLowerCase();
+        if (errorMessage.includes('permission') || 
+            errorMessage.includes('camera') || 
+            errorMessage.includes('access') ||
+            errorMessage.includes('denied')) {
+          setShowCameraHint(true);
+        }
+      }
+      
       // Detaillierte Fehlermeldung anzeigen
       toast.error(
         error instanceof Error 
@@ -436,6 +702,9 @@ export function GetImage({
     <>
       {/* Orientierungsdialog */}
       <OrientationDialog />
+      
+      {/* Kamera-Hinweis-Dialog */}
+      <CameraHintDialog />
       
       <div className={fullHeight ? "h-screen max-h-[70vh] flex flex-col" : ""}>
         <div className={`relative w-full ${
@@ -506,7 +775,12 @@ export function GetImage({
                 <Progress value={localUploadProgress} className="w-full" />
                 <p className="text-sm sm:text-base text-center mt-3 text-black font-semibold">
                   {Math.round(localUploadProgress)}% 
-                  {progressPhase === 'analyze' ? ' analysiert' : ' hochgeladen'}
+                  {progressPhase === 'upload' && localUploadProgress <= 20 && localUploadProgress > 5 
+                    ? ' komprimiert' 
+                    : progressPhase === 'analyze' 
+                      ? ' analysiert' 
+                      : ' hochgeladen'
+                  }
                 </p>
               </div>
             ) : (
@@ -517,6 +791,36 @@ export function GetImage({
                 <p className={`${fullHeight ? "text-base sm:text-lg" : "text-xs"} text-center text-black max-w-md bg-white/95 px-2 sm:px-3 py-2 rounded-lg shadow-md mt-3`}>
                   {uploadedImage ? "Bild ersetzen" : anweisung}
                 </p>
+                
+                {/* Kamera-Status-Anzeige für mobile Geräte */}
+                {isMobile && cameraAvailable !== null && (
+                  <div className={`${fullHeight ? "text-sm" : "text-xs"} bg-white/95 px-2 py-1 rounded-lg shadow-md mt-2 flex items-center justify-center gap-2`}>
+                    {cameraAvailable ? (
+                      <>
+                        <Camera className="w-4 h-4 text-green-600" />
+                        <span className="text-green-600">Kamera verfügbar</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="w-4 h-4 text-amber-600" />
+                        <span className="text-amber-600">Nur Galerie verfügbar</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-auto p-1 text-amber-600 hover:text-amber-700"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setShowCameraHint(true);
+                          }}
+                        >
+                          <AlertTriangle className="w-3 h-3" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                )}
+                
                 <Upload className={`${fullHeight ? "w-16 h-16 sm:w-20 sm:h-20" : "w-8 h-8"} my-4 sm:my-6 text-black`} />
                 <p className={`${fullHeight ? "text-base sm:text-lg" : "text-xs"} text-black bg-white/95 px-2 sm:px-3 py-2 rounded-lg shadow-md`}>
                   {uploadedImage ? "Klicken zum Ersetzen" : "Klicken zum Hochladen"}
@@ -529,6 +833,7 @@ export function GetImage({
               className="hidden" 
               onChange={handleBildUpload}
               accept="image/*"
+              capture={isMobile && cameraAvailable ? "environment" : undefined} // Rückkamera bevorzugen auf mobilen Geräten
             />
           </label>
         </div>
