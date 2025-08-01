@@ -1,18 +1,17 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Upload, X, RotateCw, Smartphone, Camera, AlertTriangle } from "lucide-react";
+import { Upload, X, RotateCw, Smartphone, Camera, AlertTriangle, Zap } from "lucide-react";
 import { Progress } from "../ui/progress";
 import { Bild, PlantNetResponse, PlantNetResult } from "@/types/nature-scout";
 import { toast } from "sonner";
 import Image from 'next/image';
 import { Button } from "../ui/button";
-
-
+import { EnhancedCameraModal } from "./EnhancedCameraModal";
 
 interface GetImageProps {
   imageTitle: string;
-  imageKey: string; // Neuer Parameter für den korrekten imageKey
+  imageKey: string;
   anweisung: string;
   onBildUpload: (
     imageKey: string,
@@ -29,12 +28,12 @@ interface GetImageProps {
   setIsUploading: (value: boolean) => void;
   schematicBg?: string;
   fullHeight?: boolean;
-  requiredOrientation?: 'landscape' | 'portrait'; // Neue Prop für die gewünschte Orientierung
+  requiredOrientation?: 'landscape' | 'portrait';
 }
 
 export function GetImage({ 
   imageTitle, 
-  imageKey, // Neuer Parameter
+  imageKey,
   anweisung, 
   onBildUpload, 
   onDeleteImage,
@@ -46,7 +45,6 @@ export function GetImage({
   fullHeight = false,
   requiredOrientation
 }: GetImageProps) {
-  // Verwende die explizit übergebene Orientierung
   const isPanorama = requiredOrientation === 'landscape';
   const isPortrait = requiredOrientation === 'portrait';
   
@@ -56,9 +54,10 @@ export function GetImage({
   const [isLandscape, setIsLandscape] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [showOrientationDialog, setShowOrientationDialog] = useState(false);
-  const [cameraAvailable, setCameraAvailable] = useState<boolean | null>(null); // null = noch nicht geprüft
+  const [cameraAvailable, setCameraAvailable] = useState<boolean | null>(null);
   const [showCameraHint, setShowCameraHint] = useState(false);
   const [showCameraModal, setShowCameraModal] = useState(false);
+  const [showEnhancedCamera, setShowEnhancedCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -78,6 +77,61 @@ export function GetImage({
     } : {}
   );
 
+  // Kamera-Verfügbarkeit prüfen
+  useEffect(() => {
+    const checkCameraAvailability = async () => {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          setCameraAvailable(false);
+          return;
+        }
+        
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }
+        });
+        
+        setCameraAvailable(true);
+        stream.getTracks().forEach(track => track.stop());
+      } catch (error) {
+        setCameraAvailable(false);
+      }
+    };
+
+    checkCameraAvailability();
+  }, []);
+
+  // Mobile-Erkennung und Orientierung
+  useEffect(() => {
+    const checkOrientation = () => {
+      const landscape = window.innerWidth > window.innerHeight;
+      const mobile = window.innerWidth <= 1024;
+      
+      setIsLandscape(landscape);
+      setIsMobile(mobile);
+      
+      if (mobile && requiredOrientation) {
+        if (requiredOrientation === 'landscape' && !landscape) {
+          setShowOrientationDialog(true);
+        } else if (requiredOrientation === 'portrait' && landscape) {
+          setShowOrientationDialog(true);
+        } else {
+          setShowOrientationDialog(false);
+        }
+      } else {
+        setShowOrientationDialog(false);
+      }
+    };
+    
+    checkOrientation();
+    window.addEventListener('resize', checkOrientation);
+    window.addEventListener('orientationchange', checkOrientation);
+    return () => {
+      window.removeEventListener('resize', checkOrientation);
+      window.removeEventListener('orientationchange', checkOrientation);
+    };
+  }, [requiredOrientation]);
+
+  // Hintergrundbild setzen
   useEffect(() => {
     if (existingImage?.url) {
       setUploadedImage(existingImage.url);
@@ -86,10 +140,9 @@ export function GetImage({
         backgroundSize: 'contain',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
-        opacity: 0.3 // Dezenter für bessere Sichtbarkeit der Upload-Elemente
+        opacity: 0.3
       });
     } else {
-      // Wichtig: uploadedImage zurücksetzen, wenn kein existingImage vorhanden ist
       setUploadedImage(null);
       if (schematicBg) {
         setBackgroundImageStyle({
@@ -103,151 +156,50 @@ export function GetImage({
         setBackgroundImageStyle({});
       }
     }
-  }, [existingImage, schematicBg, isPortrait]);
+  }, [existingImage, schematicBg]);
 
-  // Progress zurücksetzen, wenn sich der Bildschritt ändert
+  // Progress zurücksetzen
   useEffect(() => {
     setLocalUploadProgress(0);
     setProgressPhase('upload');
-  }, [imageKey]); // imageKey ändert sich, wenn wir zu einem neuen Bildschritt wechseln
+  }, [imageKey]);
 
-  // Orientierungserkennung für mobile Geräte
+  // Timer für Fortschritt
   useEffect(() => {
-    const checkOrientation = () => {
-      const landscape = window.innerWidth > window.innerHeight;
-      const mobile = window.innerWidth <= 1024; // Erweitert für Desktop-Testing (ursprünglich 768)
-      
-      setIsLandscape(landscape);
-      setIsMobile(mobile);
-      
-      // Debug-Ausgaben
-      console.log('🔍 Orientation Check:', {
-        imageTitle,
-        requiredOrientation,
-        isPanorama,
-        isPortrait,
-        mobile,
-        landscape,
-        width: window.innerWidth,
-        height: window.innerHeight
-      });
-      
-      // Nur für mobile Geräte und wenn eine Orientierung explizit gefordert ist
-      if (mobile && requiredOrientation) {
-        if (requiredOrientation === 'landscape' && !landscape) {
-          // Querformat erforderlich, aber aktuell Hochformat
-          console.log('📱 Showing dialog: Landscape required');
-          setShowOrientationDialog(true);
-        } else if (requiredOrientation === 'portrait' && landscape) {
-          // Hochformat erforderlich, aber aktuell Querformat
-          console.log('📱 Showing dialog: Portrait required');
-          setShowOrientationDialog(true);
-        } else {
-          console.log('📱 Hiding dialog: Correct orientation');
-          setShowOrientationDialog(false);
-        }
-      } else {
-        console.log('💻 Desktop mode or no orientation required: No dialog');
-        setShowOrientationDialog(false);
-      }
-    };
-
-    // Initial prüfen
-    checkOrientation();
-
-    // Event Listener für Orientierungsänderungen
-    window.addEventListener('resize', checkOrientation);
-    window.addEventListener('orientationchange', checkOrientation);
-
-    return () => {
-      window.removeEventListener('resize', checkOrientation);
-      window.removeEventListener('orientationchange', checkOrientation);
-    };
-  }, [requiredOrientation, imageTitle]);
-
-  // Kamera-Verfügbarkeitsprüfung
-  useEffect(() => {
-    async function checkCameraAvailability() {
-      try {
-        // Überprüfe ob MediaDevices API verfügbar ist
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          console.log('📱 MediaDevices API nicht verfügbar');
-          setCameraAvailable(false);
-          return;
-        }
-
-        // Überprüfe verfügbare Geräte
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const hasCamera = devices.some(device => device.kind === 'videoinput');
-        
-        if (!hasCamera) {
-          console.log('📱 Keine Videoeingabegeräte gefunden');
-          setCameraAvailable(false);
-          return;
-        }
-
-        // Teste ob wir tatsächlich auf die Kamera zugreifen können
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'environment' } // Rückkamera bevorzugen
+    let progressTimer: NodeJS.Timeout | null = null;
+    
+    if (isUploading) {
+      if (progressPhase === 'upload' && localUploadProgress < 60) {
+        progressTimer = setInterval(() => {
+          setLocalUploadProgress(prevProgress => {
+            if (prevProgress < 10) return 10;
+            if (prevProgress < 30) return prevProgress + 0.8;
+            if (prevProgress < 50) return prevProgress + 0.4;
+            return Math.min(prevProgress + 0.2, 59);
           });
-          
-          // Stream sofort wieder freigeben
-          stream.getTracks().forEach(track => track.stop());
-          
-          console.log('📱 Kamera verfügbar und zugänglich');
-          setCameraAvailable(true);
-        } catch (permissionError) {
-          console.log('📱 Kamera vorhanden, aber Zugriff verweigert:', permissionError);
-          // Auch bei Berechtigung-verweigerung ist die Kamera technisch verfügbar
-          setCameraAvailable(true);
-        }
-      } catch (error) {
-        console.error('📱 Fehler bei Kamera-Verfügbarkeitsprüfung:', error);
-        setCameraAvailable(false);
+        }, 100);
+      } else if (progressPhase === 'analyze' && localUploadProgress < 90) {
+        progressTimer = setInterval(() => {
+          setLocalUploadProgress(prevProgress => {
+            if (prevProgress < 70) return prevProgress + 0.3;
+            if (prevProgress < 80) return prevProgress + 0.2;
+            return Math.min(prevProgress + 0.1, 89);
+          });
+        }, 100);
       }
-    }
-
-    // Nur auf mobilen Geräten prüfen
-    if (isMobile) {
-      checkCameraAvailability();
-    } else {
-      setCameraAvailable(true); // Desktop hat normalerweise eine Kamera oder Dateizugriff
-    }
-  }, [isMobile]);
-
-  // Kamera-Stream cleanup beim Unmount
-  useEffect(() => {
-    return () => {
-      if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, [cameraStream]);
-
-  // Escape-Taste zum Schließen der Kamera
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' && showCameraModal) {
-        stopCamera();
-      }
-    }
-
-    if (showCameraModal) {
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
     }
     
-    // Cleanup-Funktion für den Fall, dass showCameraModal false ist
-    return () => {};
-  }, [showCameraModal]);
+    return () => {
+      if (progressTimer) clearInterval(progressTimer);
+    };
+  }, [isUploading, localUploadProgress, progressPhase]);
 
-  // Kamera-Funktionen
+  // Standard Kamera-Funktionen
   async function startCamera() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'environment', // Rückkamera bevorzugen
+          facingMode: 'environment',
           width: { ideal: 1920 },
           height: { ideal: 1080 }
         }
@@ -260,10 +212,9 @@ export function GetImage({
       }
       
       setShowCameraModal(true);
-      console.log('📹 Kamera erfolgreich gestartet');
     } catch (error) {
-      console.error('❌ Fehler beim Starten der Kamera:', error);
-      toast.error('Kamera konnte nicht gestartet werden. Überprüfen Sie die Berechtigung.');
+      console.error('Fehler beim Starten der Kamera:', error);
+      toast.error('Kamera konnte nicht gestartet werden.');
       setShowCameraHint(true);
     }
   }
@@ -291,14 +242,10 @@ export function GetImage({
       return null;
     }
 
-    // Canvas-Größe an Video anpassen
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-
-    // Aktuelles Videobild auf Canvas zeichnen
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // Canvas als Blob exportieren
     return new Promise((resolve) => {
       canvas.toBlob((blob) => {
         if (blob) {
@@ -307,22 +254,218 @@ export function GetImage({
             type: 'image/jpeg',
             lastModified: timestamp
           });
-          console.log('📸 Foto aufgenommen:', file.size / 1024 / 1024, 'MB');
           resolve(file);
         } else {
           toast.error('Foto konnte nicht aufgenommen werden');
           resolve(null);
         }
-      }, 'image/jpeg', 0.92); // Hohe Qualität für Kamera-Aufnahmen
+      }, 'image/jpeg', 0.92);
     });
   }
+
+  // Upload und Verarbeitung
+  async function uploadImage(imageUrl: string, filename: string): Promise<{ url: string; lowResUrl: string; filename: string }> {
+    const response = await fetch(imageUrl);
+    const blob = await response.blob();
+    const file = new File([blob], filename, { type: blob.type });
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const uploadResponse = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) throw new Error('Upload fehlgeschlagen');
+    return await uploadResponse.json();
+  }
+
+  async function compressImageOnClient(file: File): Promise<File> {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new window.Image();
+      
+      img.onload = () => {
+        const fileSizeMB = file.size / 1024 / 1024;
+        
+        let MAX_WIDTH, MAX_HEIGHT, COMPRESSION_QUALITY;
+        
+        if (fileSizeMB > 10) {
+          MAX_WIDTH = 1600;
+          MAX_HEIGHT = 1600;
+          COMPRESSION_QUALITY = 0.7;
+        } else if (fileSizeMB > 5) {
+          MAX_WIDTH = 2000;
+          MAX_HEIGHT = 2000;
+          COMPRESSION_QUALITY = 0.8;
+        } else {
+          MAX_WIDTH = 2400;
+          MAX_HEIGHT = 2400;
+          COMPRESSION_QUALITY = 0.85;
+        }
+
+        let { width, height } = img;
+        
+        if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+          const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+          width *= ratio;
+          height *= ratio;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now()
+            });
+            resolve(compressedFile);
+          } else {
+            resolve(file);
+          }
+        }, 'image/jpeg', COMPRESSION_QUALITY);
+      };
+      
+      img.onerror = () => resolve(file);
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  async function processImage(file: File, filename: string, doAnalyzePlant: boolean) {
+    setProgressPhase('upload');
+    
+    const compressedFile = await compressImageOnClient(file);
+    
+    setLocalUploadProgress(20);
+    
+    const imageUrl = URL.createObjectURL(compressedFile);
+    const { url, lowResUrl, filename: uploadedFilename } = await uploadImage(imageUrl, filename);
+    
+    setLocalUploadProgress(60);
+    
+    let analysis: { bestMatch: string; results: PlantNetResult[] } = { bestMatch: "", results: [] };
+    
+    if (doAnalyzePlant) {
+      setProgressPhase('analyze');
+      setLocalUploadProgress(65);
+      
+      try {
+        const plantResponse = await analyzePlants([url]);
+        if (plantResponse.results && plantResponse.results.length > 0) {
+          const bestMatch = plantResponse.results[0];
+          analysis = {
+            bestMatch: bestMatch?.species?.scientificNameWithoutAuthor || "Unbekannte Pflanze",
+            results: plantResponse.results
+          };
+        }
+      } catch (error) {
+        console.error("Fehler bei der Pflanzenanalyse:", error);
+        analysis = { bestMatch: "Analyse fehlgeschlagen", results: [] };
+      }
+    }
+    
+    URL.revokeObjectURL(imageUrl);
+    
+    return {
+      url,
+      lowResUrl,
+      filename: uploadedFilename,
+      analysis
+    };
+  }
+
+  async function analyzePlants(imageUrls: string[]) {
+    const response = await fetch('/api/analyze/plants', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrls }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Analyse fehlgeschlagen');
+    }
+
+    return await response.json() as PlantNetResponse;
+  }
+
+  function updateUIWithImage(
+    url: string, 
+    data: { 
+      imageTitle: string;
+      filename: string;
+      lowResUrl: string;
+      bestMatch: string;
+      result?: PlantNetResult;
+    }
+  ) {
+    setUploadedImage(url);
+    setBackgroundImageStyle({
+      backgroundImage: `url("${data.lowResUrl || url}")`,
+      backgroundSize: 'contain',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      opacity: 0.3
+    });
+
+    onBildUpload(
+      imageKey,
+      data.filename,
+      url,
+      data.bestMatch,
+      data.result,
+      data.lowResUrl
+    );
+  }
+
+  // Event Handlers
+  const handleBildUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setLocalUploadProgress(5);
+
+    try {
+      const { url, lowResUrl, filename, analysis } = await processImage(
+        file,
+        file.name,
+        doAnalyzePlant
+      );
+
+      updateUIWithImage(url, {
+        imageTitle,
+        filename,
+        lowResUrl,
+        bestMatch: analysis?.bestMatch || "",
+        result: analysis?.results[0]
+      });
+
+      setLocalUploadProgress(100);
+      toast.success(
+        doAnalyzePlant 
+          ? 'Bild hochgeladen und Pflanze analysiert'
+          : 'Bild erfolgreich hochgeladen'
+      );
+    } catch (error) {
+      console.error("Upload-Fehler:", error);
+      toast.error('Upload fehlgeschlagen');
+    } finally {
+      setIsUploading(false);
+      event.target.value = '';
+    }
+  };
 
   async function handleCameraCapture() {
     const file = await capturePhoto();
     if (file) {
       stopCamera();
       
-      // Benutze die gleiche Upload-Logik wie bei Datei-Upload
       setIsUploading(true);
       setProgressPhase('upload');
       setLocalUploadProgress(5);
@@ -349,62 +492,80 @@ export function GetImage({
             : 'Foto aufgenommen'
         );
       } catch (error) {
-        console.error("❌ Fehler beim Verarbeiten des Kamera-Fotos:", error);
-        toast.error(
-          error instanceof Error 
-            ? `Fehler: ${error.message}`
-            : 'Fehler beim Verarbeiten des Fotos'
-        );
+        console.error("Kamera-Fehler:", error);
+        toast.error('Fehler beim Verarbeiten des Fotos');
       } finally {
         setIsUploading(false);
       }
     }
   }
 
-  // Orientierungsdialog Komponente
+  async function handleEnhancedCameraCapture(file: File) {
+    setIsUploading(true);
+    setProgressPhase('upload');
+    setLocalUploadProgress(5);
+
+    try {
+      const { url, lowResUrl, filename, analysis } = await processImage(
+        file,
+        file.name,
+        doAnalyzePlant
+      );
+
+      updateUIWithImage(url, {
+        imageTitle,
+        filename,
+        lowResUrl,
+        bestMatch: analysis?.bestMatch || "",
+        result: analysis?.results[0]
+      });
+
+      setLocalUploadProgress(100);
+      toast.success(
+        doAnalyzePlant 
+          ? 'Foto aufgenommen und Pflanze analysiert (Erweiterte Kamera)'
+          : 'Foto aufgenommen (Erweiterte Kamera)'
+      );
+    } catch (error) {
+      console.error("Erweiterte Kamera-Fehler:", error);
+      toast.error('Fehler beim Verarbeiten des Fotos');
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  // Dialoge und UI-Komponenten
   const OrientationDialog = () => {
     if (!showOrientationDialog) return null;
 
     const isRequiringLandscape = requiredOrientation === 'landscape';
-    const isRequiringPortrait = requiredOrientation === 'portrait';
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000] p-4">
         <div className="bg-white rounded-lg p-6 max-w-sm text-center shadow-xl">
           <div className="flex justify-center mb-4">
-            {isRequiringLandscape ? (
-              <div className="flex items-center gap-2">
-                <Smartphone className="h-8 w-8 text-blue-500 transform -rotate-90" />
-                <RotateCw className="h-6 w-6 text-gray-400" />
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Smartphone className="h-8 w-8 text-blue-500" />
-                <RotateCw className="h-6 w-6 text-gray-400" />
-              </div>
-            )}
+            <Smartphone 
+              className={`h-12 w-12 text-blue-500 transition-transform duration-500 ${
+                isRequiringLandscape ? 'rotate-90' : 'rotate-0'
+              }`} 
+            />
           </div>
           
           <h3 className="text-lg font-semibold mb-2 text-gray-900">
-            {isRequiringLandscape ? "Handy quer drehen" : "Handy aufrecht halten"}
+            {isRequiringLandscape ? "Querformat benötigt" : "Hochformat benötigt"}
           </h3>
           
           <p className="text-gray-600 mb-4">
             {isRequiringLandscape 
-              ? "Für das Panoramabild bitte das Handy quer halten, um den besten Überblick zu erhalten."
-              : "Für Detail- und Pflanzenbilder bitte das Handy aufrecht halten, um die beste Aufnahme zu erzielen."
+              ? "Bitte drehen Sie Ihr Gerät ins Querformat für die bestmögliche Aufnahme des Panoramabilds."
+              : "Bitte drehen Sie Ihr Gerät ins Hochformat für die optimale Aufnahme."
             }
-          </p>
-          
-          <p className="text-sm text-gray-500">
-            Dieser Dialog verschwindet automatisch, wenn Sie das Handy richtig halten.
           </p>
         </div>
       </div>
     );
   };
 
-  // Kamera-Hinweis-Komponente
   const CameraHintDialog = () => {
     if (!showCameraHint || !isMobile) return null;
 
@@ -452,7 +613,6 @@ export function GetImage({
     );
   };
 
-  // Kamera-Modal-Komponente
   const CameraModal = () => {
     if (!showCameraModal) return null;
 
@@ -473,7 +633,6 @@ export function GetImage({
           </div>
           
           <div className="flex-1 flex flex-col items-center">
-            {/* Video-Preview */}
             <div className="relative bg-black rounded-lg overflow-hidden max-w-full max-h-[60vh]">
               <video
                 ref={videoRef}
@@ -482,13 +641,12 @@ export function GetImage({
                 muted
                 className="w-full h-full object-cover"
                 style={{ 
-                  transform: 'scaleX(-1)', // Spiegeln für natürliche Ansicht
+                  transform: 'scaleX(-1)',
                   maxWidth: '800px',
                   maxHeight: '600px'
                 }}
               />
               
-              {/* Kamera-Raster für bessere Ausrichtung */}
               <div className="absolute inset-0 pointer-events-none">
                 <div className="w-full h-full border-2 border-white/20">
                   <div className="absolute top-1/3 left-0 right-0 h-0 border-t border-white/20"></div>
@@ -499,7 +657,6 @@ export function GetImage({
               </div>
             </div>
             
-            {/* Kamera-Steuerung */}
             <div className="flex gap-4 mt-6">
               <Button 
                 variant="outline" 
@@ -520,435 +677,33 @@ export function GetImage({
               </Button>
             </div>
             
-            {/* Verstecktes Canvas für Foto-Capture */}
             <canvas
               ref={canvasRef}
               className="hidden"
             />
-          </div>
-          
-          <div className="text-center text-sm text-gray-500 mt-4">
-            <p>Positionieren Sie das Motiv im Rahmen und klicken Sie auf "Foto aufnehmen"</p>
           </div>
         </div>
       </div>
     );
   };
 
-  // Timer für kontinuierliche Fortschrittsanzeige
-  useEffect(() => {
-    let progressTimer: NodeJS.Timeout | null = null;
-    
-    if (isUploading) {
-      if (progressPhase === 'upload' && localUploadProgress < 60) {
-        // Upload-Phase (0-60%)
-        progressTimer = setInterval(() => {
-          setLocalUploadProgress(prevProgress => {
-            if (prevProgress < 10) return 10; // Sofort auf 10% setzen
-            if (prevProgress < 30) return prevProgress + 0.8;
-            if (prevProgress < 50) return prevProgress + 0.4;
-            return Math.min(prevProgress + 0.2, 59); // Maximal 59% bis Upload fertig
-          });
-        }, 100);
-      } else if (progressPhase === 'analyze' && localUploadProgress < 90) {
-        // Analyse-Phase (60-90%)
-        progressTimer = setInterval(() => {
-          setLocalUploadProgress(prevProgress => {
-            if (prevProgress < 70) return prevProgress + 0.3;
-            if (prevProgress < 80) return prevProgress + 0.2;
-            return Math.min(prevProgress + 0.1, 89); // Maximal 89% bis Analyse fertig
-          });
-        }, 100);
-      }
-    }
-    
-    return () => {
-      if (progressTimer) clearInterval(progressTimer);
-    };
-  }, [isUploading, localUploadProgress, progressPhase]);
-
-  async function uploadImage(imageUrl: string, filename: string): Promise<{ url: string; lowResUrl: string; filename: string }> {
-    const response = await fetch(imageUrl);
-    const blob = await response.blob();
-    const file = new File([blob], filename, { type: blob.type });
-
-    const formData = new FormData();
-    formData.append("image", file);
-
-    const uploadResponse = await fetch('/api/upload', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!uploadResponse.ok) throw new Error('Upload fehlgeschlagen');
-    return await uploadResponse.json();
-  }
-
-  // Clientseitige Bildkomprimierung
-  async function compressImageOnClient(file: File): Promise<File> {
-    return new Promise((resolve, reject) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const img = new window.Image();
-      
-      img.onload = () => {
-        try {
-          // Dynamische Komprimierung basierend auf Dateigröße
-          const fileSizeMB = file.size / 1024 / 1024;
-          
-          // Aggressive Komprimierung für sehr große Dateien
-          let MAX_WIDTH, MAX_HEIGHT, COMPRESSION_QUALITY;
-          
-          if (fileSizeMB > 15) {
-            // Sehr große Dateien: Starke Komprimierung
-            MAX_WIDTH = 1200;
-            MAX_HEIGHT = 1200; 
-            COMPRESSION_QUALITY = 0.75;
-          } else if (fileSizeMB > 8) {
-            // Große Dateien: Mittlere Komprimierung
-            MAX_WIDTH = 1400;
-            MAX_HEIGHT = 1400;
-            COMPRESSION_QUALITY = 0.8;
-          } else {
-            // Normale Dateien: Schonende Komprimierung
-            MAX_WIDTH = 1600;
-            MAX_HEIGHT = 1600;
-            COMPRESSION_QUALITY = 0.85;
-          }
-          
-          let { width, height } = img;
-          
-          // Seitenverhältnis beibehalten
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height = Math.round((height * MAX_WIDTH) / width);
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width = Math.round((width * MAX_HEIGHT) / height);
-              height = MAX_HEIGHT;
-            }
-          }
-          
-          // Canvas-Größe setzen
-          canvas.width = width;
-          canvas.height = height;
-          
-          // Bildqualität verbessern
-          if (ctx) {
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            
-            // Bild auf Canvas zeichnen
-            ctx.drawImage(img, 0, 0, width, height);
-            
-            // Als Blob mit Komprimierung exportieren
-            canvas.toBlob(
-              (blob) => {
-                if (blob) {
-                  // Neuen File aus Blob erstellen
-                  const compressedFile = new File(
-                    [blob], 
-                    file.name, 
-                    { 
-                      type: 'image/jpeg', // Immer JPEG für bessere Komprimierung
-                      lastModified: Date.now() 
-                    }
-                  );
-                  
-                  const originalSizeMB = (file.size / 1024 / 1024).toFixed(1);
-                  const compressedSizeMB = (compressedFile.size / 1024 / 1024).toFixed(1);
-                  const compressionRatio = Math.round(compressedFile.size / file.size * 100);
-                  
-                  console.log(`📱 Bildkomprimierung: ${originalSizeMB}MB → ${compressedSizeMB}MB (${compressionRatio}%)`);
-                  
-                  // Benutzer über signifikante Komprimierung informieren
-                  if (compressionRatio < 30 && file.size > 5 * 1024 * 1024) {
-                    toast.success(`Bild komprimiert: ${originalSizeMB}MB → ${compressedSizeMB}MB`);
-                  }
-                  
-                  resolve(compressedFile);
-                } else {
-                  reject(new Error('Bildkomprimierung fehlgeschlagen'));
-                }
-              },
-              'image/jpeg',
-              COMPRESSION_QUALITY
-            );
-          } else {
-            reject(new Error('Canvas-Kontext nicht verfügbar'));
-          }
-        } catch (error) {
-          reject(error);
-        }
-      };
-      
-      img.onerror = () => {
-        reject(new Error('Bild konnte nicht geladen werden'));
-      };
-      
-      // File als Data URL laden
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          img.src = e.target.result as string;
-        }
-      };
-      reader.onerror = () => {
-        reject(new Error('Datei konnte nicht gelesen werden'));
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  async function processImage(
-    imageSource: File | string,
-    originalFileName: string,
-    doAnalyzePlant: boolean
-  ): Promise<{
-    url: string;
-    lowResUrl: string;
-    filename: string;
-    analysis: PlantNetResponse | null;
-  }> {
-    setProgressPhase('upload');
-    setLocalUploadProgress(5);
-    
-    let uploadResult;
-    if (typeof imageSource === 'string') {
-      uploadResult = await uploadImage(imageSource, originalFileName);
-    } else {
-      // Clientseitige Komprimierung für Dateien > 1MB
-      let fileToUpload = imageSource;
-      if (imageSource.size > 1024 * 1024) { // Größer als 1MB
-        try {
-          setLocalUploadProgress(10);
-          fileToUpload = await compressImageOnClient(imageSource);
-          setLocalUploadProgress(20);
-        } catch (compressionError) {
-          console.warn('⚠️ Clientseitige Komprimierung fehlgeschlagen, verwende Original:', compressionError);
-          // Fallback: Original verwenden
-          fileToUpload = imageSource;
-        }
-      }
-      
-      const formData = new FormData();
-      formData.append("image", fileToUpload);
-      const uploadResponse = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!uploadResponse.ok) {
-        // Verbesserte Fehlerbehandlung
-        const errorData = await uploadResponse.json().catch(() => null);
-        throw new Error(
-          errorData?.error || 
-          `Upload fehlgeschlagen mit Status ${uploadResponse.status}`
-        );
-      }
-      uploadResult = await uploadResponse.json();
-    }
-
-    setLocalUploadProgress(60);
-
-    let analysis = null;
-    if (doAnalyzePlant) {
-      setProgressPhase('analyze');
-      analysis = await analyzePlants([uploadResult.url]);
-      setLocalUploadProgress(90);
-    }
-
-    setProgressPhase('complete');
-    return { 
-      url: uploadResult.url,
-      lowResUrl: uploadResult.lowResUrl, 
-      filename: uploadResult.filename, 
-      analysis 
-    };
-  }
-
-  const handleBildUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    
-    // Informiere über große Dateien
-    const fileSizeMB = file.size / 1024 / 1024;
-    if (fileSizeMB > 5) {
-      console.log(`📱 Große Datei erkannt: ${fileSizeMB.toFixed(1)}MB - Komprimierung wird angewendet`);
-      if (fileSizeMB > 10) {
-        toast.info(`Großes Bild (${fileSizeMB.toFixed(1)}MB) wird komprimiert...`);
-      }
-    }
-    
-    setIsUploading(true);
-    setProgressPhase('upload');
-    setLocalUploadProgress(5);
-
-    try {
-      const { url, lowResUrl, filename, analysis } = await processImage(
-        file,
-        file.name,
-        doAnalyzePlant
-      );
-
-      updateUIWithImage(url, {
-        imageTitle,
-        filename,
-        lowResUrl,
-        bestMatch: analysis?.bestMatch || "",
-        result: analysis?.results[0]
-      });
-
-      setLocalUploadProgress(100);
-      toast.success(
-        doAnalyzePlant 
-          ? 'Bild hochgeladen und Pflanze analysiert'
-          : 'Bild hochgeladen'
-      );
-    } catch (error) {
-      console.error("❌ Fehler beim Hochladen oder Analysieren:", error);
-      
-      // Bei bestimmten Fehlern Kamera-Hinweis anzeigen
-      if (isMobile && error instanceof Error) {
-        const errorMessage = error.message.toLowerCase();
-        if (errorMessage.includes('permission') || 
-            errorMessage.includes('camera') || 
-            errorMessage.includes('access') ||
-            errorMessage.includes('denied')) {
-          setShowCameraHint(true);
-        }
-      }
-      
-      // Detaillierte Fehlermeldung anzeigen
-      toast.error(
-        error instanceof Error 
-          ? `Fehler: ${error.message}`
-          : 'Fehler beim Hochladen oder Analysieren des Bildes'
-      );
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleSampleImageClick = async (sampleSrc: string) => {
-    setIsUploading(true);
-    setProgressPhase('upload');
-    setLocalUploadProgress(5);
-
-    try {
-      const pathParts = sampleSrc.split('/');
-      const originalFileName = pathParts[pathParts.length - 1];
-
-      const { url, lowResUrl, filename, analysis } = await processImage(
-        sampleSrc,
-        originalFileName || '',
-        doAnalyzePlant
-      );
-
-      updateUIWithImage(url, {
-        imageTitle,
-        filename,
-        lowResUrl,
-        bestMatch: analysis?.bestMatch || "",
-        result: analysis?.results[0]
-      });
-
-      setLocalUploadProgress(100);
-      toast.success(
-        doAnalyzePlant 
-          ? 'Beispielbild hochgeladen und Pflanze analysiert'
-          : 'Beispielbild hochgeladen'
-      );
-    } catch (error) {
-      console.error("Fehler beim Verarbeiten des Beispielbildes:", error);
-      
-      // Bei bestimmten Fehlern Kamera-Hinweis anzeigen
-      if (isMobile && error instanceof Error) {
-        const errorMessage = error.message.toLowerCase();
-        if (errorMessage.includes('permission') || 
-            errorMessage.includes('camera') || 
-            errorMessage.includes('access') ||
-            errorMessage.includes('denied')) {
-          setShowCameraHint(true);
-        }
-      }
-      
-      // Detaillierte Fehlermeldung anzeigen
-      toast.error(
-        error instanceof Error 
-          ? `Fehler: ${error.message}`
-          : 'Fehler beim Verarbeiten des Beispielbildes'
-      );
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  function updateUIWithImage(
-    url: string, 
-    data: { 
-      imageTitle: string;
-      filename: string;
-      lowResUrl: string;
-      bestMatch: string;
-      result?: PlantNetResult;
-    }
-  ) {
-    setUploadedImage(url);
-    // Für hochgeladene Bilder verwenden wir die Low-Res Version als Hintergrund
-    setBackgroundImageStyle({
-      backgroundImage: `url("${data.lowResUrl || url}")`,
-      backgroundSize: 'contain',
-      backgroundPosition: 'center',
-      backgroundRepeat: 'no-repeat',
-      opacity: 0.3 // Dezenter für bessere Sichtbarkeit der Upload-Elemente
-    });
-
-    onBildUpload(
-      imageKey,
-      data.filename,
-      url,
-      data.bestMatch,
-      data.result,
-      data.lowResUrl
-    );
-  }
-
-  async function analyzePlants(imageUrls: string[]) {
-    const response = await fetch('/api/analyze/plants', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageUrls }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Analyse fehlgeschlagen');
-    }
-
-    return await response.json() as PlantNetResponse;
-  }
-
   return (
     <>
-      {/* Orientierungsdialog */}
       <OrientationDialog />
-      
-      {/* Kamera-Hinweis-Dialog */}
       <CameraHintDialog />
-      
-      {/* Kamera-Modal */}
       <CameraModal />
       
-      <div className={fullHeight ? "h-screen max-h-[70vh] flex flex-col" : ""}>
-        <div className={`relative w-full ${
-          fullHeight 
-            ? isPanorama 
-              ? "max-w-4xl" 
-              : "max-w-2xl" 
-            : "max-w-xs"
+      <div className={`
+        ${fullHeight 
+          ? isPanorama
+            ? "w-full max-w-4xl" 
+            : isPortrait
+              ? "w-full max-w-md"
+              : "w-full max-w-2xl"
+          : "max-w-xs"
         } mx-auto`}>
+        
+        {/* Upload-Anzeigebereich */}
         <div 
           className={`flex flex-col items-center justify-center ${
             fullHeight 
@@ -958,35 +713,43 @@ export function GetImage({
                   ? "h-full min-h-[60vh] w-full aspect-[9/16] max-w-md mx-auto"
                   : "h-full min-h-[60vh] w-full" 
               : "h-[150px] w-[150px]"
-          } border-2 border-dashed border-gray-300 rounded-xl cursor-pointer bg-gray-100 hover:bg-gray-200 p-4 sm:p-6 ${uploadedImage ? "" : "space-y-2"} relative overflow-hidden`}
+          } border-2 border-dashed border-gray-300 rounded-xl bg-gray-100 p-4 sm:p-6 relative overflow-hidden`}
+          style={backgroundImageStyle}
         >
-          {/* Hintergrundbild Container */}
-          {backgroundImageStyle.backgroundImage && (
-            <div 
-              className={`absolute rounded-lg ${
-                isPanorama 
-                  ? "inset-4 sm:inset-6" 
-                  : isPortrait 
-                    ? "top-8 bottom-8 left-6 right-6 sm:left-8 sm:right-8"
-                    : "inset-4 sm:inset-6"
-              }`}
-              style={{
-                ...backgroundImageStyle,
-                zIndex: 1
-              }}
-            />
-          )}
-          
+          {/* Kamera-Status oben rechts */}
+          <div className="absolute top-2 right-2 z-20">
+            <div className="text-xs bg-white/95 px-2 py-1 rounded-lg shadow-md flex items-center gap-1">
+              {cameraAvailable !== null && (
+                <>
+                  {cameraAvailable ? (
+                    <>
+                      <Camera className="w-3 h-3 text-green-600" />
+                      <span className="text-green-600">Kamera</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="w-3 h-3 text-amber-600" />
+                      <span className="text-amber-600">Galerie</span>
+                    </>
+                  )}
+                </>
+              )}
+              <span className="text-gray-500 ml-1">
+                {isMobile ? "📱" : "💻"}
+              </span>
+            </div>
+          </div>
+
+          {/* Delete Button für hochgeladene Bilder */}
           {uploadedImage && (
             <Button
               variant="destructive"
               size="icon"
-              className="absolute top-2 right-2 z-20"
+              className="absolute top-2 left-2 z-20"
               onClick={(e) => {
                 e.preventDefault();
                 onDeleteImage(imageKey);
                 setUploadedImage(null);
-                // Zurück zum Schema-Bild falls vorhanden
                 if (schematicBg) {
                   setBackgroundImageStyle({
                     backgroundImage: `url("${schematicBg}")`,
@@ -1003,103 +766,100 @@ export function GetImage({
               <X className="h-4 w-4" />
             </Button>
           )}
-          
-          <label htmlFor={`dropzone-file-${imageTitle}`} className="flex flex-col items-center justify-center w-full h-full relative z-10">
-            {isUploading ? (
-              <div className="w-full px-4 sm:px-6 bg-white/95 rounded-lg py-4 sm:py-6 shadow-md">
-                <Progress value={localUploadProgress} className="w-full" />
-                <p className="text-sm sm:text-base text-center mt-3 text-black font-semibold">
-                  {Math.round(localUploadProgress)}% 
-                  {progressPhase === 'upload' && localUploadProgress <= 20 && localUploadProgress > 5 
-                    ? ' komprimiert' 
-                    : progressPhase === 'analyze' 
-                      ? ' analysiert' 
-                      : ' hochgeladen'
-                  }
-                </p>
-              </div>
-            ) : (
-              <>
-                <h2 className={`${fullHeight ? "text-lg sm:text-2xl" : "text-sm"} font-bold text-center text-black bg-white/95 px-3 sm:px-4 py-2 rounded-lg shadow-md`}>
-                  {imageTitle.replace(/_/g, ' ')}
-                </h2>
-                <p className={`${fullHeight ? "text-base sm:text-lg" : "text-xs"} text-center text-black max-w-md bg-white/95 px-2 sm:px-3 py-2 rounded-lg shadow-md mt-3`}>
-                  {uploadedImage ? "Bild ersetzen" : anweisung}
-                </p>
-                
-                {/* Kamera-Status-Anzeige für mobile Geräte */}
-                {isMobile && cameraAvailable !== null && (
-                  <div className={`${fullHeight ? "text-sm" : "text-xs"} bg-white/95 px-2 py-1 rounded-lg shadow-md mt-2 flex items-center justify-center gap-2`}>
-                    {cameraAvailable ? (
-                      <>
-                        <Camera className="w-4 h-4 text-green-600" />
-                        <span className="text-green-600">Kamera verfügbar</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertTriangle className="w-4 h-4 text-amber-600" />
-                        <span className="text-amber-600">Nur Galerie verfügbar</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-auto p-1 text-amber-600 hover:text-amber-700"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setShowCameraHint(true);
-                          }}
-                        >
-                          <AlertTriangle className="w-3 h-3" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                )}
-                
-                <Upload className={`${fullHeight ? "w-16 h-16 sm:w-20 sm:h-20" : "w-8 h-8"} my-4 sm:my-6 text-black`} />
-                <p className={`${fullHeight ? "text-base sm:text-lg" : "text-xs"} text-black bg-white/95 px-2 sm:px-3 py-2 rounded-lg shadow-md`}>
-                  {uploadedImage ? "Klicken zum Ersetzen" : "Klicken zum Hochladen"}
-                </p>
-                
-                {/* Kamera-Schaltfläche für Desktop */}
-                {!isMobile && cameraAvailable && !uploadedImage && (
-                  <div className="mt-4">
-                    <Button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        startCamera();
-                      }}
-                      variant="outline"
-                      className="flex items-center gap-2 bg-white/95 hover:bg-white text-black border-gray-300"
-                    >
-                      <Camera className="h-4 w-4" />
-                      Mit Kamera aufnehmen
-                    </Button>
-                  </div>
-                )}
-              </>
-            )}
-            <input 
-              id={`dropzone-file-${imageTitle}`} 
-              type="file" 
-              className="hidden" 
-              onChange={handleBildUpload}
-              accept="image/*"
-              capture={isMobile && cameraAvailable ? "environment" : undefined} // Rückkamera bevorzugen auf mobilen Geräten
-            />
-          </label>
+
+          {/* Content */}
+          {isUploading ? (
+            <div className="w-full px-4 sm:px-6 bg-white/95 rounded-lg py-4 sm:py-6 shadow-md">
+              <Progress value={localUploadProgress} className="w-full" />
+              <p className="text-sm sm:text-base text-center mt-3 text-black font-semibold">
+                {Math.round(localUploadProgress)}% 
+                {progressPhase === 'upload' && localUploadProgress <= 20 && localUploadProgress > 5 
+                  ? ' komprimiert' 
+                  : progressPhase === 'analyze' 
+                    ? ' analysiert' 
+                    : ' hochgeladen'
+                }
+              </p>
+            </div>
+          ) : (
+            <>
+              <h2 className={`${fullHeight ? "text-lg sm:text-2xl" : "text-sm"} font-bold text-center text-black bg-white/95 px-3 sm:px-4 py-2 rounded-lg shadow-md`}>
+                {imageTitle.replace(/_/g, ' ')}
+              </h2>
+              <p className={`${fullHeight ? "text-base sm:text-lg" : "text-xs"} text-center text-black max-w-md bg-white/95 px-2 sm:px-3 py-2 rounded-lg shadow-md mt-3`}>
+                {uploadedImage ? "Bild ersetzen" : anweisung}
+              </p>
+              <Upload className={`${fullHeight ? "w-16 h-16 sm:w-20 sm:h-20" : "w-8 h-8"} my-4 sm:my-6 text-black`} />
+            </>
+          )}
         </div>
         
+        {/* Drei Upload-Optionen nebeneinander */}
+        <div className="mt-4 flex gap-2 flex-wrap justify-center">
+          <Button
+            type="button"
+            onClick={() => document.getElementById(`dropzone-file-${imageTitle}`)?.click()}
+            variant="outline"
+            className="flex items-center gap-2 bg-white/95 hover:bg-white text-black border-gray-300"
+            size={isMobile ? "sm" : "default"}
+          >
+            <Upload className="h-4 w-4" />
+            Hochladen
+          </Button>
+          
+          {(cameraAvailable || true) && (
+            <>
+              <Button
+                type="button"
+                onClick={() => startCamera()}
+                variant="outline"
+                className="flex items-center gap-2 bg-gray-50 hover:bg-gray-100 text-black border-gray-300"
+                size={isMobile ? "sm" : "default"}
+              >
+                <Camera className="h-4 w-4" />
+                {isMobile ? "Standard" : "Standard Kamera"}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setShowEnhancedCamera(true)}
+                variant="outline"
+                className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300"
+                size={isMobile ? "sm" : "default"}
+              >
+                <Zap className="h-4 w-4" />
+                {isMobile ? "Erweitert" : "Erweiterte Kamera"}
+              </Button>
+            </>
+          )}
+        </div>
+        
+        {/* Verstecktes File Input */}
+        <input 
+          id={`dropzone-file-${imageTitle}`} 
+          type="file" 
+          className="hidden" 
+          onChange={handleBildUpload}
+          accept="image/*"
+          capture={isMobile && cameraAvailable ? "environment" : undefined} 
+        />
+        
+        {/* Pflanzen-Analyse Info */}
         {uploadedImage && doAnalyzePlant && (
-          <div className="mt-2 text-xs w-full sm:w-[150px]">
+          <div className="mt-2 text-xs w-full">
             <p className="font-medium">Erkannte Pflanze:</p>
             <p className="text-gray-600">{existingImage?.analyse || "Analyse läuft..."}</p>
           </div>
         )}
-        </div>
       </div>
+
+      {/* Erweiterte Kamera Modal (react-webcam) */}
+      <EnhancedCameraModal
+        isOpen={showEnhancedCamera}
+        onClose={() => setShowEnhancedCamera(false)}
+        onCapture={handleEnhancedCameraCapture}
+        title={imageTitle.replace(/_/g, ' ')}
+        requiredOrientation={requiredOrientation}
+      />
     </>
   );
-} 
+}

@@ -893,7 +893,7 @@ export function LocationDetermination({
   }, [showPolygonWarning]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-12rem)]">
+    <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Map-Container mit relativer Positionierung für überlagerte UI-Elemente */}
       <div className="relative w-full flex-grow">
         <MapNoSSR

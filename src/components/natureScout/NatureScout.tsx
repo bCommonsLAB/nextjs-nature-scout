@@ -600,7 +600,7 @@ export default function NatureScout() {
       {/* Navigation - außerhalb des main Containers, immer unten, fixed position */}
       <div 
         ref={navigationRef}
-        className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm py-3 sm:py-4 px-4 border-t border-gray-200 shadow-lg"
+        className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm py-2 sm:py-2 px-4 border-t border-gray-200 shadow-lg"
         style={{
           position: 'fixed',
           bottom: 0,
@@ -608,17 +608,17 @@ export default function NatureScout() {
           right: 0,
           zIndex: 10000,
           width: '100%',
-          minHeight: '75px',
-          paddingBottom: 'env(safe-area-inset-bottom, 12px)'
+          minHeight: '55px',
+          paddingBottom: 'env(safe-area-inset-bottom, 6px)'
         }}
       >
-        <div className="container mx-auto flex justify-between items-center gap-4">
+        <div className="container mx-auto flex justify-between items-center gap-1">
           <div className="flex gap-2">
               <Button 
                 onClick={() => aktiverSchritt === 0 ? router.push('/') : setAktiverSchritt(prev => prev - 1)} 
                 disabled={aktiverSchritt === 0 && false}
                 variant="outline"
-                className="gap-2"
+                className="gap-1"
               >
                 <ChevronLeft className="h-4 w-4" />
                 Zurück
@@ -629,7 +629,7 @@ export default function NatureScout() {
             ref={nextButtonRef}
             onClick={() => setAktiverSchritt(prev => prev + 1)} 
             disabled={isNextButtonDisabled(aktiverSchritt, metadata, isAnyUploadActive)}
-            className="gap-2"
+            className="gap-1"
           >
             Weiter
             <ChevronRight className="h-4 w-4" />
