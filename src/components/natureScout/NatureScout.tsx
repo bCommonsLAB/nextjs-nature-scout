@@ -550,7 +550,7 @@ export default function NatureScout() {
                     </CardTitle>
                   </CardHeader>
                   ) : (
-                    aktiverSchritt !== 1 && aktiverSchritt !== 2 ? (
+                    aktiverSchritt !== 1 && aktiverSchritt !== 2 && aktiverSchritt !== 3 && aktiverSchritt !== 4 && aktiverSchritt !== 5 ? (
                       <CardHeader>
                         <CardTitle>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2">

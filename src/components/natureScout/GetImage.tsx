@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Upload, X, RotateCw, Smartphone, Camera, AlertTriangle } from "lucide-react";
 import { Progress } from "../ui/progress";
 import { Bild, PlantNetResponse, PlantNetResult } from "@/types/nature-scout";
@@ -58,6 +58,10 @@ export function GetImage({
   const [showOrientationDialog, setShowOrientationDialog] = useState(false);
   const [cameraAvailable, setCameraAvailable] = useState<boolean | null>(null); // null = noch nicht geprüft
   const [showCameraHint, setShowCameraHint] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [backgroundImageStyle, setBackgroundImageStyle] = useState<React.CSSProperties>(
     existingImage?.url ? {
       backgroundImage: `url("${existingImage.lowResUrl || existingImage.url}")`,
@@ -212,6 +216,151 @@ export function GetImage({
     }
   }, [isMobile]);
 
+  // Kamera-Stream cleanup beim Unmount
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [cameraStream]);
+
+  // Escape-Taste zum Schließen der Kamera
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape' && showCameraModal) {
+        stopCamera();
+      }
+    }
+
+    if (showCameraModal) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+    
+    // Cleanup-Funktion für den Fall, dass showCameraModal false ist
+    return () => {};
+  }, [showCameraModal]);
+
+  // Kamera-Funktionen
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment', // Rückkamera bevorzugen
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      });
+      
+      setCameraStream(stream);
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      
+      setShowCameraModal(true);
+      console.log('📹 Kamera erfolgreich gestartet');
+    } catch (error) {
+      console.error('❌ Fehler beim Starten der Kamera:', error);
+      toast.error('Kamera konnte nicht gestartet werden. Überprüfen Sie die Berechtigung.');
+      setShowCameraHint(true);
+    }
+  }
+
+  function stopCamera() {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    setShowCameraModal(false);
+  }
+
+  async function capturePhoto(): Promise<File | null> {
+    if (!videoRef.current || !canvasRef.current) {
+      toast.error('Kamera nicht bereit');
+      return null;
+    }
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      toast.error('Canvas nicht verfügbar');
+      return null;
+    }
+
+    // Canvas-Größe an Video anpassen
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    // Aktuelles Videobild auf Canvas zeichnen
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Canvas als Blob exportieren
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const timestamp = Date.now();
+          const file = new File([blob], `camera_${timestamp}.jpg`, {
+            type: 'image/jpeg',
+            lastModified: timestamp
+          });
+          console.log('📸 Foto aufgenommen:', file.size / 1024 / 1024, 'MB');
+          resolve(file);
+        } else {
+          toast.error('Foto konnte nicht aufgenommen werden');
+          resolve(null);
+        }
+      }, 'image/jpeg', 0.92); // Hohe Qualität für Kamera-Aufnahmen
+    });
+  }
+
+  async function handleCameraCapture() {
+    const file = await capturePhoto();
+    if (file) {
+      stopCamera();
+      
+      // Benutze die gleiche Upload-Logik wie bei Datei-Upload
+      setIsUploading(true);
+      setProgressPhase('upload');
+      setLocalUploadProgress(5);
+
+      try {
+        const { url, lowResUrl, filename, analysis } = await processImage(
+          file,
+          file.name,
+          doAnalyzePlant
+        );
+
+        updateUIWithImage(url, {
+          imageTitle,
+          filename,
+          lowResUrl,
+          bestMatch: analysis?.bestMatch || "",
+          result: analysis?.results[0]
+        });
+
+        setLocalUploadProgress(100);
+        toast.success(
+          doAnalyzePlant 
+            ? 'Foto aufgenommen und Pflanze analysiert'
+            : 'Foto aufgenommen'
+        );
+      } catch (error) {
+        console.error("❌ Fehler beim Verarbeiten des Kamera-Fotos:", error);
+        toast.error(
+          error instanceof Error 
+            ? `Fehler: ${error.message}`
+            : 'Fehler beim Verarbeiten des Fotos'
+        );
+      } finally {
+        setIsUploading(false);
+      }
+    }
+  }
+
   // Orientierungsdialog Komponente
   const OrientationDialog = () => {
     if (!showOrientationDialog) return null;
@@ -298,6 +447,89 @@ export function GetImage({
           >
             Verstanden
           </Button>
+        </div>
+      </div>
+    );
+  };
+
+  // Kamera-Modal-Komponente
+  const CameraModal = () => {
+    if (!showCameraModal) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[10000] p-4">
+        <div className="bg-white rounded-lg p-4 max-w-4xl w-full max-h-[90vh] flex flex-col">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Foto aufnehmen - {imageTitle.replace(/_/g, ' ')}
+            </h3>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={stopCamera}
+            >
+              <X className="h-6 w-6" />
+            </Button>
+          </div>
+          
+          <div className="flex-1 flex flex-col items-center">
+            {/* Video-Preview */}
+            <div className="relative bg-black rounded-lg overflow-hidden max-w-full max-h-[60vh]">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+                style={{ 
+                  transform: 'scaleX(-1)', // Spiegeln für natürliche Ansicht
+                  maxWidth: '800px',
+                  maxHeight: '600px'
+                }}
+              />
+              
+              {/* Kamera-Raster für bessere Ausrichtung */}
+              <div className="absolute inset-0 pointer-events-none">
+                <div className="w-full h-full border-2 border-white/20">
+                  <div className="absolute top-1/3 left-0 right-0 h-0 border-t border-white/20"></div>
+                  <div className="absolute top-2/3 left-0 right-0 h-0 border-t border-white/20"></div>
+                  <div className="absolute top-0 bottom-0 left-1/3 w-0 border-l border-white/20"></div>
+                  <div className="absolute top-0 bottom-0 left-2/3 w-0 border-l border-white/20"></div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Kamera-Steuerung */}
+            <div className="flex gap-4 mt-6">
+              <Button 
+                variant="outline" 
+                onClick={stopCamera}
+                className="flex items-center gap-2"
+              >
+                <X className="h-4 w-4" />
+                Abbrechen
+              </Button>
+              
+              <Button 
+                onClick={handleCameraCapture}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+                disabled={isUploading}
+              >
+                <Camera className="h-4 w-4" />
+                {isUploading ? 'Verarbeitet...' : 'Foto aufnehmen'}
+              </Button>
+            </div>
+            
+            {/* Verstecktes Canvas für Foto-Capture */}
+            <canvas
+              ref={canvasRef}
+              className="hidden"
+            />
+          </div>
+          
+          <div className="text-center text-sm text-gray-500 mt-4">
+            <p>Positionieren Sie das Motiv im Rahmen und klicken Sie auf "Foto aufnehmen"</p>
+          </div>
         </div>
       </div>
     );
@@ -706,6 +938,9 @@ export function GetImage({
       {/* Kamera-Hinweis-Dialog */}
       <CameraHintDialog />
       
+      {/* Kamera-Modal */}
+      <CameraModal />
+      
       <div className={fullHeight ? "h-screen max-h-[70vh] flex flex-col" : ""}>
         <div className={`relative w-full ${
           fullHeight 
@@ -825,6 +1060,25 @@ export function GetImage({
                 <p className={`${fullHeight ? "text-base sm:text-lg" : "text-xs"} text-black bg-white/95 px-2 sm:px-3 py-2 rounded-lg shadow-md`}>
                   {uploadedImage ? "Klicken zum Ersetzen" : "Klicken zum Hochladen"}
                 </p>
+                
+                {/* Kamera-Schaltfläche für Desktop */}
+                {!isMobile && cameraAvailable && !uploadedImage && (
+                  <div className="mt-4">
+                    <Button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        startCamera();
+                      }}
+                      variant="outline"
+                      className="flex items-center gap-2 bg-white/95 hover:bg-white text-black border-gray-300"
+                    >
+                      <Camera className="h-4 w-4" />
+                      Mit Kamera aufnehmen
+                    </Button>
+                  </div>
+                )}
               </>
             )}
             <input 
