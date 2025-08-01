@@ -931,11 +931,11 @@ export function LocationDetermination({
 
         {/* GPS Status-Anzeige (permanent oder durch Klick auf GPS-Icon aufrufbar) */}
         {showGpsStatus && (
-          <div 
+          <div
             className="absolute bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-2 text-xs"
             onClick={toggleGpsStatus}
             style={{
-              zIndex: 20000, // Höherer z-index als alle anderen Elemente
+              zIndex: 1000, // Reduzierter z-index
               position: 'absolute', // Wieder auf absolute setzen für korrekte Positionierung
               left: '55px', // Neben dem GPS-Button (10px + Buttonbreite + Abstand)
               top: '75px'   // Gleiche Höhe wie der GPS-Button
@@ -989,7 +989,7 @@ export function LocationDetermination({
         
         {/* Standortinformationen/Habitat-Info (unten rechts) */}
         {showLocationInfo && (
-          <div className="absolute bottom-11 right-3 z-[10000] bg-gray-800/30 backdrop-blur-sm rounded-lg shadow-lg p-3 max-w-[70vw]">
+          <div className="absolute bottom-11 right-3 z-[1000] bg-gray-800/30 backdrop-blur-sm rounded-lg shadow-lg p-3 max-w-[70vw]">
             <div className="flex justify-between items-start">
               <h3 className="text-[12px] font-semibold mb-1 text-white">
                 {selectedHabitatId ? "Bestehendes Habitat" : "Standortinformationen"}

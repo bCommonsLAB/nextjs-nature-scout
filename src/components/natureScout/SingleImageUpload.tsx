@@ -13,6 +13,7 @@ interface SingleImageUploadProps {
   doAnalyzePlant: boolean;
   schematicBg?: string;
   onUploadActiveChange?: (isActive: boolean) => void;
+  requiredOrientation?: 'landscape' | 'portrait'; // Neue Prop für die gewünschte Orientierung
 }
 
 export function SingleImageUpload({ 
@@ -23,7 +24,8 @@ export function SingleImageUpload({
   instruction,
   doAnalyzePlant,
   schematicBg,
-  onUploadActiveChange
+  onUploadActiveChange,
+  requiredOrientation
 }: SingleImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   
@@ -70,6 +72,7 @@ export function SingleImageUpload({
     <div className="h-full">
       <GetImage 
         imageTitle={title} 
+        imageKey={imageKey} // Neuer Parameter
         anweisung={instruction}
         onBildUpload={handleBildUpload}
         onDeleteImage={handleDeleteImage}
@@ -79,6 +82,7 @@ export function SingleImageUpload({
         setIsUploading={setIsUploading}
         schematicBg={schematicBg}
         fullHeight={true}
+        requiredOrientation={requiredOrientation} // Neue Prop weitergeben
       />
     </div>
   );

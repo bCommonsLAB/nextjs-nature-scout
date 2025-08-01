@@ -1045,7 +1045,7 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
   return (
     <>
       {/* Haupt-Container für die Leaflet-Karte */}
-      <div ref={mapContainerRef} className="leaflet-container" style={{ width: '100%', height: '100%', position: 'relative', zIndex: 9999, overflow: 'hidden' }} />
+      <div ref={mapContainerRef} className="leaflet-container" style={{ width: '100%', height: '100%', position: 'relative', zIndex: 100, overflow: 'hidden' }} />
       
       {/* Globale Styles für Leaflet-Elemente */}
       <style jsx global>{`
