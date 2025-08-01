@@ -40,7 +40,7 @@ const schrittErklaerungen = [
   },
   {
     title: "Umriss zeichnen",
-    description: "Klicken Sie auf die Karte, um Eckpunkte des Habitat-Umrisses im Uhrzeigersinn zu setzen. Sie benötigen mindestens 3 Punkte und wählen als letzen den ersten Punkt erneut aus. 'Speichern' sie die Fläche."
+    description: "Klicken Sie auf die Karte mindestens 3 Eckpunkte des Habitats. Wählen als letzen den ersten Punkt erneut aus und 'Speichern' sie die Fläche."
   },
   {
     title: "Panoramabild",
@@ -512,7 +512,7 @@ export default function NatureScout() {
           setMetadata={setMetadata} 
           imageKey="Detailbild_2"
           title="Pflanzenbild 2"
-          instruction="Zweite typische Pflanzenart"
+          instruction="Zweite typische Pflanzenart (optional)"
           doAnalyzePlant={true}
           schematicBg="/images/schema-plant2.svg"
           onUploadActiveChange={handleUploadActiveChange}
