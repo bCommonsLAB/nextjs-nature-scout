@@ -1,13 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Upload, X, RotateCw, Smartphone, Camera, AlertTriangle, Zap } from "lucide-react";
+import { Upload, X, RotateCw, Smartphone, Camera, AlertTriangle } from "lucide-react";
 import { Progress } from "../ui/progress";
 import { Bild, PlantNetResponse, PlantNetResult } from "@/types/nature-scout";
 import { toast } from "sonner";
 import Image from 'next/image';
 import { Button } from "../ui/button";
-import { EnhancedCameraModal } from "./EnhancedCameraModal";
 
 interface GetImageProps {
   imageTitle: string;
@@ -57,20 +56,20 @@ export function GetImage({
   const [cameraAvailable, setCameraAvailable] = useState<boolean | null>(null);
   const [showCameraHint, setShowCameraHint] = useState(false);
   const [showCameraModal, setShowCameraModal] = useState(false);
-  const [showEnhancedCamera, setShowEnhancedCamera] = useState(false);
+
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [backgroundImageStyle, setBackgroundImageStyle] = useState<React.CSSProperties>(
     existingImage?.url ? {
       backgroundImage: `url("${existingImage.lowResUrl || existingImage.url}")`,
-      backgroundSize: isPortrait ? 'cover' : 'contain',
+      backgroundSize: isPortrait ? '85%' : '85%',
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat',
       opacity: 0.3
     } : schematicBg ? {
       backgroundImage: `url("${schematicBg}")`,
-      backgroundSize: 'contain',
+      backgroundSize: '80%',
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat',
       opacity: 0.08
@@ -137,7 +136,7 @@ export function GetImage({
       setUploadedImage(existingImage.url);
       setBackgroundImageStyle({
         backgroundImage: `url("${existingImage.lowResUrl || existingImage.url}")`,
-        backgroundSize: 'contain',
+        backgroundSize: '85%',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
         opacity: 0.3
@@ -147,7 +146,7 @@ export function GetImage({
       if (schematicBg) {
         setBackgroundImageStyle({
           backgroundImage: `url("${schematicBg}")`,
-          backgroundSize: 'contain',
+          backgroundSize: '80%',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
           opacity: 0.08
@@ -407,7 +406,7 @@ export function GetImage({
     setUploadedImage(url);
     setBackgroundImageStyle({
       backgroundImage: `url("${data.lowResUrl || url}")`,
-      backgroundSize: 'contain',
+      backgroundSize: '85%',
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat',
       opacity: 0.3
@@ -497,40 +496,6 @@ export function GetImage({
       } finally {
         setIsUploading(false);
       }
-    }
-  }
-
-  async function handleEnhancedCameraCapture(file: File) {
-    setIsUploading(true);
-    setProgressPhase('upload');
-    setLocalUploadProgress(5);
-
-    try {
-      const { url, lowResUrl, filename, analysis } = await processImage(
-        file,
-        file.name,
-        doAnalyzePlant
-      );
-
-      updateUIWithImage(url, {
-        imageTitle,
-        filename,
-        lowResUrl,
-        bestMatch: analysis?.bestMatch || "",
-        result: analysis?.results[0]
-      });
-
-      setLocalUploadProgress(100);
-      toast.success(
-        doAnalyzePlant 
-          ? 'Foto aufgenommen und Pflanze analysiert (Erweiterte Kamera)'
-          : 'Foto aufgenommen (Erweiterte Kamera)'
-      );
-    } catch (error) {
-      console.error("Erweiterte Kamera-Fehler:", error);
-      toast.error('Fehler beim Verarbeiten des Fotos');
-    } finally {
-      setIsUploading(false);
     }
   }
 
@@ -714,8 +679,21 @@ export function GetImage({
                   : "h-full min-h-[60vh] w-full" 
               : "h-[150px] w-[150px]"
           } border-2 border-dashed border-gray-300 rounded-xl bg-gray-100 p-4 sm:p-6 relative overflow-hidden`}
-          style={backgroundImageStyle}
         >
+          {/* Hintergrundbild - separates Element für korrekte Opacity */}
+          {backgroundImageStyle.backgroundImage && (
+            <div 
+              className="absolute inset-0 rounded-xl"
+              style={{
+                backgroundImage: backgroundImageStyle.backgroundImage,
+                backgroundSize: backgroundImageStyle.backgroundSize,
+                backgroundPosition: backgroundImageStyle.backgroundPosition,
+                backgroundRepeat: backgroundImageStyle.backgroundRepeat,
+                opacity: backgroundImageStyle.opacity,
+                zIndex: 1
+              }}
+            />
+          )}
           {/* Kamera-Status oben rechts */}
           <div className="absolute top-2 right-2 z-20">
             <div className="text-xs bg-white/95 px-2 py-1 rounded-lg shadow-md flex items-center gap-1">
@@ -753,7 +731,7 @@ export function GetImage({
                 if (schematicBg) {
                   setBackgroundImageStyle({
                     backgroundImage: `url("${schematicBg}")`,
-                    backgroundSize: 'contain',
+                    backgroundSize: '80%',
                     backgroundPosition: 'center',
                     backgroundRepeat: 'no-repeat',
                     opacity: 0.08
@@ -767,81 +745,46 @@ export function GetImage({
             </Button>
           )}
 
-          {/* Content */}
-          {isUploading ? (
-            <div className="w-full px-4 sm:px-6 bg-white/95 rounded-lg py-4 sm:py-6 shadow-md">
-              <Progress value={localUploadProgress} className="w-full" />
-              <p className="text-sm sm:text-base text-center mt-3 text-black font-semibold">
-                {Math.round(localUploadProgress)}% 
-                {progressPhase === 'upload' && localUploadProgress <= 20 && localUploadProgress > 5 
-                  ? ' komprimiert' 
-                  : progressPhase === 'analyze' 
-                    ? ' analysiert' 
-                    : ' hochgeladen'
-                }
-              </p>
-            </div>
-          ) : (
-            <>
-              <h2 className={`${fullHeight ? "text-lg sm:text-2xl" : "text-sm"} font-bold text-center text-black bg-white/95 px-3 sm:px-4 py-2 rounded-lg shadow-md`}>
-                {imageTitle.replace(/_/g, ' ')}
-              </h2>
-              <p className={`${fullHeight ? "text-base sm:text-lg" : "text-xs"} text-center text-black max-w-md bg-white/95 px-2 sm:px-3 py-2 rounded-lg shadow-md mt-3`}>
-                {uploadedImage ? "Bild ersetzen" : anweisung}
-              </p>
-              <Upload className={`${fullHeight ? "w-16 h-16 sm:w-20 sm:h-20" : "w-8 h-8"} my-4 sm:my-6 text-black`} />
-            </>
-          )}
+          {/* Content - über dem Hintergrundbild */}
+          <label htmlFor={`dropzone-file-${imageTitle}`} className="relative z-10 flex flex-col items-center justify-center w-full h-full cursor-pointer">
+            {isUploading ? (
+              <div className="w-full px-4 sm:px-6 bg-white/95 rounded-lg py-4 sm:py-6 shadow-md">
+                <Progress value={localUploadProgress} className="w-full" />
+                <p className="text-sm sm:text-base text-center mt-3 text-black font-semibold">
+                  {Math.round(localUploadProgress)}% 
+                  {progressPhase === 'upload' && localUploadProgress <= 20 && localUploadProgress > 5 
+                    ? ' komprimiert' 
+                    : progressPhase === 'analyze' 
+                      ? ' analysiert' 
+                      : ' hochgeladen'
+                  }
+                </p>
+              </div>
+            ) : (
+              <>
+                <h2 className={`${fullHeight ? "text-lg sm:text-2xl" : "text-sm"} font-bold text-center text-black bg-white/95 px-3 sm:px-4 py-2 rounded-lg shadow-md`}>
+                  {imageTitle.replace(/_/g, ' ')}
+                </h2>
+                <p className={`${fullHeight ? "text-base sm:text-lg" : "text-xs"} text-center text-black max-w-md bg-white/95 px-2 sm:px-3 py-2 rounded-lg shadow-md mt-3`}>
+                  {uploadedImage ? "Bild ersetzen" : anweisung}
+                </p>
+                <Upload className={`${fullHeight ? "w-24 h-24 sm:w-32 sm:h-32" : "w-12 h-12"} my-4 sm:my-6 text-black`} />
+                <p className={`${fullHeight ? "text-base sm:text-lg" : "text-xs"} text-black bg-white/95 px-2 sm:px-3 py-2 rounded-lg shadow-md`}>
+                  {uploadedImage ? "Klicken zum Ersetzen" : "Klicken zum Hochladen"}
+                </p>
+              </>
+            )}
+          </label>
+          {/* File Input */}
+          <input 
+            id={`dropzone-file-${imageTitle}`} 
+            type="file" 
+            className="hidden" 
+            onChange={handleBildUpload}
+            accept="image/*"
+            capture={isMobile && cameraAvailable ? "environment" : undefined} 
+          />
         </div>
-        
-        {/* Drei Upload-Optionen nebeneinander */}
-        <div className="mt-4 flex gap-2 flex-wrap justify-center">
-          <Button
-            type="button"
-            onClick={() => document.getElementById(`dropzone-file-${imageTitle}`)?.click()}
-            variant="outline"
-            className="flex items-center gap-2 bg-white/95 hover:bg-white text-black border-gray-300"
-            size={isMobile ? "sm" : "default"}
-          >
-            <Upload className="h-4 w-4" />
-            Hochladen
-          </Button>
-          
-          {(cameraAvailable || true) && (
-            <>
-              <Button
-                type="button"
-                onClick={() => startCamera()}
-                variant="outline"
-                className="flex items-center gap-2 bg-gray-50 hover:bg-gray-100 text-black border-gray-300"
-                size={isMobile ? "sm" : "default"}
-              >
-                <Camera className="h-4 w-4" />
-                {isMobile ? "Standard" : "Standard Kamera"}
-              </Button>
-              <Button
-                type="button"
-                onClick={() => setShowEnhancedCamera(true)}
-                variant="outline"
-                className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300"
-                size={isMobile ? "sm" : "default"}
-              >
-                <Zap className="h-4 w-4" />
-                {isMobile ? "Erweitert" : "Erweiterte Kamera"}
-              </Button>
-            </>
-          )}
-        </div>
-        
-        {/* Verstecktes File Input */}
-        <input 
-          id={`dropzone-file-${imageTitle}`} 
-          type="file" 
-          className="hidden" 
-          onChange={handleBildUpload}
-          accept="image/*"
-          capture={isMobile && cameraAvailable ? "environment" : undefined} 
-        />
         
         {/* Pflanzen-Analyse Info */}
         {uploadedImage && doAnalyzePlant && (
@@ -852,14 +795,6 @@ export function GetImage({
         )}
       </div>
 
-      {/* Erweiterte Kamera Modal (react-webcam) */}
-      <EnhancedCameraModal
-        isOpen={showEnhancedCamera}
-        onClose={() => setShowEnhancedCamera(false)}
-        onCapture={handleEnhancedCameraCapture}
-        title={imageTitle.replace(/_/g, ' ')}
-        requiredOrientation={requiredOrientation}
-      />
     </>
   );
 }

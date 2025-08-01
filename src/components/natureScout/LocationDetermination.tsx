@@ -338,6 +338,7 @@ export function LocationDetermination({
   const [isLoadingGeodata, setIsLoadingGeodata] = useState<boolean>(false);
   const [showLocationInfo, setShowLocationInfo] = useState<boolean>(false);
   const [isSavingPolygon, setIsSavingPolygon] = useState<boolean>(false);
+  const [polygonSaved, setPolygonSaved] = useState<boolean>(false);
   
   // Zustand für die berechnete Fläche
   const [areaInSqMeters, setAreaInSqMeters] = useState<number>(
@@ -800,6 +801,9 @@ export function LocationDetermination({
       
       // Lokaler State für Polygon-Punkte aktualisieren
       setPolygonPoints(currentPoints);
+      
+      // Polygon als gespeichert markieren
+      setPolygonSaved(true);
       // HINWEIS: currentPosition (GPS-Standort des Nutzers) wird hier NICHT überschrieben
       // Habitat-Position (centerLat/centerLng) und GPS-Position des Nutzers sind bewusst getrennt,
       // damit der Nutzer sich im Gelände frei bewegen kann, während das Habitat an seinem Ort bleibt
@@ -830,6 +834,9 @@ export function LocationDetermination({
       ...prevMetadata,
       polygonPoints: []
     }));
+    
+    // Polygon-Speicherstatus zurücksetzen
+    setPolygonSaved(false);
     
     // Standortinformationsanzeige ausblenden
     setShowLocationInfo(false);
@@ -1197,18 +1204,18 @@ export function LocationDetermination({
           </div>
         )}
         
-        {/* UI-Overlay: Aktions-Buttons für Polygon-Modus (unten zentriert) */}
+        {/* UI-Overlay: Aktions-Buttons für Polygon-Modus (unten links) */}
         {mapMode === 'polygon' && (
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-[9999] bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg">
+          <div className="absolute bottom-4 left-4 z-[9999] bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg">
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={savePolygon}
-                disabled={isSavingPolygon}
+                disabled={isSavingPolygon || polygonSaved}
                 className="h-8 text-xs"
               >
-                {isSavingPolygon ? 'Speichern...' : 'Umriss speichern'}
+                {isSavingPolygon ? 'Speichern...' : polygonSaved ? 'Umriss gespeichert' : 'Umriss speichern'}
               </Button>
               
               <Button
@@ -1226,34 +1233,37 @@ export function LocationDetermination({
         
         {/* UI-Overlay: Aktions-Buttons (oben links) */}
         {mapMode !== 'polygon' && (
-        <div className="absolute z-[9999] flex flex-row gap-2 items-center" style={{left: 10, top: 75}}>
-            <Button 
-              variant="secondary" 
-              size="icon" 
-              onClick={centerToCurrentGPS} 
-              className="h-7 w-7 shadow-lg bg-blue-600 hover:bg-blue-700"
-              title="Auf aktuelle GPS-Position zentrieren"
-            >
-              <LocateFixed className="h-4 w-4 text-white" />
-            </Button>
-            
-            {/* Neuer Button zum Anzeigen des GPS-Status */}
-            {!showGpsStatus && (
+          <>
+          <div className="absolute z-[9999] flex flex-row gap-2 items-center" style={{left: 10, top: 80}}>
               <Button 
                 variant="secondary" 
                 size="icon" 
-                onClick={toggleGpsStatus} 
-                className="h-7 w-7 shadow-lg bg-gray-600 hover:bg-gray-700"
-                title="GPS-Status anzeigen"
+                onClick={centerToCurrentGPS} 
+                className="h-8 w-8 shadow-lg bg-blue-600 hover:bg-blue-700"
+                title="Auf aktuelle GPS-Position zentrieren"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-white">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="12" y1="16" x2="12" y2="12"></line>
-                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                </svg>
+                <LocateFixed className="h-4 w-4 text-white" />
               </Button>
-            )}
-          </div>
+            </div>
+            <div className="absolute z-[9999] flex flex-row gap-2 items-center" style={{left: 10, top: 118}}>
+              {/* Neuer Button zum Anzeigen des GPS-Status */}
+              {!showGpsStatus && (
+                <Button 
+                  variant="secondary" 
+                  size="icon" 
+                  onClick={toggleGpsStatus} 
+                  className="h-8 w-8 shadow-lg bg-gray-600 hover:bg-gray-700"
+                  title="GPS-Status anzeigen"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-white">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                  </svg>
+                </Button>
+              )}
+            </div>
+          </>
         )}
         {/* Entferne alte Buttons für Speichern/Neu (wurden nach oben verschoben) */}
         {!showLocationInfo && (

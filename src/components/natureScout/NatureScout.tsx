@@ -40,7 +40,7 @@ const schrittErklaerungen = [
   },
   {
     title: "Umriss zeichnen",
-    description: "Klicken Sie auf die Karte, um Eckpunkte des Habitat-Umrisses im Uhrzeigersinn zu setzen. Sie benötigen mindestens 3 Punkte. Die Fläche wird automatisch berechnet."
+    description: "Klicken Sie auf die Karte, um Eckpunkte des Habitat-Umrisses im Uhrzeigersinn zu setzen. Sie benötigen mindestens 3 Punkte und wählen als letzen den ersten Punkt erneut aus. 'Speichern' sie die Fläche."
   },
   {
     title: "Panoramabild",
@@ -70,15 +70,15 @@ const schrittErklaerungen = [
 
 // Weiter-Button-Labels für jeden Schritt
 const weiterButtonLabels = [
-  "Weiter zum Standort finden",      // Von Schritt 0 (Willkommen) 
-  "Weiter zum Umriss zeichnen",      // Von Schritt 1 (Standort finden)
-  "Weiter zum Panoramabild",         // Von Schritt 2 (Umriss zeichnen)
-  "Weiter zum Detailbild",           // Von Schritt 3 (Panoramabild)
-  "Weiter zum Pflanzenbild 1",       // Von Schritt 4 (Detailbild)
-  "Weiter zum Pflanzenbild 2",       // Von Schritt 5 (Pflanzenbild 1)
-  "Weiter zur Analyse",              // Von Schritt 6 (Pflanzenbild 2)
-  "Habitat speichern und analysieren", // Von Schritt 7 (Habitat analysieren)
-  "Neuen Habitat erfassen"           // Von Schritt 8 (Verifizierung)
+  "Standort finden",      // Von Schritt 0 (Willkommen) 
+  "Umriss zeichnen",      // Von Schritt 1 (Standort finden)
+  "Panoramabild erfassen",         // Von Schritt 2 (Umriss zeichnen)
+  "Detailbild erfassen",           // Von Schritt 3 (Panoramabild)
+  "Pflanze 1 erfassen",       // Von Schritt 4 (Detailbild)
+  "Pflanze 2 erfassen",       // Von Schritt 5 (Pflanzenbild 1)
+  "zur Analyse",              // Von Schritt 6 (Pflanzenbild 2)
+  "Habitat speichern", // Von Schritt 7 (Habitat analysieren)
+  "Neues Habitat erfassen"           // Von Schritt 8 (Verifizierung)
 ];
 
 // Schwebende Sprechblasen-Komponente
@@ -646,7 +646,7 @@ export default function NatureScout() {
       {/* Navigation - außerhalb des main Containers, immer unten, fixed position */}
       <div 
         ref={navigationRef}
-        className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm py-2 sm:py-2 px-4 border-t border-gray-200 shadow-lg"
+        className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm py-2 sm:py-2 px-1 border-t border-gray-200 shadow-lg"
         style={{
           position: 'fixed',
           bottom: 0,
@@ -658,18 +658,16 @@ export default function NatureScout() {
           paddingBottom: 'env(safe-area-inset-bottom, 6px)'
         }}
       >
-        <div className="container mx-auto flex justify-between items-center gap-1">
-          <div className="flex gap-2">
-              <Button 
-                onClick={() => aktiverSchritt === 0 ? router.push('/') : setAktiverSchritt(prev => prev - 1)} 
-                disabled={aktiverSchritt === 0 && false}
-                variant="outline"
-                className="gap-1"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Zurück
-              </Button>
-          </div>
+        <div className="container mx-auto flex justify-between items-center">
+          <Button 
+            onClick={() => aktiverSchritt === 0 ? router.push('/') : setAktiverSchritt(prev => prev - 1)} 
+            disabled={aktiverSchritt === 0 && false}
+            variant="outline"
+            className="gap-1"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Zurück
+          </Button>
 
           <Button 
             ref={nextButtonRef}
