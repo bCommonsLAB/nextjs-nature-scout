@@ -25,12 +25,6 @@ const nextConfig: NextConfig = {
               pathname: '/**',
             },
             {
-              protocol: 'https',
-              hostname: 'nature.bcommonslab.org',
-              port: '',
-              pathname: '/**',
-            },
-            {
               protocol: 'http',
               hostname: 'localhost',
               port: '',

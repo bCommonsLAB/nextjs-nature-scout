@@ -27,14 +27,16 @@ export function UploadedImageList({ bilder }: UploadedImageListProps) {
     <>
       <div className="flex overflow-x-auto gap-3 pb-4 -mx-2 px-2">
         {bilder.map((bild) => (
-          <div key={bild.imageKey} className="border rounded-lg p-2 w-[22vw] min-w-[150px] max-w-[220px] flex-shrink-0">
-            <Image 
-              src={`${bild.url}`}
-              alt={`Bild ${bild.imageKey}`} 
-              className="w-full h-28 sm:h-36 object-contain rounded bg-gray-50" 
-              width={200} 
-              height={200} 
-            />
+          <div key={bild.imageKey} className="border rounded-lg p-2 w-48 sm:w-52 flex-shrink-0">
+            <div className="relative w-full aspect-square bg-gray-50 rounded overflow-hidden">
+              <Image 
+                src={`${bild.url}`}
+                alt={`Bild ${bild.imageKey}`} 
+                fill
+                className="object-cover" 
+                sizes="(max-width: 768px) 192px, 208px"
+              />
+            </div>
             <div className="mt-2 space-y-1">
               <p className="text-xs sm:text-sm text-gray-600">{bild.imageKey.replace("_", " ")}</p>
               {bild.analyse && (

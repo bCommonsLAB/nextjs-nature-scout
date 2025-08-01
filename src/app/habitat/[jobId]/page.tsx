@@ -375,14 +375,15 @@ export default function HabitateDetailPage() {
                 {data.metadata?.bilder?.map((bild: HabitatBild, index: number) => (
                   <div key={index} className="bg-gray-50 p-3 rounded">
                     <div 
-                      className="relative h-64 w-full cursor-pointer"
+                      className="relative w-full aspect-[4/3] cursor-pointer bg-gray-100 rounded overflow-hidden"
                       onClick={() => setPreviewImage(bild.url)}
                     >
                       <Image
                         src={bild.url.replace('.jpg', '_low.jpg')}
                         alt={`Bild ${index + 1}`}
                         fill
-                        className="habitat-image"
+                        className="object-cover transition-transform hover:scale-105"
+                        sizes="(max-width: 768px) 100vw, 50vw"
                       />
                       <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-20 transition-opacity">
                         <SearchIcon className="h-6 w-6 text-white opacity-0 hover:opacity-100" />

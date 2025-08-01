@@ -1,58 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Upload, X } from "lucide-react";
+import { Upload, X, RotateCw, Smartphone } from "lucide-react";
 import { Progress } from "../ui/progress";
 import { Bild, PlantNetResponse, PlantNetResult } from "@/types/nature-scout";
 import { toast } from "sonner";
 import Image from 'next/image';
 import { Button } from "../ui/button";
 
-let SAMPLE_IMAGES = [
-  {
-    src: '/habitatsamples/trockenrasen-kurzgrasig.jpg',
-    title: 'Trockenrasen kurzgrasig',
-    type: 'habitat'
-  },
-  {
-    src: '/habitatsamples/verlandungsmoor.jpg',
-    title: 'Moor Verlandungsmoor',
-    type: 'habitat'
-  },
-  {
-    src: '/habitatsamples/magerwiese-artenreich.jpg',
-    title: 'Magerwiese artenreich',
-    type: 'habitat'
-  },
-  {
-    src: '/habitatsamples/fettwiese-standard.jpg',
-    title: 'Fettwiese',
-    type: 'habitat'
-  },
-  {
-    src: '/plantsamples/arnika.jpg',
-    title: 'Arnika (typisch für Magerwiese)',
-    type: 'plant'
-  },
-  {
-    src: '/plantsamples/salvia-pratensis.jpg',
-    title: 'Salvia pratensis (typisch für Magerwiese)',
-    type: 'plant'
-  },
-  {
-    src: '/plantsamples/trifolium-montanum.jpg',
-    title: 'Trifolium montanum (typisch für Magerwiese)',
-    type: 'plant'
-  },
-  {
-    src: '/plantsamples/fumana-ericoides.jpg',
-    title: 'Fumana ericoides (typisch für Trockenrasen)',
-    type: 'plant'
-  },
-];
+
 
 interface GetImageProps {
   imageTitle: string;
+  imageKey: string; // Neuer Parameter für den korrekten imageKey
   anweisung: string;
   onBildUpload: (
     imageKey: string,
@@ -67,29 +27,48 @@ interface GetImageProps {
   doAnalyzePlant?: boolean;
   isUploading: boolean;
   setIsUploading: (value: boolean) => void;
+  schematicBg?: string;
+  fullHeight?: boolean;
+  requiredOrientation?: 'landscape' | 'portrait'; // Neue Prop für die gewünschte Orientierung
 }
 
 export function GetImage({ 
   imageTitle, 
+  imageKey, // Neuer Parameter
   anweisung, 
   onBildUpload, 
   onDeleteImage,
   existingImage, 
   doAnalyzePlant = false,
   isUploading,
-  setIsUploading 
+  setIsUploading,
+  schematicBg,
+  fullHeight = false,
+  requiredOrientation
 }: GetImageProps) {
-  SAMPLE_IMAGES=[]
+  // Verwende die explizit übergebene Orientierung
+  const isPanorama = requiredOrientation === 'landscape';
+  const isPortrait = requiredOrientation === 'portrait';
+  
   const [localUploadProgress, setLocalUploadProgress] = useState(0);
   const [uploadedImage, setUploadedImage] = useState<string | null>(existingImage?.url || null);
   const [progressPhase, setProgressPhase] = useState<'upload' | 'analyze' | 'complete'>('upload');
+  const [isLandscape, setIsLandscape] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [showOrientationDialog, setShowOrientationDialog] = useState(false);
   const [backgroundImageStyle, setBackgroundImageStyle] = useState<React.CSSProperties>(
     existingImage?.url ? {
-      backgroundImage: `url("${existingImage.url}")`,
+      backgroundImage: `url("${existingImage.lowResUrl || existingImage.url}")`,
+      backgroundSize: isPortrait ? 'cover' : 'contain',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      opacity: 0.3
+    } : schematicBg ? {
+      backgroundImage: `url("${schematicBg}")`,
       backgroundSize: 'contain',
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat',
-      opacity: 1
+      opacity: 0.08
     } : {}
   );
 
@@ -97,14 +76,131 @@ export function GetImage({
     if (existingImage?.url) {
       setUploadedImage(existingImage.url);
       setBackgroundImageStyle({
-        backgroundImage: `url("${existingImage.url.replace('.jpg', '_low.jpg')}")`,
+        backgroundImage: `url("${existingImage.lowResUrl || existingImage.url}")`,
         backgroundSize: 'contain',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
-        opacity: 1
+        opacity: 0.3 // Dezenter für bessere Sichtbarkeit der Upload-Elemente
       });
+    } else {
+      // Wichtig: uploadedImage zurücksetzen, wenn kein existingImage vorhanden ist
+      setUploadedImage(null);
+      if (schematicBg) {
+        setBackgroundImageStyle({
+          backgroundImage: `url("${schematicBg}")`,
+          backgroundSize: 'contain',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          opacity: 0.08
+        });
+      } else {
+        setBackgroundImageStyle({});
+      }
     }
-  }, [existingImage]);
+  }, [existingImage, schematicBg, isPortrait]);
+
+  // Progress zurücksetzen, wenn sich der Bildschritt ändert
+  useEffect(() => {
+    setLocalUploadProgress(0);
+    setProgressPhase('upload');
+  }, [imageKey]); // imageKey ändert sich, wenn wir zu einem neuen Bildschritt wechseln
+
+  // Orientierungserkennung für mobile Geräte
+  useEffect(() => {
+    const checkOrientation = () => {
+      const landscape = window.innerWidth > window.innerHeight;
+      const mobile = window.innerWidth <= 1024; // Erweitert für Desktop-Testing (ursprünglich 768)
+      
+      setIsLandscape(landscape);
+      setIsMobile(mobile);
+      
+      // Debug-Ausgaben
+      console.log('🔍 Orientation Check:', {
+        imageTitle,
+        requiredOrientation,
+        isPanorama,
+        isPortrait,
+        mobile,
+        landscape,
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+      
+      // Nur für mobile Geräte und wenn eine Orientierung explizit gefordert ist
+      if (mobile && requiredOrientation) {
+        if (requiredOrientation === 'landscape' && !landscape) {
+          // Querformat erforderlich, aber aktuell Hochformat
+          console.log('📱 Showing dialog: Landscape required');
+          setShowOrientationDialog(true);
+        } else if (requiredOrientation === 'portrait' && landscape) {
+          // Hochformat erforderlich, aber aktuell Querformat
+          console.log('📱 Showing dialog: Portrait required');
+          setShowOrientationDialog(true);
+        } else {
+          console.log('📱 Hiding dialog: Correct orientation');
+          setShowOrientationDialog(false);
+        }
+      } else {
+        console.log('💻 Desktop mode or no orientation required: No dialog');
+        setShowOrientationDialog(false);
+      }
+    };
+
+    // Initial prüfen
+    checkOrientation();
+
+    // Event Listener für Orientierungsänderungen
+    window.addEventListener('resize', checkOrientation);
+    window.addEventListener('orientationchange', checkOrientation);
+
+    return () => {
+      window.removeEventListener('resize', checkOrientation);
+      window.removeEventListener('orientationchange', checkOrientation);
+    };
+  }, [requiredOrientation, imageTitle]);
+
+  // Orientierungsdialog Komponente
+  const OrientationDialog = () => {
+    if (!showOrientationDialog) return null;
+
+    const isRequiringLandscape = requiredOrientation === 'landscape';
+    const isRequiringPortrait = requiredOrientation === 'portrait';
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000] p-4">
+        <div className="bg-white rounded-lg p-6 max-w-sm text-center shadow-xl">
+          <div className="flex justify-center mb-4">
+            {isRequiringLandscape ? (
+              <div className="flex items-center gap-2">
+                <Smartphone className="h-8 w-8 text-blue-500 transform -rotate-90" />
+                <RotateCw className="h-6 w-6 text-gray-400" />
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Smartphone className="h-8 w-8 text-blue-500" />
+                <RotateCw className="h-6 w-6 text-gray-400" />
+              </div>
+            )}
+          </div>
+          
+          <h3 className="text-lg font-semibold mb-2 text-gray-900">
+            {isRequiringLandscape ? "Handy quer drehen" : "Handy aufrecht halten"}
+          </h3>
+          
+          <p className="text-gray-600 mb-4">
+            {isRequiringLandscape 
+              ? "Für das Panoramabild bitte das Handy quer halten, um den besten Überblick zu erhalten."
+              : "Für Detail- und Pflanzenbilder bitte das Handy aufrecht halten, um die beste Aufnahme zu erzielen."
+            }
+          </p>
+          
+          <p className="text-sm text-gray-500">
+            Dieser Dialog verschwindet automatisch, wenn Sie das Handy richtig halten.
+          </p>
+        </div>
+      </div>
+    );
+  };
 
   // Timer für kontinuierliche Fortschrittsanzeige
   useEffect(() => {
@@ -303,16 +399,17 @@ export function GetImage({
     }
   ) {
     setUploadedImage(url);
+    // Für hochgeladene Bilder verwenden wir die Low-Res Version als Hintergrund
     setBackgroundImageStyle({
-      backgroundImage: `url("${url}")`,
+      backgroundImage: `url("${data.lowResUrl || url}")`,
       backgroundSize: 'contain',
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat',
-      opacity: 1
+      opacity: 0.3 // Dezenter für bessere Sichtbarkeit der Upload-Elemente
     });
 
     onBildUpload(
-      data.imageTitle,
+      imageKey,
       data.filename,
       url,
       data.bestMatch,
@@ -336,77 +433,96 @@ export function GetImage({
   }
 
   return (
-    <div>
-      <div className="relative max-w-xs mx-auto">
+    <>
+      {/* Orientierungsdialog */}
+      <OrientationDialog />
+      
+      <div className={fullHeight ? "h-screen max-h-[70vh] flex flex-col" : ""}>
+        <div className={`relative w-full ${
+          fullHeight 
+            ? isPanorama 
+              ? "max-w-4xl" 
+              : "max-w-2xl" 
+            : "max-w-xs"
+        } mx-auto`}>
         <div 
-          className={`flex flex-col items-center justify-center h-[150px] w-[150px] border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-100 hover:bg-gray-200 p-2 ${uploadedImage ? "" : "space-y-1"}`}
-          style={backgroundImageStyle}
+          className={`flex flex-col items-center justify-center ${
+            fullHeight 
+              ? isPanorama
+                ? "h-full min-h-[50vh] w-full aspect-video max-h-[60vh]" 
+                : isPortrait
+                  ? "h-full min-h-[60vh] w-full aspect-[9/16] max-w-md mx-auto"
+                  : "h-full min-h-[60vh] w-full" 
+              : "h-[150px] w-[150px]"
+          } border-2 border-dashed border-gray-300 rounded-xl cursor-pointer bg-gray-100 hover:bg-gray-200 p-4 sm:p-6 ${uploadedImage ? "" : "space-y-2"} relative overflow-hidden`}
         >
+          {/* Hintergrundbild Container */}
+          {backgroundImageStyle.backgroundImage && (
+            <div 
+              className={`absolute rounded-lg ${
+                isPanorama 
+                  ? "inset-4 sm:inset-6" 
+                  : isPortrait 
+                    ? "top-8 bottom-8 left-6 right-6 sm:left-8 sm:right-8"
+                    : "inset-4 sm:inset-6"
+              }`}
+              style={{
+                ...backgroundImageStyle,
+                zIndex: 1
+              }}
+            />
+          )}
+          
           {uploadedImage && (
             <Button
               variant="destructive"
               size="icon"
-              className="absolute top-2 right-2 z-10"
+              className="absolute top-2 right-2 z-20"
               onClick={(e) => {
                 e.preventDefault();
-                onDeleteImage(imageTitle);
+                onDeleteImage(imageKey);
                 setUploadedImage(null);
-                setBackgroundImageStyle({});
+                // Zurück zum Schema-Bild falls vorhanden
+                if (schematicBg) {
+                  setBackgroundImageStyle({
+                    backgroundImage: `url("${schematicBg}")`,
+                    backgroundSize: 'contain',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    opacity: 0.08
+                  });
+                } else {
+                  setBackgroundImageStyle({});
+                }
               }}
             >
               <X className="h-4 w-4" />
             </Button>
           )}
           
-          <label htmlFor={`dropzone-file-${imageTitle}`} className="flex flex-col items-center justify-center w-full h-full">
+          <label htmlFor={`dropzone-file-${imageTitle}`} className="flex flex-col items-center justify-center w-full h-full relative z-10">
             {isUploading ? (
-              <div className="w-full px-4">
+              <div className="w-full px-4 sm:px-6 bg-white/95 rounded-lg py-4 sm:py-6 shadow-md">
                 <Progress value={localUploadProgress} className="w-full" />
-                <p className="text-xs text-center mt-2">
+                <p className="text-sm sm:text-base text-center mt-3 text-black font-semibold">
                   {Math.round(localUploadProgress)}% 
                   {progressPhase === 'analyze' ? ' analysiert' : ' hochgeladen'}
                 </p>
               </div>
-            ) : !uploadedImage ? (
+            ) : (
               <>
-                <h2 className="text-sm font-semibold">{imageTitle.replace(/_/g, ' ')}</h2>
-                <p className="text-xs text-center text-gray-500">{anweisung}</p>
-                <Upload className="w-8 h-8 my-1 text-gray-400" />
-                <p className="text-xs text-gray-500">Klicken zum Hochladen</p>
-                {SAMPLE_IMAGES.length > 0 && (
-                  <div className="mt-1">
-                    <p className="text-xs text-gray-600">Beispielbilder:</p>
-                    <div className="grid grid-cols-4 gap-1 mt-1">
-                    {SAMPLE_IMAGES
-                      .filter(sample => 
-                        doAnalyzePlant ? sample.type === 'plant' 
-                          : sample.type === 'habitat'
-                      )
-                      .map((sample, index) => (
-                        <button
-                          key={index}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            handleSampleImageClick(sample.src);
-                          }}
-                          className="relative w-[30px] h-[30px] rounded overflow-hidden hover:opacity-90 transition-opacity"
-                          title={sample.title}
-                        >
-                          <Image
-                            src={sample.src.replace('.jpg', '_low.jpg')}
-                            alt={sample.title}
-                            width={30}
-                            height={30}
-                            className="object-cover"
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <h2 className={`${fullHeight ? "text-lg sm:text-2xl" : "text-sm"} font-bold text-center text-black bg-white/95 px-3 sm:px-4 py-2 rounded-lg shadow-md`}>
+                  {imageTitle.replace(/_/g, ' ')}
+                </h2>
+                <p className={`${fullHeight ? "text-base sm:text-lg" : "text-xs"} text-center text-black max-w-md bg-white/95 px-2 sm:px-3 py-2 rounded-lg shadow-md mt-3`}>
+                  {uploadedImage ? "Bild ersetzen" : anweisung}
+                </p>
+                <Upload className={`${fullHeight ? "w-16 h-16 sm:w-20 sm:h-20" : "w-8 h-8"} my-4 sm:my-6 text-black`} />
+                <p className={`${fullHeight ? "text-base sm:text-lg" : "text-xs"} text-black bg-white/95 px-2 sm:px-3 py-2 rounded-lg shadow-md`}>
+                  {uploadedImage ? "Klicken zum Ersetzen" : "Klicken zum Hochladen"}
+                </p>
               </>
-            ) : null}
+            )}
             <input 
               id={`dropzone-file-${imageTitle}`} 
               type="file" 
@@ -418,12 +534,13 @@ export function GetImage({
         </div>
         
         {uploadedImage && doAnalyzePlant && (
-          <div className="mt-2 text-xs w-[150px]">
+          <div className="mt-2 text-xs w-full sm:w-[150px]">
             <p className="font-medium">Erkannte Pflanze:</p>
             <p className="text-gray-600">{existingImage?.analyse || "Analyse läuft..."}</p>
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </>
   );
 } 
