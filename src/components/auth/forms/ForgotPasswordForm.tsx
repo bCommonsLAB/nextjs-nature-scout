@@ -64,7 +64,7 @@ export default function ForgotPasswordForm() {
             <Alert className="border-[#D3E0BD] bg-[#FAFFF3]">
               <Mail className="h-5 w-5 text-[#637047]" />
               <AlertDescription className="text-base text-[#2D3321]">
-                Wir haben eine E-Mail an <strong>{email}</strong> gesendet. 
+                Falls diese Email-Adresse <strong>{email}</strong> registriert ist, haben wir eine E-Mail an sie gesendet. 
                 Klicken Sie auf den Link in der E-Mail, um Ihr Passwort zurückzusetzen.
               </AlertDescription>
             </Alert>
