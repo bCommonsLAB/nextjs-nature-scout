@@ -8,6 +8,8 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css'; // CSS für Leaflet Draw
 import './leaflet-custom.css';  // Ihre custom Styles
 import { AuthProviders } from "@/components/providers/AuthProviders"
+import ErrorBoundary from "@/components/ErrorBoundary"
+import ChunkErrorHandler from "@/components/ChunkErrorHandler"
 
 // const customLocalization = {
 //   ...deDE,
@@ -48,13 +50,16 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
       >
-        <AuthProviders>
-          <Navbar />
-          <main>
-            {children}
-          </main>
-          <Footer />
-        </AuthProviders>
+        <ErrorBoundary>
+          <AuthProviders>
+            <ChunkErrorHandler />
+            <Navbar />
+            <main>
+              {children}
+            </main>
+            <Footer />
+          </AuthProviders>
+        </ErrorBoundary>
       </body>
     </html>
   );

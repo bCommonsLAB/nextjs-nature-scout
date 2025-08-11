@@ -62,9 +62,6 @@ export default function LoginForm() {
     }
     
     // Nachrichten anzeigen
-    if (message === 'registration_disabled') {
-      setError('Öffentliche Registrierung ist derzeit deaktiviert. Sie benötigen eine Einladung, um sich zu registrieren.')
-    }
     // Keine separate "invite_accepted" Nachricht mehr - wird durch Einladungs-Banner ersetzt
   }, [])
 

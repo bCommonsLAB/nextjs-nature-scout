@@ -4,6 +4,55 @@ const nextConfig: NextConfig = {
     // Standalone output für Docker-Build
     output: 'standalone',
 
+    // Webpack-Optimierungen für bessere Chunk-Loading-Stabilität
+    webpack: (config, { dev, isServer }) => {
+        if (dev && !isServer) {
+            // Entwicklungsumgebung: Bessere Chunk-Loading-Stabilität
+            config.optimization = {
+                ...config.optimization,
+                splitChunks: {
+                    chunks: 'all',
+                    cacheGroups: {
+                        default: false,
+                        vendors: false,
+                        // React und Next.js in separate Chunks
+                        react: {
+                            name: 'react',
+                            chunks: 'all',
+                            test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/,
+                            priority: 40,
+                        },
+                        next: {
+                            name: 'next',
+                            chunks: 'all',
+                            test: /[\\/]node_modules[\\/]next[\\/]/,
+                            priority: 30,
+                        },
+                        // UI-Komponenten in separaten Chunks
+                        ui: {
+                            name: 'ui',
+                            chunks: 'all',
+                            test: /[\\/]components[\\/]ui[\\/]/,
+                            priority: 20,
+                        },
+                        // Gemeinsame Chunks
+                        common: {
+                            name: 'common',
+                            chunks: 'all',
+                            minChunks: 2,
+                            priority: 10,
+                        },
+                    },
+                },
+            };
+            
+            // Bessere Source Maps für Entwicklung
+            config.devtool = 'eval-source-map';
+        }
+        
+        return config;
+    },
+
     images: {
         remotePatterns: [
             {
