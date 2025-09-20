@@ -43,7 +43,7 @@ async function _connectToDatabase(): Promise<Db> {
       retryWrites: true,
       // Writable concern für bessere Konsistenz
       w: 'majority',
-      wtimeout: 5000
+      wtimeoutMS: 5000
     });
 
     await client.connect();

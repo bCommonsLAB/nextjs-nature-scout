@@ -21,8 +21,10 @@ import { useState } from 'react';
 interface HabitateEntry {
   jobId: string;
   status: string;
+  startTime: string;
   updatedAt: string;
   verified?: boolean;
+  verifiedAt?: string;
   metadata?: {
     erfassungsperson?: string;
     email?: string;
@@ -120,31 +122,23 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
       <table className="min-w-full bg-white rounded-lg overflow-hidden shadow-md">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+            <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-14">
               Bild
             </th>
             <th 
-              className={`px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28 ${getSortableHeaderClass('updatedAt')}`}
-              onClick={() => onSort('updatedAt')}
+              className={`px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28 ${getSortableHeaderClass('startTime')}`}
+              onClick={() => onSort('startTime')}
             >
               <div className="flex items-center">
-                Datum {renderSortIcon('updatedAt')}
+                Erfasst {renderSortIcon('startTime')}
               </div>
             </th>
             <th 
-              className={`px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32 ${getSortableHeaderClass('metadata.erfassungsperson')}`}
+              className={`px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40 ${getSortableHeaderClass('metadata.erfassungsperson')}`}
               onClick={() => onSort('metadata.erfassungsperson')}
             >
               <div className="flex items-center">
-                Person {renderSortIcon('metadata.erfassungsperson')}
-              </div>
-            </th>
-            <th 
-              className={`px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32 ${getSortableHeaderClass('metadata.organizationName')}`}
-              onClick={() => onSort('metadata.organizationName')}
-            >
-              <div className="flex items-center">
-                Organisation {renderSortIcon('metadata.organizationName')}
+                Person & Organisation {renderSortIcon('metadata.erfassungsperson')}
               </div>
             </th>
             <th 
@@ -205,14 +199,13 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
                   <div className="relative group">
                     <Link href={`/habitat/${entry.jobId}`} className="block">
                       {entry.metadata?.bilder && entry.metadata.bilder.length > 0 && entry.metadata.bilder[0]?.url ? (
-                        <div className="relative h-14 w-16">
+                        <div className="relative h-14 w-14 overflow-hidden rounded">
                           <Image
                             src={entry.metadata.bilder[0].url.replace('.jpg', '_low.jpg')}
                             alt="Vorschaubild"
-                            width={120}
-                            height={90}
+                            fill
                             unoptimized={true}
-                            className="habitat-image rounded"
+                            className="object-cover"
                           />
                           <button 
                             onClick={(e) => {
@@ -228,7 +221,7 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
                           </button>
                         </div>
                       ) : (
-                        <div className="h-14 w-16 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">
+                        <div className="h-14 w-14 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">
                           Kein Bild
                         </div>
                       )}
@@ -237,20 +230,21 @@ export function HabitateList({ entries, onSort, currentSortBy, currentSortOrder,
                 </td>
                 <td className="px-2 py-2 whitespace-nowrap">
                   <Link href={`/habitat/${entry.jobId}`} className="block">
-                    {entry.updatedAt && format(new Date(entry.updatedAt), 'dd.MM.yyyy HH:mm', { locale: de })}
-                  </Link>
-                </td>
-                <td className="px-2 py-2 whitespace-nowrap">
-                  <Link href={`/habitat/${entry.jobId}`} className="block">
-                    <div className="font-medium">{entry.metadata?.erfassungsperson || '-'}</div>
-                  </Link>
-                </td>
-                <td className="px-2 py-2 whitespace-nowrap">
-                  <Link href={`/habitat/${entry.jobId}`} className="block">
-                    <div className="flex items-center">
-                      <div className="font-medium text-sm text-gray-700">
-                        {entry.metadata?.organizationName || 'Keine Organisation'}
+                    <div className="text-sm">
+                      {entry.startTime && format(new Date(entry.startTime), 'dd.MM.yyyy', { locale: de })}
+                    </div>
+                    {entry.verified && entry.verifiedAt && (
+                      <div className="text-xs text-green-600 mt-1">
+                        Geprüft: {format(new Date(entry.verifiedAt), 'dd.MM.yyyy', { locale: de })}
                       </div>
+                    )}
+                  </Link>
+                </td>
+                <td className="px-2 py-2 whitespace-nowrap">
+                  <Link href={`/habitat/${entry.jobId}`} className="block">
+                    <div className="font-medium text-sm">{entry.metadata?.erfassungsperson || '-'}</div>
+                    <div className="text-xs text-gray-500 mt-1 truncate max-w-[160px]" title={entry.metadata?.organizationName || 'Keine Organisation'}>
+                      {entry.metadata?.organizationName || 'Keine Organisation'}
                     </div>
                   </Link>
                 </td>

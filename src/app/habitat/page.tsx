@@ -36,6 +36,7 @@ interface HabitateEntry {
     kommentar?: string;
     [key: string]: unknown;
   };
+  startTime: string;
   createdAt: string;
   updatedAt: string;
   verified?: boolean;
@@ -79,7 +80,7 @@ function HabitatPageContent() {
   
   const page = Number(searchParams.get('page') || '1');
   const search = searchParams.get('search') || '';
-  const sortBy = searchParams.get('sortBy') || 'updatedAt';
+  const sortBy = searchParams.get('sortBy') || 'startTime';
   const sortOrder = searchParams.get('sortOrder') || 'desc';
   const selectedPerson = searchParams.get('person') || '';
   const selectedGemeinde = searchParams.get('gemeinde') || '';
@@ -179,7 +180,7 @@ function HabitatPageContent() {
   const resetAllFilters = () => {
     const params = new URLSearchParams();
     params.set('page', '1');
-    if (sortBy !== 'updatedAt') params.set('sortBy', sortBy);
+    if (sortBy !== 'startTime') params.set('sortBy', sortBy);
     if (sortOrder !== 'desc') params.set('sortOrder', sortOrder);
     
     router.push(`/habitat?${params.toString()}`);

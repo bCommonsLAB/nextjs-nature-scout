@@ -256,6 +256,32 @@ export function HabitatTypesConfig() {
     }
   };
 
+  // Handler für Enter-Taste in Textareas - verhindert Dialog-Schließung
+  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter') {
+      e.stopPropagation();
+      // Lass die Enter-Taste normal funktionieren (neue Zeile)
+    }
+  };
+
+  // Spezieller Handler für das Pflanzenarten-Feld
+  const handleSpeciesKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter') {
+      e.stopPropagation();
+      // Lass die Enter-Taste normal funktionieren (neue Zeile)
+      // Verhindere nicht das Standardverhalten
+    }
+  };
+
+  // Spezielle onChange-Behandlung für Pflanzenarten
+  const handleSpeciesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (!currentType) return;
+    const value = e.target.value;
+    // Teile nur bei echten Zeilenumbrüchen, nicht bei jeder Änderung
+    const lines = value.split("\n");
+    setCurrentType({...currentType, typicalSpecies: lines});
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-6">
@@ -358,7 +384,7 @@ export function HabitatTypesConfig() {
 
       {/* Detail-Dialog zum Bearbeiten/Hinzufügen */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>
               {currentIndex !== null ? "Habitat-Typ bearbeiten" : "Neuen Habitat-Typ erstellen"}
@@ -367,81 +393,81 @@ export function HabitatTypesConfig() {
           
           {currentType && (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-6">
-                {/* Linke Spalte: Name und Beschreibung */}
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="name">Name</Label>
-                    <Input 
-                      id="name"
-                      value={currentType.name}
-                      onChange={(e) => updateCurrentType('name', e.target.value)}
-                      placeholder="Name des Habitat-Typs"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="description">Beschreibung</Label>
-                    <Textarea 
-                      id="description"
-                      value={currentType.description}
-                      onChange={(e) => updateCurrentType('description', e.target.value)}
-                      placeholder="Beschreibung des Habitat-Typs"
-                      className="min-h-[140px]"
-                    />
-                  </div>
+              {/* Erste Zeile: Name, Habitat-Gruppe und Schutzstatus in drei Spalten */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="name">Name</Label>
+                  <Input 
+                    id="name"
+                    value={currentType.name}
+                    onChange={(e) => updateCurrentType('name', e.target.value)}
+                    placeholder="Name des Habitat-Typs"
+                  />
                 </div>
                 
-                {/* Rechte Spalte: Familie und Schutzstatus */}
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="habitatFamilie">Habitat-Gruppe</Label>
-                    <Select 
-                      value={currentType.habitatFamilie || ""} 
-                      onValueChange={(value) => updateCurrentType('habitatFamilie', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Habitat-Gruppe auswählen" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {habitatGroups.sort((a, b) => a.pos - b.pos).map((group) => (
-                          <SelectItem key={group._id} value={group.name}>
-                            {group.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="schutzstatus">Schutzstatus</Label>
-                    <Select 
-                      value={currentType.schutzstatus || "none"} 
-                      onValueChange={(value) => updateCurrentType('schutzstatus', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Schutzstatus auswählen" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Kein Schutzstatus</SelectItem>
-                        <SelectItem value="gesetzlich geschützt">Gesetzlich geschützt</SelectItem>
-                        <SelectItem value="ökologisch hochwertig">Ökologisch hochwertig</SelectItem>
-                        <SelectItem value="ökologisch niederwertig">Ökologisch niederwertig</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div>
+                  <Label htmlFor="habitatFamilie">Habitat-Gruppe</Label>
+                  <Select 
+                    value={currentType.habitatFamilie || ""} 
+                    onValueChange={(value) => updateCurrentType('habitatFamilie', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Habitat-Gruppe auswählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {habitatGroups.sort((a, b) => a.pos - b.pos).map((group) => (
+                        <SelectItem key={group._id} value={group.name}>
+                          {group.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="schutzstatus">Schutzstatus</Label>
+                  <Select 
+                    value={currentType.schutzstatus || "none"} 
+                    onValueChange={(value) => updateCurrentType('schutzstatus', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Schutzstatus auswählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Kein Schutzstatus</SelectItem>
+                      <SelectItem value="gesetzlich geschützt">Gesetzlich geschützt</SelectItem>
+                      <SelectItem value="ökologisch hochwertig">Ökologisch hochwertig</SelectItem>
+                      <SelectItem value="ökologisch niederwertig">Ökologisch niederwertig</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               
-              {/* Über die volle Breite: Typische Arten */}
+              {/* Zweite Zeile: Beschreibung über volle Breite */}
+              <div>
+                <Label htmlFor="description">Beschreibung</Label>
+                <Textarea 
+                  id="description"
+                  value={currentType.description}
+                  onChange={(e) => updateCurrentType('description', e.target.value)}
+                  onKeyDown={handleTextareaKeyDown}
+                  placeholder="Beschreibung des Habitat-Typs"
+                  className="min-h-[200px] w-full"
+                  rows={10}
+                />
+              </div>
+              
+              {/* Dritte Zeile: Typische Pflanzenarten über volle Breite */}
               <div>
                 <Label htmlFor="typicalSpecies">Typische Pflanzenarten</Label>
                 <Textarea 
                   id="typicalSpecies"
                   value={currentType.typicalSpecies.join("\n")}
-                  onChange={(e) => updateCurrentType('typicalSpecies', e.target.value.split("\n").filter(s => s.trim()))}
+                  onChange={handleSpeciesChange}
+                  onKeyDown={handleSpeciesKeyDown}
                   placeholder="Eine Art pro Zeile"
-                  className="min-h-[150px] w-full"
+                  className="min-h-[200px] w-full"
+                  rows={12}
                 />
               </div>
             </div>

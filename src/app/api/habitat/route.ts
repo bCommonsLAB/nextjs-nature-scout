@@ -22,8 +22,10 @@ interface MongoDocument extends Document {
   _id: string;
   jobId: string;
   status: string;
+  startTime: string;
   updatedAt: string;
   verified?: boolean;
+  verifiedAt?: string;
   metadata?: {
     erfassungsperson?: string;
     email?: string;
@@ -65,7 +67,7 @@ export async function GET(request: Request) {
   const page = Number(searchParams.get('page') || '1');
   const searchTerm = searchParams.get('search') || '';
   const selectedPerson = searchParams.get('person') || '';
-  const sortBy = searchParams.get('sortBy') || 'updatedAt';
+  const sortBy = searchParams.get('sortBy') || 'startTime';
   const sortOrder = searchParams.get('sortOrder') || 'desc';
   
   try {
@@ -228,8 +230,10 @@ export async function GET(request: Request) {
       .project({
         jobId: 1,
         status: 1,
+        startTime: 1, // Erfassungsdatum hinzufügen
         updatedAt: 1,
         verified: 1, // Verifizierungsstatus
+        verifiedAt: 1, // Verifizierungsdatum hinzufügen
         'metadata.erfassungsperson': 1,
         'metadata.email': 1,
         'metadata.gemeinde': 1,

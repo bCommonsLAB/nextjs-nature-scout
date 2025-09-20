@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
 import { EffektiverHabitatEditor } from '@/components/habitat/EffektiverHabitatEditor';
+import { ParameterHeading } from '@/components/natureScout/ParameterHeading';
 
 interface HabitatBild {
   url: string;
@@ -35,6 +36,7 @@ interface Pflanze {
 interface HabitatData {
   jobId: string;
   status: string;
+  startTime?: string;
   verified?: boolean;
   verifiedAt?: string;
   verifiedBy?: {
@@ -70,6 +72,15 @@ interface HabitatData {
     habitatfamilie?: string;
     typicalSpecies?: string[];
     kommentar?: string;
+    bildanalyse?: any[];
+    vegetationsstruktur?: Record<string, any>;
+    blühaspekte?: Record<string, any>;
+    nutzung?: Record<string, any>;
+    bewertung?: Record<string, any>;
+  };
+  llmInfo?: {
+    habitatStructuredOutput?: Record<string, any>;
+    schutzstatusStructuredOutput?: Record<string, any>;
   };
   verifiedResult?: {
     habitattyp?: string;
@@ -112,46 +123,99 @@ export default function HabitateDetailPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [isExpert, setIsExpert] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
   
-  useEffect(() => {
-    const checkPermissions = async () => {
+  // Hilfsfunktion für Retry-Logik mit exponentieller Verzögerung
+  const fetchWithRetry = async (url: string, maxRetries = 3, delay = 1000): Promise<Response> => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const response = await fetch('/api/users/isExpert');
-        const { isExpert } = await response.json();
-        setIsExpert(isExpert);
-      } catch (error) {
-        console.error('Fehler beim Überprüfen der Expertenrechte:', error);
-      }
-    };
-    
-    checkPermissions();
-  }, []);
-  
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/habitat/${jobId}`);
-        
-        if (!response.ok) {
-          throw new Error(`Fehler beim Laden der Daten: ${response.status}`);
+        const response = await fetch(url);
+        if (response.ok) {
+          return response;
         }
         
-        const result = await response.json();
-        setData(result);
-        setError(null);
+        // Bei 5xx-Fehlern (Server-Fehler) retry, bei 4xx-Fehlern (Client-Fehler) nicht
+        if (response.status >= 500 && attempt < maxRetries) {
+          console.warn(`API-Aufruf fehlgeschlagen (Versuch ${attempt}/${maxRetries}): ${response.status}`);
+          await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, attempt - 1)));
+          continue;
+        }
+        
+        return response;
+      } catch (error) {
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        console.warn(`API-Aufruf fehlgeschlagen (Versuch ${attempt}/${maxRetries}):`, error);
+        await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, attempt - 1)));
+      }
+    }
+    throw new Error('Maximale Anzahl von Wiederholungsversuchen erreicht');
+  };
+
+  useEffect(() => {
+    const fetchDataAndPermissions = async () => {
+      // Cache-Check: Nur laden wenn Daten älter als 30 Sekunden sind oder nicht vorhanden
+      const now = Date.now();
+      const cacheTimeout = 30000; // 30 Sekunden
+      
+      if (data && (now - lastFetchTime) < cacheTimeout) {
+        console.log('Verwende gecachte Daten');
+        setLoading(false);
+        return;
+      }
+      
+      setLoading(true);
+      try {
+        // Parallele API-Aufrufe mit Retry-Logik für bessere Stabilität
+        const [habitatResponse, expertResponse] = await Promise.allSettled([
+          fetchWithRetry(`/api/habitat/${jobId}`),
+          fetchWithRetry('/api/users/isExpert')
+        ]);
+        
+        // Habitat-Daten verarbeiten
+        if (habitatResponse.status === 'fulfilled') {
+          const habitatResult = habitatResponse.value;
+          if (!habitatResult.ok) {
+            throw new Error(`Fehler beim Laden der Daten: ${habitatResult.status}`);
+          }
+          const habitatData = await habitatResult.json();
+          setData(habitatData);
+          setError(null);
+          setLastFetchTime(now);
+        } else {
+          throw new Error(`Fehler beim Laden der Habitat-Daten: ${habitatResponse.reason}`);
+        }
+        
+        // Expertenrechte verarbeiten
+        if (expertResponse.status === 'fulfilled') {
+          const expertResult = expertResponse.value;
+          if (expertResult.ok) {
+            const { isExpert } = await expertResult.json();
+            setIsExpert(isExpert);
+          } else {
+            console.warn('Fehler beim Überprüfen der Expertenrechte:', expertResult.status);
+            // Setze isExpert auf false als Fallback
+            setIsExpert(false);
+          }
+        } else {
+          console.warn('Fehler beim Überprüfen der Expertenrechte:', expertResponse.reason);
+          setIsExpert(false);
+        }
+        
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Unbekannter Fehler';
         setError(errorMessage);
+        console.error('Fehler beim Laden der Daten:', err);
       } finally {
         setLoading(false);
       }
     };
     
     if (jobId) {
-      fetchData();
+      fetchDataAndPermissions();
     }
-  }, [jobId]);
+  }, [jobId, data, lastFetchTime]);
 
   const handleDelete = async () => {
     if (!data || !confirm('Sind Sie sicher, dass Sie diesen Eintrag löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.')) return;
@@ -244,6 +308,38 @@ export default function HabitateDetailPage() {
     // dass es sich um eine Bearbeitung handelt
     router.push(`/naturescout?editJobId=${jobId}`);
   };
+
+  const handleUnverify = async () => {
+    if (!data || !confirm('Sind Sie sicher, dass Sie die Verifizierung zurücknehmen möchten? Das Habitat kann dann wieder bearbeitet werden.')) return;
+    
+    try {
+      const response = await fetch(`/api/habitat/${jobId}/unverify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Fehler beim Zurücknehmen der Verifizierung');
+      }
+      
+      // Daten aktualisieren - Verifizierung entfernen
+      setData({
+        ...data,
+        verified: false,
+        verifiedAt: undefined,
+        verifiedBy: undefined,
+        verifiedResult: undefined
+      });
+      
+      alert('Verifizierung wurde erfolgreich zurückgenommen. Das Habitat kann jetzt wieder bearbeitet werden.');
+    } catch (error) {
+      console.error('Fehler beim Zurücknehmen der Verifizierung:', error);
+      alert(`Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler beim Zurücknehmen der Verifizierung'}`);
+    }
+  };
   
   // Hilfsfunktion für die Bestimmung der Farbe des Schutzstatus
   const getSchutzstatusColor = (status: string) => {
@@ -261,6 +357,34 @@ export default function HabitateDetailPage() {
         return 'bg-gray-400 text-white';
     }
   };
+
+  // Hilfsfunktion zur Transformation der Tooltip-Daten
+  const transformSchemaToTooltips = (schema: Record<string, any>) => {
+    const tooltips: Record<string, any> = {};
+    for (const [key, value] of Object.entries(schema)) {
+      if (typeof value === 'string') {
+        tooltips[key] = {
+          title: key,
+          description: value
+        };
+      } else if (typeof value === 'object') {
+        tooltips[key] = {
+          title: key,
+          description: '',
+          ...Object.entries(value).reduce((acc, [subKey, subValue]) => ({
+            ...acc,
+            [subKey]: typeof subValue === 'string' ? subValue : ''
+          }), {})
+        };
+      }
+    }
+    return tooltips;
+  };
+
+  // Tooltip-Daten für Habitat-Parameter
+  const habitatTooltips = data?.llmInfo?.habitatStructuredOutput 
+    ? transformSchemaToTooltips(data.llmInfo.habitatStructuredOutput)
+    : {};
 
   const handleEditorSaved = (updatedData: { habitattyp: string; habitatfamilie?: string; schutzstatus?: string; kommentar?: string; verified: boolean; verifiedAt: Date | string }) => {
     if (data) {
@@ -325,37 +449,59 @@ export default function HabitateDetailPage() {
                 Habitaterfassung: 
               </h1>
               <p className="text-gray-500">
-                Erfasst am {data.updatedAt && format(new Date(data.updatedAt), 'dd. MMMM yyyy, HH:mm', { locale: de })} von {data.metadata?.erfassungsperson || 'Unbekannt'}
+                Erfasst am {data.startTime && format(new Date(data.startTime), 'dd. MMMM yyyy, HH:mm', { locale: de })} von {data.metadata?.erfassungsperson || 'Unbekannt'}
               </p>
             </div>
             
-            {/* Aktions-Buttons nur anzeigen, wenn Benutzer Experte ist ODER das Habitat noch nicht verifiziert wurde */}
-            {(isExpert || !data.verified) && (
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={handleReanalyze}
-                  disabled={analyzing}
-                  className="inline-flex items-center px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" /> {analyzing ? 'Analysiere...' : 'Neu analysieren'}
-                </button>
+            {/* Aktions-Buttons basierend auf Verifizierungsstatus */}
+            <div className="flex flex-wrap gap-2">
+              {/* Für verifizierte Habitate: Nur Verifizierung zurücknehmen und Löschen */}
+              {data.verified && isExpert && (
+                <>
+                  <button
+                    onClick={handleUnverify}
+                    className="inline-flex items-center px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded transition-colors"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" /> Verifizierung zurücknehmen
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" /> {deleting ? 'Wird gelöscht...' : 'Löschen'}
+                  </button>
+                </>
+              )}
+              
+              {/* Für nicht-verifizierte Habitate: Alle Aktionen erlaubt */}
+              {!data.verified && (isExpert || !data.verified) && (
+                <>
+                  <button
+                    onClick={handleReanalyze}
+                    disabled={analyzing}
+                    className="inline-flex items-center px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" /> {analyzing ? 'Analysiere...' : 'Neu analysieren'}
+                  </button>
 
-                <button
-                  onClick={handleEdit}
-                  className="inline-flex items-center px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded transition-colors"
-                >
-                  <Edit className="h-4 w-4 mr-2" /> Bearbeiten
-                </button>
+                  <button
+                    onClick={handleEdit}
+                    className="inline-flex items-center px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded transition-colors"
+                  >
+                    <Edit className="h-4 w-4 mr-2" /> Bearbeiten
+                  </button>
 
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" /> {deleting ? 'Wird gelöscht...' : 'Löschen'}
-                </button>
-              </div>
-            )}
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" /> {deleting ? 'Wird gelöscht...' : 'Löschen'}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -410,14 +556,19 @@ export default function HabitateDetailPage() {
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold">Analyseergebnis</h2>
-                
+                <div className="text-sm text-gray-500 text-right">
+                  <div>Letzte Analyse vom</div>
+                  <div className="font-medium">
+                    {data.updatedAt && format(new Date(data.updatedAt), 'dd.MM.yyyy HH:mm', { locale: de })}
+                  </div>
+                </div>
               </div>
               
               {/* Unterschiedliche Ansichten basierend auf Benutzerrolle und Verifizierungsstatus */}
               {data.result?.habitattyp && (
                 <>
-                  {/* Für Experten immer den Editor anzeigen */}
-                  {isExpert && (
+                  {/* Für Experten: Editor nur für nicht-verifizierte Habitate */}
+                  {isExpert && !data.verified && (
                     <EffektiverHabitatEditor
                       jobId={jobId as string}
                       detectedHabitat={data.result.habitattyp}
@@ -431,6 +582,72 @@ export default function HabitateDetailPage() {
                       verifiedAt={data.verifiedAt}
                       verifiedBy={data.verifiedBy}
                     />
+                  )}
+                  
+                  {/* Für Experten: Verifizierte Habitate - nur Anzeige */}
+                  {isExpert && data.verified && data.verifiedResult && (
+                    <div className="space-y-4">
+                      <div className="bg-green-50 p-4 rounded border border-green-200 mb-4">
+                        <div className="flex items-center text-green-700 mb-3">
+                          <CheckCircle className="h-5 w-5 mr-2" />
+                          <span className="font-medium">✅ Habitat final verifiziert und abgeschlossen</span>
+                        </div>
+                        {data.verifiedAt && (
+                          <p className="text-green-700 text-sm">
+                            Verifiziert am {format(new Date(data.verifiedAt), 'dd.MM.yyyy HH:mm', { locale: de })}
+                            {data.verifiedBy?.userName && ` von ${data.verifiedBy.userName}`}
+                            {data.verifiedBy?.role && ` (${data.verifiedBy.role})`}
+                          </p>
+                        )}
+                        <div className="mt-2 p-2 bg-green-100 rounded text-sm text-green-800">
+                          <strong>Hinweis:</strong> Verifizierte Habitate sind final abgeschlossen. Verwenden Sie "Verifizierung zurücknehmen", um Änderungen zu ermöglichen.
+                        </div>
+                      </div>
+                      
+                      {/* Verifizierter Habitat - Read-Only für Experten */}
+                      <div className="p-4 border rounded-lg bg-white">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-medium text-lg mb-2">Habitat: {data.verifiedResult.habitattyp}</h3>
+                            {data.verifiedResult.habitatfamilie && (
+                              <p className="text-gray-500 mb-4">Habitatgruppe: {data.verifiedResult.habitatfamilie}</p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            {data.verifiedResult.schutzstatus && (
+                              <div className="mb-2">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSchutzstatusColor(data.verifiedResult.schutzstatus)}`}>
+                                  {normalizeSchutzstatus(data.verifiedResult.schutzstatus)}
+                                </span>
+                              </div>
+                            )}
+                            <div className="text-xs text-gray-500">
+                              <div className="font-semibold text-green-600">Verifiziert am</div>
+                              <div className="font-medium">
+                                {data.verifiedAt && format(new Date(data.verifiedAt), 'dd.MM.yyyy HH:mm', { locale: de })}
+                              </div>
+                              {/* Zeige auch KI-Analyse-Datum, falls es vom Verifizierungs-Datum abweicht */}
+                              {data.updatedAt && data.verifiedAt && 
+                               new Date(data.updatedAt).getTime() !== new Date(data.verifiedAt).getTime() && (
+                                <div className="mt-2 pt-2 border-t border-gray-200">
+                                  <div className="text-blue-600">Letzte KI-Analyse vom</div>
+                                  <div className="font-medium">
+                                    {format(new Date(data.updatedAt), 'dd.MM.yyyy HH:mm', { locale: de })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {data.verifiedResult.kommentar && (
+                          <div className="mt-4 p-3 bg-gray-50 rounded border text-sm">
+                            <p className="text-gray-700 font-medium mb-1">Expertenkommentar:</p>
+                            <p className="text-gray-800">{data.verifiedResult.kommentar}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
                   
                   {/* Für normale Benutzer und nicht verifizierte Habitate - nur KI-Ergebnisse mit Hinweis */}
@@ -452,7 +669,15 @@ export default function HabitateDetailPage() {
                       </div>
 
                       <div className="p-4 border rounded-lg bg-white">
-                        <h3 className="font-medium text-lg mb-2">Habitat: {data.result.habitattyp}</h3>
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="font-medium text-lg">Habitat: {data.result.habitattyp}</h3>
+                          <div className="text-xs text-gray-500 text-right">
+                            <div className="text-blue-600 font-semibold">KI-Analyse vom</div>
+                            <div className="font-medium">
+                              {data.updatedAt && format(new Date(data.updatedAt), 'dd.MM.yyyy HH:mm', { locale: de })}
+                            </div>
+                          </div>
+                        </div>
                         {data.result.habitatfamilie && (
                           <p className="text-gray-500 mb-4">Habitat-Gruppe: {data.result.habitatfamilie}</p>
                         )}
@@ -476,7 +701,7 @@ export default function HabitateDetailPage() {
                       <div className="bg-green-50 p-4 rounded border border-green-200 mb-4">
                         <div className="flex items-center text-green-700 mb-3">
                           <CheckCircle className="h-5 w-5 mr-2" />
-                          <span className="font-medium">Dieser Habitat wurde verifiziert</span>
+                          <span className="font-medium">✅ Habitat final verifiziert und abgeschlossen</span>
                         </div>
                         {data.verifiedAt && (
                           <p className="text-green-700 text-sm">
@@ -485,6 +710,9 @@ export default function HabitateDetailPage() {
                             {data.verifiedBy?.role && ` (${data.verifiedBy.role})`}
                           </p>
                         )}
+                        <div className="mt-2 p-2 bg-green-100 rounded text-sm text-green-800">
+                          <strong>Hinweis:</strong> Verifizierte Habitate sind final abgeschlossen und können nicht mehr bearbeitet werden.
+                        </div>
                       </div>
                       
                       {/* Verifizierter Habitat */}
@@ -496,13 +724,31 @@ export default function HabitateDetailPage() {
                               <p className="text-gray-500 mb-4">Habitatgruppe: {data.verifiedResult.habitatfamilie}</p>
                             )}
                           </div>
-                          {data.verifiedResult.schutzstatus && (
-                            <div>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSchutzstatusColor(data.verifiedResult.schutzstatus)}`}>
-                                {normalizeSchutzstatus(data.verifiedResult.schutzstatus)}
-                              </span>
+                          <div className="text-right">
+                            {data.verifiedResult.schutzstatus && (
+                              <div className="mb-2">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSchutzstatusColor(data.verifiedResult.schutzstatus)}`}>
+                                  {normalizeSchutzstatus(data.verifiedResult.schutzstatus)}
+                                </span>
+                              </div>
+                            )}
+                            <div className="text-xs text-gray-500">
+                              <div className="font-semibold text-green-600">Verifiziert am</div>
+                              <div className="font-medium">
+                                {data.verifiedAt && format(new Date(data.verifiedAt), 'dd.MM.yyyy HH:mm', { locale: de })}
+                              </div>
+                              {/* Zeige auch KI-Analyse-Datum, falls es vom Verifizierungs-Datum abweicht */}
+                              {data.updatedAt && data.verifiedAt && 
+                               new Date(data.updatedAt).getTime() !== new Date(data.verifiedAt).getTime() && (
+                                <div className="mt-2 pt-2 border-t border-gray-200">
+                                  <div className="text-blue-600">Letzte KI-Analyse vom</div>
+                                  <div className="font-medium">
+                                    {format(new Date(data.updatedAt), 'dd.MM.yyyy HH:mm', { locale: de })}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          )}
+                          </div>
                         </div>
                         
                         {data.verifiedResult.kommentar && (
@@ -527,12 +773,12 @@ export default function HabitateDetailPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Zuklappbarer Bereich für KI-generierte Hinweise - nur für Experten sichtbar */}
+                  {/* Detaillierte KI-Analyse - nur für Experten sichtbar */}
                   {isExpert && (
                     <div className="border border-gray-200 rounded-md overflow-hidden mt-6">
                       <details className="group">
                         <summary className="flex justify-between items-center p-4 cursor-pointer bg-gray-50 hover:bg-gray-100">
-                          <span className="font-semibold text-gray-700">Analyse Hinweise (KI generiert)</span>
+                          <span className="font-semibold text-gray-700">Wie kam dieses Ergebnis zustande?</span>
                           <span className="transition group-open:rotate-180">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                               <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -540,89 +786,257 @@ export default function HabitateDetailPage() {
                           </span>
                         </summary>
                         <div className="p-4 border-t border-gray-200 bg-white">
-                          <div className="space-y-4">
-                            {/* Zusammenfassung */}
-                            <div className="bg-gray-50 p-4 rounded">
-                              <h3 className="font-semibold text-sm">Zusammenfassung</h3>
-                              <p className="mt-1 text-sm text-gray-600">{data.result.zusammenfassung}</p>
-                            </div>
-                            
-                            {/* Typische Pflanzenarten */}
-                            {data.result.typicalSpecies && data.result.typicalSpecies.length > 0 && (
-                              <div className="bg-gray-50 p-4 rounded">
-                                <h3 className="font-semibold text-sm">Typische Pflanzenarten</h3>
-                                <ul className="mt-1 pl-5 text-sm list-disc">
-                                  {data.result.typicalSpecies.map((species, index) => (
-                                    <li key={index}>{species}</li>
-                                  ))}
-                                </ul>
+                          
+                          <div className="space-y-6">
+                            {/* Erkannte Parameter */}
+                            <div className="bg-white border border-gray-200 rounded-lg p-4">
+                              <ParameterHeading 
+                                title="Erkannte Parameter"
+                                description="Die hier gelisteten Parameter wurden durch das LLM aufgrund von Wahrscheinlichkeiten analysiert. Jeder Parameter wird durch eine gezielte Frage bestimmt, die hinter dem Fragesymbol erklärt wird. Es kann sein, dass einige erkannte Parameter falsch sind, aber es zwingt das LLM viele Indizien zu berücksichtigen und die Einschätzung zu verbessern."
+                                details={{}}
+                              />
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Bildanalyse */}
+                                {data.result?.bildanalyse && Array.isArray(data.result.bildanalyse) && data.result.bildanalyse.length > 0 && (
+                                  <div className="space-y-3">
+                                    <ParameterHeading 
+                                      title={habitatTooltips.bildanalyse?.title || 'Bildanalyse'}
+                                      description={habitatTooltips.bildanalyse?.description || ''}
+                                      details={{
+                                        Bilder: habitatTooltips.bildanalyse?.bilder || ''
+                                      }}
+                                    />
+                                    <div className="ml-6 space-y-1">
+                                      {data.result.bildanalyse.map((analyse: any, index: number) => (
+                                        <p key={index} className="text-sm text-gray-600">
+                                          {typeof analyse === 'string' ? analyse : JSON.stringify(analyse)}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Pflanzenarten */}
+                                {data.result?.pflanzenarten && Array.isArray(data.result.pflanzenarten) && data.result.pflanzenarten.length > 0 && (
+                                  <div className="space-y-3">
+                                    <ParameterHeading 
+                                      title={habitatTooltips.pflanzenarten?.title || 'Pflanzenarten'}
+                                      description={habitatTooltips.pflanzenarten?.description || ''}
+                                      details={{
+                                        Name: habitatTooltips.pflanzenarten?.name || '',
+                                        Häufigkeit: habitatTooltips.pflanzenarten?.häufigkeit || '',
+                                        "Ist Zeiger": habitatTooltips.pflanzenarten?.istzeiger || ''
+                                      }}
+                                    />
+                                    <div className="ml-6 space-y-1">
+                                      {data.result.pflanzenarten.map((pflanze: any, index: number) => (
+                                        <p key={index} className="text-sm text-gray-600">
+                                          {typeof pflanze === 'string' ? pflanze : `${pflanze.name || pflanze.species || 'Unbekannt'} (${pflanze.häufigkeit || pflanze.score || 'unbekannt'})`}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Vegetationsstruktur */}
+                                {data.result?.vegetationsstruktur && typeof data.result.vegetationsstruktur === 'object' && (
+                                  <div className="space-y-3">
+                                    <ParameterHeading 
+                                      title={habitatTooltips.vegetationsstruktur?.title || 'Vegetationsstruktur'}
+                                      description={habitatTooltips.vegetationsstruktur?.description || ''}
+                                      details={{
+                                        Höhe: habitatTooltips.vegetationsstruktur?.höhe || '',
+                                        Dichte: habitatTooltips.vegetationsstruktur?.dichte || '',
+                                        Deckung: habitatTooltips.vegetationsstruktur?.deckung || ''
+                                      }}
+                                    />
+                                    <div className="ml-6 space-y-1 text-sm text-gray-600">
+                                      {Object.entries(data.result.vegetationsstruktur).map(([key, value]) => (
+                                        <p key={key}>
+                                          {key.charAt(0).toUpperCase() + key.slice(1)}: <span className="font-medium">
+                                            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                          </span>
+                                        </p>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Blühaspekte */}
+                                {data.result?.blühaspekte && typeof data.result.blühaspekte === 'object' && (
+                                  <div className="space-y-3">
+                                    <ParameterHeading 
+                                      title={habitatTooltips.blühaspekte?.title || 'Blühaspekte'}
+                                      description={habitatTooltips.blühaspekte?.description || ''}
+                                      details={{
+                                        Intensität: habitatTooltips.blühaspekte?.intensität || '',
+                                        "Anzahl Farben": habitatTooltips.blühaspekte?.anzahlfarben || ''
+                                      }}
+                                    />
+                                    <div className="ml-6 space-y-1 text-sm text-gray-600">
+                                      {Object.entries(data.result.blühaspekte).map(([key, value]) => (
+                                        <p key={key}>
+                                          {key.charAt(0).toUpperCase() + key.slice(1)}: <span className="font-medium">
+                                            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                          </span>
+                                        </p>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Nutzung */}
+                                {data.result?.nutzung && typeof data.result.nutzung === 'object' && (
+                                  <div className="space-y-3">
+                                    <ParameterHeading 
+                                      title={habitatTooltips.nutzung?.title || 'Nutzung'}
+                                      description={habitatTooltips.nutzung?.description || ''}
+                                      details={{
+                                        Beweidung: habitatTooltips.nutzung?.beweidung || '',
+                                        Mahd: habitatTooltips.nutzung?.mahd || '',
+                                        Düngung: habitatTooltips.nutzung?.düngung || ''
+                                      }}
+                                    />
+                                    <div className="ml-6 space-y-1 text-sm text-gray-600">
+                                      {Object.entries(data.result.nutzung).map(([key, value]) => (
+                                        <p key={key}>
+                                          {key.charAt(0).toUpperCase() + key.slice(1)}: <span className="font-medium">
+                                            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                          </span>
+                                        </p>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Bewertung */}
+                                {data.result?.bewertung && typeof data.result.bewertung === 'object' && (
+                                  <div className="space-y-3">
+                                    <ParameterHeading 
+                                      title={habitatTooltips.bewertung?.title || 'Bewertung'}
+                                      description={habitatTooltips.bewertung?.description || ''}
+                                      details={{
+                                        Artenreichtum: habitatTooltips.bewertung?.artenreichtum || '',
+                                        Konfidenz: habitatTooltips.bewertung?.konfidenz || ''
+                                      }}
+                                    />
+                                    <div className="ml-6 space-y-1 text-sm text-gray-600">
+                                      {Object.entries(data.result.bewertung).map(([key, value]) => (
+                                        <p key={key}>
+                                          {key.charAt(0).toUpperCase() + key.slice(1)}: <span className="font-medium">
+                                            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                          </span>
+                                        </p>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Habitattyp */}
+                                {data.result?.habitattyp && (
+                                  <div className="space-y-3">
+                                    <ParameterHeading 
+                                      title={habitatTooltips.habitattyp?.title || 'Habitattyp'}
+                                      description={habitatTooltips.habitattyp?.description || ''}
+                                      details={{}}
+                                    />
+                                    <p className="text-sm text-gray-600 ml-6">
+                                      Typ: <span className="font-medium">{data.result.habitattyp}</span>
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Schutzstatus */}
+                                {data.result?.schutzstatus && (
+                                  <div className="space-y-3">
+                                    <ParameterHeading 
+                                      title={habitatTooltips.schutzstatus?.title || 'Schutzstatus'}
+                                      description={habitatTooltips.schutzstatus?.description || ''}
+                                      details={{}}
+                                    />
+                                    <p className="text-sm text-gray-600 ml-6">
+                                      Status: <span className="font-medium">{data.result.schutzstatus}</span>
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Habitatfamilie */}
+                                {data.result?.habitatfamilie && (
+                                  <div className="space-y-3">
+                                    <ParameterHeading 
+                                      title={habitatTooltips.habitatfamilie?.title || 'Habitatfamilie'}
+                                      description={habitatTooltips.habitatfamilie?.description || ''}
+                                      details={{}}
+                                    />
+                                    <p className="text-sm text-gray-600 ml-6">
+                                      Familie: <span className="font-medium">{data.result.habitatfamilie}</span>
+                                    </p>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                            
-                            {/* Standort */}
-                            {data.result.standort && (
-                              <div className="bg-gray-50 p-4 rounded">
-                                <h3 className="font-semibold text-sm">Standort</h3>
-                                <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
-                                  <div>Hangneigung: <span className="font-medium">{data.result.standort.hangneigung}</span></div>
-                                  <div>Exposition: <span className="font-medium">{data.result.standort.exposition}</span></div>
-                                  <div>Bodenfeuchtigkeit: <span className="font-medium">{data.result.standort.bodenfeuchtigkeit}</span></div>
+                            </div>
+
+                            {/* Evidenz */}
+                            {data.result?.evidenz && (
+                              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                <ParameterHeading 
+                                  title={habitatTooltips.evidenz?.title || 'Evidenz'}
+                                  description={habitatTooltips.evidenz?.description || ''}
+                                  details={{
+                                    dafür_spricht: habitatTooltips.evidenz?.dafür_spricht || '',
+                                    dagegen_spricht: habitatTooltips.evidenz?.dagegen_spricht || ''
+                                  }}
+                                />
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {data.result.evidenz.dafür_spricht && (
+                                    <div>
+                                      <h4 className="text-sm font-medium text-green-600 mb-2">Dafür spricht:</h4>
+                                      {Array.isArray(data.result.evidenz.dafür_spricht) ? (
+                                        <ul className="list-disc pl-5 space-y-1 text-sm text-gray-600">
+                                          {data.result.evidenz.dafür_spricht.map((punkt: string, index: number) => (
+                                            <li key={index}>{punkt}</li>
+                                          ))}
+                                        </ul>
+                                      ) : (
+                                        <p className="text-sm text-gray-600">{data.result.evidenz.dafür_spricht}</p>
+                                      )}
+                                    </div>
+                                  )}
+                                  
+                                  {data.result.evidenz.dagegen_spricht && (
+                                    <div>
+                                      <h4 className="text-sm font-medium text-red-500 mb-2">Dagegen spricht:</h4>
+                                      {Array.isArray(data.result.evidenz.dagegen_spricht) ? (
+                                        <ul className="list-disc pl-5 space-y-1 text-sm text-gray-600">
+                                          {data.result.evidenz.dagegen_spricht.map((punkt: string, index: number) => (
+                                            <li key={index}>{punkt}</li>
+                                          ))}
+                                        </ul>
+                                      ) : (
+                                        <p className="text-sm text-gray-600">{data.result.evidenz.dagegen_spricht}</p>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             )}
-                            
-                            {/* Pflanzenarten */}
-                            {data.result.pflanzenarten && data.result.pflanzenarten.length > 0 && (
-                              <div className="bg-gray-50 p-4 rounded">
-                                <h3 className="font-semibold text-sm">Erkannte Pflanzenarten</h3>
-                                <ul className="mt-2 space-y-1 text-sm">
-                                  {data.result.pflanzenarten.map((pflanze: Pflanze, index: number) => (
-                                    <li key={index} className="flex justify-between">
-                                      <span>{pflanze.name}</span>
-                                      <span className="text-gray-500">{pflanze.häufigkeit}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                            
-                            {/* Evidenz */}
-                            {data.result.evidenz && (
-                              <div className="bg-gray-50 p-4 rounded">
-                                <h3 className="font-semibold text-sm">Evidenz</h3>
-                                {data.result.evidenz.dafür_spricht && (
-                                  <div className="mt-2">
-                                    <h4 className="text-xs font-medium text-green-600">Dafür spricht:</h4>
-                                    {Array.isArray(data.result.evidenz.dafür_spricht) ? (
-                                      <ul className="list-disc pl-5 space-y-1 text-sm">
-                                        {data.result.evidenz.dafür_spricht.map((punkt: string, index: number) => (
-                                          <li key={index}>{punkt}</li>
-                                        ))}
-                                      </ul>
-                                    ) : (
-                                      <p className="text-sm">{data.result.evidenz.dafür_spricht}</p>
-                                    )}
-                                  </div>
-                                )}
-                                {data.result.evidenz.dagegen_spricht && (
-                                  <div className="mt-2">
-                                    <h4 className="text-xs font-medium text-red-500">Dagegen spricht:</h4>
-                                    {Array.isArray(data.result.evidenz.dagegen_spricht) ? (
-                                      <ul className="list-disc pl-5 space-y-1 text-sm">
-                                        {data.result.evidenz.dagegen_spricht.map((punkt: string, index: number) => (
-                                          <li key={index}>{punkt}</li>
-                                        ))}
-                                      </ul>
-                                    ) : (
-                                      <p className="text-sm">{data.result.evidenz.dagegen_spricht}</p>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            )}
+
+                            {/* Zusammenfassung */}
+                            <div className="bg-white border border-gray-200 rounded-lg p-4">
+                              <ParameterHeading 
+                                title={habitatTooltips.zusammenfassung?.title || 'Zusammenfassung'}
+                                description={habitatTooltips.zusammenfassung?.description || ''}
+                                details={{}}
+                              />
+                              <p className="text-sm text-gray-600">
+                                Das Habitat ist wahrscheinlich ein {data.result?.habitattyp || 'unbekannter Typ'}.
+                              </p>
+                            </div>
                           </div>
                           
-                          <div className="mt-4 bg-yellow-50 p-3 rounded text-sm border border-yellow-200">
+                          <div className="mt-6 bg-yellow-50 p-4 rounded text-sm border border-yellow-200">
                             <p className="text-yellow-700">
                               <strong>Hinweis:</strong> Diese Analyseinformationen wurden automatisch durch KI erzeugt und dienen nur als Orientierungshilfe. 
                               Experten verifizieren nur den Habitattyp und den Schutzstatus, nicht die dargestellten Analysehinweise.
