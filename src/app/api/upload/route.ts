@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       const orientation = metadata.orientation || 1;
       
       // Sharp automatisch rotieren lassen basierend auf EXIF-Orientierung
-      let sharpInstance = sharp(buffer, { failOnError: false }).rotate();
+      const sharpInstance = sharp(buffer, { failOnError: false }).rotate();
       
       // Nach der automatischen Rotation die Dimensionen neu ermitteln
       const rotatedMetadata = await sharpInstance.metadata();
