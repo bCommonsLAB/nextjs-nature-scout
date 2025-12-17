@@ -155,3 +155,4 @@ Client Components sind nicht direkt von React2Shell betroffen, da die Schwachste
 - **06.12.2025**: Code-Analyse durchgeführt
 - **06.12.2025**: Sicherheitsdokumentation erstellt
 
+
