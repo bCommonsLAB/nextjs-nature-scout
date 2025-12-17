@@ -1,3 +1,5 @@
+"use client";
+
 // components/MapNoSSR.tsx
 // Implementiert eine interaktive Karte mit Polygon-Zeichnungsfunktionalität mithilfe von Leaflet
 // Die Komponente wird client-seitig ohne SSR geladen, um Kompatibilitätsprobleme zu vermeiden
