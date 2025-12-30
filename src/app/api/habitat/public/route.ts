@@ -24,6 +24,11 @@ export async function GET(request: Request) {
   const verifizierungsstatus = searchParams.get('verifizierungsstatus') || 'alle';
   const includeFilterOptions = searchParams.get('includeFilterOptions') === 'true';
   
+  // Neue Parameter für Geo-Queries
+  const bounds = searchParams.get('bounds');
+  const markersOnly = searchParams.get('markersOnly') === 'true';
+  const zoom = searchParams.get('zoom') ? Number(searchParams.get('zoom')) : null;
+  
   try {
     // Optionale Authentifizierung - keine Fehler, falls nicht eingeloggt
     let currentUserEmail: string | null = null;
@@ -58,6 +63,22 @@ export async function GET(request: Request) {
       // Zeige nur Einträge an, die nicht als gelöscht markiert sind
       deleted: { $ne: true }
     };
+    
+    // Geo-Query: Bounds-Filterung hinzufügen, falls vorhanden
+    if (bounds) {
+      const boundsArray = bounds.split(',');
+      if (boundsArray.length === 4) {
+        const minLat = Number(boundsArray[0]);
+        const minLng = Number(boundsArray[1]);
+        const maxLat = Number(boundsArray[2]);
+        const maxLng = Number(boundsArray[3]);
+        // Validiere, dass alle Werte gültige Zahlen sind
+        if (!isNaN(minLat) && !isNaN(minLng) && !isNaN(maxLat) && !isNaN(maxLng)) {
+          filter['metadata.latitude'] = { $gte: minLat, $lte: maxLat };
+          filter['metadata.longitude'] = { $gte: minLng, $lte: maxLng };
+        }
+      }
+    }
     
     // Filter für Verifizierungsstatus hinzufügen, abhängig vom Parameter
     if (verifizierungsstatus === 'verifiziert') {
@@ -265,8 +286,16 @@ export async function GET(request: Request) {
     const skip = (page - 1) * limit;
     
   // Erstelle Sortierung
+  // Wenn bounds vorhanden sind, immer nach updatedAt absteigend sortieren (neueste zuerst)
   const sort: MongoSort = {};
-  sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+  if (bounds) {
+    sort.updatedAt = -1; // Immer neueste zuerst für Geo-Queries
+  } else {
+    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+  }
+  
+  // Limit für Geo-Queries: Maximal 100 Ergebnisse
+  const effectiveLimit = bounds ? Math.min(limit, 100) : limit;
   
   // Prüfe, ob minimale Ansicht für Kartenansicht gewünscht ist
   const view = searchParams.get('view');
@@ -279,7 +308,8 @@ export async function GET(request: Request) {
     verified: 1,
     'metadata.latitude': 1,
     'metadata.longitude': 1,
-    'metadata.polygonPoints': 1,
+    // Bei markersOnly=true keine polygonPoints laden (Performance-Optimierung)
+    ...(markersOnly ? {} : { 'metadata.polygonPoints': 1 }),
     'metadata.gemeinde': 1,
     'metadata.flurname': 1,
     'metadata.elevation': 1,
@@ -319,8 +349,8 @@ export async function GET(request: Request) {
   const entries = await collection
     .find(filter)
     .sort(sort)
-    .skip(skip)
-    .limit(limit)
+    .skip(bounds ? 0 : skip) // Bei Geo-Queries kein Skip (immer Top 100)
+    .limit(effectiveLimit)
     .project(projection)
     .toArray();
     

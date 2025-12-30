@@ -11,93 +11,6 @@ import 'leaflet-draw/dist/leaflet.draw.css';
 
 import type { MapNoSSRHandle } from "@/components/map/MapNoSSR";
 import { useRouter, useSearchParams } from "next/navigation";
-import { detectBrowserEnvironment } from "@/lib/utils";
-
-interface NormalizedGeolocationError {
-  code: number | null;
-  name: string | null;
-  message: string | null;
-  kind: 'permission-denied' | 'position-unavailable' | 'timeout' | 'unknown';
-  userMessage: string;
-  debug: Record<string, unknown>;
-}
-
-function serializeUnknownError(error: unknown): Record<string, unknown> {
-  // Spezielle Behandlung für GeolocationPositionError (DOM-Exception mit nicht-enumerable Properties)
-  // Prüfe, ob es ein GeolocationPositionError ist, indem wir auf die spezifischen Properties zugreifen
-  if (typeof error === 'object' && error !== null) {
-    const err = error as any;
-    // GeolocationPositionError hat 'code' und 'message' als nicht-enumerable Properties
-    // Versuche direkt darauf zuzugreifen
-    if (typeof err.code === 'number' && typeof err.message === 'string') {
-      return {
-        name: err.name || 'GeolocationPositionError',
-        message: err.message,
-        code: err.code,
-        // Versuche auch andere mögliche Properties
-        ...(err.stack ? { stack: err.stack } : {})
-      };
-    }
-  }
-
-  // Standard Error-Behandlung
-  if (error instanceof Error) {
-    return {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    };
-  }
-
-  // Fallback: Versuche alle Properties zu extrahieren
-  if (typeof error === 'object' && error !== null) {
-    const keys = new Set<string>([
-      ...Object.keys(error as Record<string, unknown>),
-      ...Object.getOwnPropertyNames(error)
-    ]);
-
-    const result: Record<string, unknown> = {};
-    for (const key of keys) {
-      try {
-        const value = (error as any)[key];
-        if (typeof value !== 'function') {
-          result[key] = value;
-        }
-      } catch {
-        // Ignorieren: manche Properties können Getter haben, die werfen
-      }
-    }
-
-    return result;
-  }
-
-  return { value: error };
-}
-
-function normalizeGeolocationError(error: unknown): NormalizedGeolocationError {
-  const debug = serializeUnknownError(error);
-  const code = typeof debug.code === 'number' ? debug.code : null;
-  const name = typeof debug.name === 'string' ? debug.name : null;
-  const message = typeof debug.message === 'string' ? debug.message : null;
-
-  // GeolocationPositionError codes (DOM): 1=PERMISSION_DENIED, 2=POSITION_UNAVAILABLE, 3=TIMEOUT
-  const kind: NormalizedGeolocationError['kind'] =
-    code === 1 ? 'permission-denied'
-    : code === 2 ? 'position-unavailable'
-    : code === 3 ? 'timeout'
-    : 'unknown';
-
-  const userMessage =
-    kind === 'permission-denied'
-      ? 'Standortzugriff verweigert. Bitte Standort-Berechtigung im Browser erlauben.'
-      : kind === 'position-unavailable'
-        ? 'GPS-Position ist aktuell nicht verfügbar (kein Fix). Bitte kurz warten oder nach draußen gehen.'
-        : kind === 'timeout'
-          ? 'GPS-Timeout. Bitte erneut versuchen oder kurz warten.'
-          : 'Unbekannter GPS-Fehler. Bitte Browser-Konsole prüfen.';
-
-  return { code, name, message, kind, userMessage, debug };
-}
 
 // Dynamisch geladene Karte ohne SSR
 const MapNoSSR = dynamic(() => import('@/components/map/MapNoSSR'), {
@@ -107,6 +20,38 @@ const MapNoSSR = dynamic(() => import('@/components/map/MapNoSSR'), {
 
 // Typen für den Map-Modus
 type MapMode = 'navigation' | 'polygon' | 'none';
+
+function toRadians(degrees: number): number {
+  return (degrees * Math.PI) / 180;
+}
+
+function calculateDistanceInMeters(a: [number, number], b: [number, number]): number {
+  // Haversine
+  const earthRadiusMeters = 6371000;
+  const dLat = toRadians(b[0] - a[0]);
+  const dLon = toRadians(b[1] - a[1]);
+  const lat1 = toRadians(a[0]);
+  const lat2 = toRadians(b[0]);
+
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLon = Math.sin(dLon / 2);
+
+  const h =
+    sinDLat * sinDLat +
+    Math.cos(lat1) * Math.cos(lat2) * (sinDLon * sinDLon);
+
+  return 2 * earthRadiusMeters * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+function getNearbyRadiusMeters(zoom: number): number {
+  // Heuristik: bei hohem Zoom kleinere Radien, bei niedrigem Zoom größere
+  if (zoom >= 18) return 500;
+  if (zoom >= 17) return 1000;
+  if (zoom >= 16) return 2000;
+  if (zoom >= 15) return 5000;
+  if (zoom >= 14) return 10000;
+  return 20000;
+}
 
 // Hilfsfunktion zur Flächenberechnung für Polygone (vereinfachte Version)
 function calculateAreaFromPoints(points: [number, number][]): number {
@@ -144,6 +89,78 @@ function calculateAreaFromPoints(points: [number, number][]): number {
   }
 }
 
+// Helper-Funktion: Prüft, ob ein Polygon geschlossen ist (erster = letzter Punkt)
+export function isPolygonClosed(points: [number, number][]): boolean {
+  if (!points || points.length < 3) {
+    return false;
+  }
+  
+  const firstPoint = points[0];
+  const lastPoint = points[points.length - 1];
+  
+  if (!firstPoint || !lastPoint) {
+    return false;
+  }
+  
+  // Prüfe, ob erster und letzter Punkt identisch sind (mit Toleranz für Floating-Point)
+  const tolerance = 0.000001; // Sehr kleine Toleranz für Koordinaten
+  return Math.abs(firstPoint[0] - lastPoint[0]) < tolerance && 
+         Math.abs(firstPoint[1] - lastPoint[1]) < tolerance;
+}
+
+// Helper-Funktion: Bestimmt den CTA-Status basierend auf Polygon-Zustand
+export function getPolygonCtaState(
+  points: [number, number][] | undefined,
+  hasSavedPolygon: boolean
+): {
+  canSave: boolean;
+  disabledReason: string | null;
+  hasSavedPolygon: boolean;
+} {
+  // Wenn bereits gespeichert, ist alles OK
+  if (hasSavedPolygon) {
+    return {
+      canSave: false, // Nicht mehr speichern, sondern weiter
+      disabledReason: null,
+      hasSavedPolygon: true
+    };
+  }
+  
+  // Keine Punkte vorhanden
+  if (!points || points.length === 0) {
+    return {
+      canSave: false,
+      disabledReason: "Mindestens 3 Punkte zeichnen",
+      hasSavedPolygon: false
+    };
+  }
+  
+  // Zu wenige Punkte
+  if (points.length < 3) {
+    return {
+      canSave: false,
+      disabledReason: `Noch ${3 - points.length} Punkt${points.length === 1 ? '' : 'e'} benötigt`,
+      hasSavedPolygon: false
+    };
+  }
+  
+  // Polygon nicht geschlossen
+  if (!isPolygonClosed(points)) {
+    return {
+      canSave: false,
+      disabledReason: "Polygon schließen: ersten Punkt anklicken",
+      hasSavedPolygon: false
+    };
+  }
+  
+  // Polygon ist bereit zum Speichern
+  return {
+    canSave: true,
+    disabledReason: null,
+    hasSavedPolygon: false
+  };
+}
+
 // Typdefinition für die Habitat-Daten aus der API
 interface HabitatFromAPI {
   jobId: string;
@@ -154,6 +171,7 @@ interface HabitatFromAPI {
     gemeinde?: string;
     flurname?: string;
     standort?: string;
+    elevation?: string | number;
     polygonPoints?: [number, number][];  // Polygon-Punkte sind hier gespeichert
   };
   result?: {
@@ -164,6 +182,7 @@ interface HabitatFromAPI {
   verifiedResult?: {
     habitattyp?: string;
     habitatfamilie?: string;
+    schutzstatus?: string;
   };
   verified?: boolean;
 }
@@ -178,8 +197,11 @@ interface MapHabitat {
   transparenz: number;
   metadata?: {
     gemeinde?: string;
+    flurname?: string;
     erfasser?: string;
     verifiziert?: boolean;
+    elevation?: string | number;
+    schutzstatus?: string;
   };
 }
 
@@ -193,14 +215,20 @@ function convertToMapHabitat(apiHabitat: HabitatFromAPI): MapHabitat | null {
   }
 
   // Priorität verwenden: verifizierte Daten, dann normale Ergebnisse
-  const habitatName = apiHabitat.verifiedResult?.habitattyp || apiHabitat.result?.habitattyp || 'Unbekanntes Habitat';
+  // Für Map-View können habitattyp/habitatfamilie fehlen -> Fallback
+  const habitatName = apiHabitat.verifiedResult?.habitattyp || apiHabitat.result?.habitattyp || 'Habitat';
   const habitatFamily = apiHabitat.verifiedResult?.habitatfamilie || apiHabitat.result?.habitatfamilie;
 
-  // Standardposition aus Lat/Lng
-  let position: [number, number] = [
-    Number(apiHabitat.metadata.latitude || 0), 
-    Number(apiHabitat.metadata.longitude || 0)
-  ];
+  // Standardposition aus Lat/Lng - nur setzen wenn gültige Werte vorhanden
+  let position: [number, number] | undefined = undefined;
+  const lat = Number(apiHabitat.metadata.latitude);
+  const lng = Number(apiHabitat.metadata.longitude);
+  
+  // Nur setzen, wenn beide Werte gültig sind (nicht 0, nicht NaN, im gültigen Bereich)
+  if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && 
+      Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+    position = [lat, lng];
+  }
   
   // Polygon als undefined initialisieren
   let polygon: [number, number][] | undefined = undefined;
@@ -283,39 +311,41 @@ function convertToMapHabitat(apiHabitat: HabitatFromAPI): MapHabitat | null {
     }
   }
 
-  // Wenn keine Lat/Lng vorhanden sind, aber ein Polygon existiert, verwende den ersten Punkt als Marker-Position.
-  // Das stellt sicher, dass Marker-only Darstellung (Zoom <= 14) trotzdem etwas anzeigen kann.
-  if ((position[0] === 0 && position[1] === 0) && polygon && polygon.length > 0) {
-    const first = polygon[0];
-    if (first) {
-      position = [first[0], first[1]];
-    }
-  }
-
+  // Schutzstatus mit Priorität für verifizierte Ergebnisse
+  const schutzstatus = apiHabitat.verifiedResult?.schutzstatus || apiHabitat.result?.schutzstatus;
+  
   let color = '#22c55e'; // Grün für niederwertige Flächen (Standard)
   let transparenz = 0.5;
   // Farbe basierend auf Schutzstatus bestimmen
-  if (apiHabitat.result?.schutzstatus === 'gesetzlich geschützt') {
+  if (schutzstatus === 'gesetzlich geschützt') {
     color = '#ef4444'; // Rot für geschützte Flächen
-  } else if (apiHabitat.result?.schutzstatus === 'ökologisch hochwertig') {
+  } else if (schutzstatus === 'ökologisch hochwertig') {
     color = '#eab308'; // Gelb für hochwertige Flächen
   }
   if (apiHabitat.verified) {
     transparenz=0.9;
   }  
 
+  // Position muss vorhanden sein ODER Polygon muss vorhanden sein
+  if (!position && !polygon) {
+    return null;
+  }
+
   return {
     id: apiHabitat.jobId,
     name: habitatName + (apiHabitat.metadata.flurname ? ` (${apiHabitat.metadata.flurname})` : ''),
-    position,
+    position: position || (polygon && polygon.length > 0 ? polygon[0] : undefined), // Fallback: erster Polygon-Punkt als Position
     polygon,
     color,
     transparenz,
     // Zusätzliche Metadaten für Popup/Details
     metadata: {
       gemeinde: apiHabitat.metadata.gemeinde,
+      flurname: apiHabitat.metadata.flurname,
       erfasser: apiHabitat.metadata.erfassungsperson,
-      verifiziert: apiHabitat.verified
+      verifiziert: apiHabitat.verified,
+      elevation: apiHabitat.metadata.elevation,
+      schutzstatus: schutzstatus
     }
   };
 }
@@ -324,18 +354,27 @@ export function LocationDetermination({
   metadata, 
   setMetadata,
   scrollToNext,
-  mapMode: forcedMapMode
+  mapMode: forcedMapMode,
+  onPolygonDraftChange,
+  // Optional: wird von NatureScout genutzt, um den "Standortdaten ermitteln"-Schritt sauber zu visualisieren
+  isLocationDataLoading = false,
+  forceShowLocationInfo = false
 }: { 
   metadata: NatureScoutData; 
   setMetadata: React.Dispatch<React.SetStateAction<NatureScoutData>>;
   scrollToNext?: () => void;
   mapMode?: 'navigation' | 'polygon';
+  // Draft-Updates während Zeichnen (für Bottom-Navigation/Tooltips im Parent)
+  onPolygonDraftChange?: (points: Array<[number, number]>) => void;
+  isLocationDataLoading?: boolean;
+  forceShowLocationInfo?: boolean;
 }) {
+  const isDebug = process.env.NEXT_PUBLIC_MAP_DEBUG === 'true';
   // Debug: Component Mount/Unmount tracking
   useEffect(() => {
-    console.log('🏔️ LocationDetermination MOUNTED mit mapMode:', forcedMapMode);
+    if (isDebug) console.log('🏔️ LocationDetermination MOUNTED mit mapMode:', forcedMapMode);
     return () => {
-      console.log('🏔️ LocationDetermination UNMOUNTED');
+      if (isDebug) console.log('🏔️ LocationDetermination UNMOUNTED');
     };
   }, []);
 
@@ -356,11 +395,6 @@ export function LocationDetermination({
     messagesCount: 0,
     lastUpdate: 0
   });
-
-  // Letzter GPS-Fehler als UI-Text (kurz und verständlich)
-  const [gpsErrorMessage, setGpsErrorMessage] = useState<string | null>(null);
-  // Fehler-Typ für gezielte Hinweise
-  const [gpsErrorKind, setGpsErrorKind] = useState<'permission-denied' | 'position-unavailable' | 'timeout' | 'unknown' | null>(null);
   
   // Zustand für das Anzeigen des GPS-Statusbadges
   const [showGpsStatus, setShowGpsStatus] = useState<boolean>(true);
@@ -373,9 +407,10 @@ export function LocationDetermination({
       metadata.latitude && metadata.latitude !== 0 ? metadata.latitude : 46.724212, 
       metadata.longitude && metadata.longitude !== 0 ? metadata.longitude : 11.65555
     ];
-    console.log('🎯 initialMapPosition berechnet:', position);
+    if (isDebug) console.log('🎯 initialMapPosition berechnet:', position);
     return position;
   }, [metadata.latitude, metadata.longitude]);
+
   
   // Flag, das bestimmt, ob bereits auf GPS-Position gezoomt wurde
   const [hasZoomedToGPS, setHasZoomedToGPS] = useState(false);
@@ -417,11 +452,38 @@ export function LocationDetermination({
   const [polygonPoints, setPolygonPoints] = useState<Array<[number, number]>>(
     metadata.polygonPoints || []
   );
+
+  // Wichtig: referenziell stabiles leeres Polygon, damit `MapNoSSR` nicht bei jedem Render
+  // den `initialPolygon`-Effekt triggert und damit Leaflet.Draw abbricht.
+  const emptyPolygon = useMemo<Array<[number, number]>>(() => [], []);
+
+  // Initial-Polygon für die Map nur dann setzen, wenn es "valid" ist (>= 3 Punkte).
+  // Dadurch kommen wir aus kaputten Zwischenständen (z.B. 1 Punkt aus einem alten Bug) wieder raus.
+  const initialPolygonForMap = useMemo(() => {
+    if (!polygonPoints || polygonPoints.length < 3) return emptyPolygon;
+    return polygonPoints;
+  }, [polygonPoints, emptyPolygon]);
+  
+  // Bestimme, ob ein Polygon bereits gespeichert wurde (aus metadata abgeleitet, persistent)
+  const hasSavedPolygon = useMemo(() => {
+    return Boolean(
+      metadata.polygonPoints && 
+      Array.isArray(metadata.polygonPoints) && 
+      metadata.polygonPoints.length >= 3 &&
+      isPolygonClosed(metadata.polygonPoints) &&
+      metadata.latitude &&
+      metadata.longitude &&
+      metadata.latitude !== 0 &&
+      metadata.longitude !== 0
+    );
+  }, [metadata.polygonPoints, metadata.latitude, metadata.longitude]);
+  
+  // CTA-Logik wird im Parent (Bottom-Navigation) genutzt; hier keine lokale CTA-UI mehr.
   
   // MapMode bei Änderung des forcedMapMode aktualisieren
   useEffect(() => {
     if (forcedMapMode) {
-      console.log(`🗺️ MapMode wechselt von "${mapMode}" zu "${forcedMapMode}" (ohne Karten-Neuinitialisierung)`);
+      if (isDebug) console.log(`🗺️ MapMode wechselt von "${mapMode}" zu "${forcedMapMode}" (ohne Karten-Neuinitialisierung)`);
       setMapMode(forcedMapMode);
     }
   }, [forcedMapMode, mapMode]);
@@ -431,6 +493,13 @@ export function LocationDetermination({
   const [isLoadingHabitats, setIsLoadingHabitats] = useState<boolean>(false);
   const [habitatLoadError, setHabitatLoadError] = useState<string | null>(null);
   const [selectedHabitatId, setSelectedHabitatId] = useState<string | null>(null);
+  const hasLoadedHabitatsRef = useRef(false);
+  
+  // Display-Mode: Marker bei niedrigem Zoom, Polygone bei hohem Zoom
+  const [displayMode, setDisplayMode] = useState<'markers' | 'polygons'>('markers');
+  
+  // Debounce-Ref für Habitat-Loading
+  const habitatLoadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Referenz auf die Map-Instanz für direkte Steuerung
   const mapRef = useRef<MapNoSSRHandle>(null);
@@ -494,14 +563,39 @@ export function LocationDetermination({
     }
   }, [searchParams, metadata.polygonPoints]);
 
-  // Funktion zum Laden bestehender Habitate
-  const loadExistingHabitats = useCallback(async () => {
+  // Funktion zum Laden bestehender Habitate mit Geo-Query
+  const loadExistingHabitats = useCallback(async (currentZoom?: number, forceMode?: 'markers' | 'polygons') => {
     try {
       setIsLoadingHabitats(true);
       setHabitatLoadError(null);
       
-      // Erhöhtes Limit, um mehr Habitate für den aktuellen Bereich zu erhalten
-      const response = await fetch('/api/habitat/public?limit=100&verifizierungsstatus=alle');
+      // Bounds von der Karte abrufen
+      const bounds = mapRef.current?.getBounds();
+      if (!bounds) {
+        if (isDebug) console.log('Keine Bounds verfügbar, überspringe Habitat-Load');
+        setIsLoadingHabitats(false);
+        return;
+      }
+      
+      // Zoom-Level bestimmen: verwende currentZoom oder hole von der Karte
+      const zoomLevel = currentZoom !== undefined ? currentZoom : (mapRef.current?.getZoom() || 14);
+      
+      // Bestimme Display-Mode basierend auf Zoom-Level
+      const currentDisplayMode = forceMode || (zoomLevel <= 14 ? 'markers' : 'polygons');
+      setDisplayMode(currentDisplayMode);
+      
+      if (isDebug) console.log('Display-Mode bestimmt:', { zoomLevel, currentDisplayMode, forceMode });
+      
+      // API-Parameter zusammenstellen
+      const boundsParam = `${bounds.minLat},${bounds.minLng},${bounds.maxLat},${bounds.maxLng}`;
+      const markersOnly = currentDisplayMode === 'markers';
+      const zoomParam = `&zoom=${zoomLevel}`;
+      
+      const url = `/api/habitat/public?limit=100&verifizierungsstatus=alle&view=map&bounds=${boundsParam}&markersOnly=${markersOnly}${zoomParam}`;
+      
+      if (isDebug) console.log('Lade Habitate mit Geo-Query:', { bounds, displayMode: currentDisplayMode, zoom: zoomLevel });
+      
+      const response = await fetch(url);
       
       if (!response.ok) {
         throw new Error(`API-Fehler: ${response.status}`);
@@ -511,14 +605,20 @@ export function LocationDetermination({
       
       // Konvertiere API-Daten in das Format für die Karte
       const validHabitats = data.entries
-        .filter((h: HabitatFromAPI) => 
-          // Filtere Habitate ohne gültige Geo-Koordinaten
-          (h.metadata?.latitude && h.metadata?.longitude) || 
-          (h.metadata?.polygonPoints && h.metadata.polygonPoints.length > 0)
-        )
         .map(convertToMapHabitat)
-        .filter(Boolean); // Entferne null-Werte
+        .filter(Boolean); // Entferne null-Werte (convertToMapHabitat gibt null zurück wenn keine gültigen Koordinaten)
       
+      if (isDebug) {
+        console.log(`Geladen: ${validHabitats.length} Habitate (Mode: ${currentDisplayMode}, Zoom: ${zoomLevel})`);
+        if (validHabitats.length > 0) {
+          console.log('Erste 3 Habitate:', validHabitats.slice(0, 3).map(h => ({
+            id: h.id,
+            name: h.name,
+            position: h.position,
+            hasPolygon: Boolean(h.polygon && h.polygon.length >= 3)
+          })));
+        }
+      }
       setExistingHabitats(validHabitats);
       
     } catch (err) {
@@ -529,6 +629,41 @@ export function LocationDetermination({
     }
   }, []);
 
+  // Bestehende Habitate beim initialen Laden der Karte abrufen
+  // (damit sie im Schritt "Standort finden" direkt sichtbar sind)
+  useEffect(() => {
+    // React StrictMode kann Effekte doppelt ausführen (dev) -> Guard
+    if (hasLoadedHabitatsRef.current) return;
+    
+    // Warte kurz, damit die Karte initialisiert ist
+    const timer = setTimeout(() => {
+      hasLoadedHabitatsRef.current = true;
+      loadExistingHabitats(zoom);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [loadExistingHabitats, zoom]);
+  
+  // Reagiere auf Zoom-Änderungen: Lade Habitate neu mit angepasstem Display-Mode
+  useEffect(() => {
+    // Debounce für Zoom-Änderungen (vermeide zu viele API-Calls)
+    if (habitatLoadTimeoutRef.current) {
+      clearTimeout(habitatLoadTimeoutRef.current);
+    }
+    
+    habitatLoadTimeoutRef.current = setTimeout(() => {
+      if (hasLoadedHabitatsRef.current) {
+        loadExistingHabitats(zoom);
+      }
+    }, 500); // 500ms Debounce
+    
+    return () => {
+      if (habitatLoadTimeoutRef.current) {
+        clearTimeout(habitatLoadTimeoutRef.current);
+      }
+    };
+  }, [zoom, loadExistingHabitats]);
+
   // Handler für Klicks auf Habitate
   const handleHabitatClick = useCallback((habitatId: string) => {
     setSelectedHabitatId(habitatId);
@@ -537,14 +672,26 @@ export function LocationDetermination({
   
   // Weitere memoized Callbacks
   const handlePolygonChange = useCallback((newPoints: Array<[number, number]>) => {
-    setPolygonPoints(newPoints);
+    // Leaflet liefert i.d.R. ein "offen" repräsentiertes Polygon (ohne Wiederholung des ersten Punktes).
+    // Für unsere Validierung (isPolygonClosed) normalisieren wir es auf "geschlossen".
+    let normalizedPoints = newPoints;
+    if (normalizedPoints.length >= 3 && !isPolygonClosed(normalizedPoints)) {
+      const firstPoint = normalizedPoints[0];
+      if (firstPoint) {
+        normalizedPoints = [...normalizedPoints, [firstPoint[0], firstPoint[1]]];
+      }
+    }
+
+    setPolygonPoints(normalizedPoints);
+    // Zeichnung ist abgeschlossen (CREATED/EDITED), Draft-Punkte im Parent zurücksetzen
+    onPolygonDraftChange?.([]);
     
     // In den Metadaten speichern
     setMetadata(prevMetadata => ({
       ...prevMetadata,
-      polygonPoints: newPoints
+      polygonPoints: normalizedPoints
     }));
-  }, [setMetadata]);
+  }, [setMetadata, onPolygonDraftChange]);
   
   const handleAreaChange = useCallback((newArea: number) => {
     // Zusätzliche Validierung
@@ -552,14 +699,28 @@ export function LocationDetermination({
       return;
     }
     
-    // Nur den lokalen State aktualisieren, NICHT die Metadaten
-    // Die Metadaten werden erst beim Speichern aktualisiert
+    // Fläche für den weiteren Flow (Standortdaten/Anzeige) in metadata spiegeln.
+    // Das ist bewusst "einfach" gehalten; wenn das zu vielen Updates führt, können wir das throttlen.
     setAreaInSqMeters(newArea);
-  }, []);
+    setMetadata(prev => ({
+      ...prev,
+      plotsize: newArea
+    }));
+  }, [setMetadata]);
   
   const handleCenterChange = useCallback((newCenter: [number, number]) => {
     // Nur für Drag-Events, keine Auswirkung auf die gespeicherte Position
-  }, []);
+    // Beim Pannen auch Habitate neu laden (mit Debounce)
+    if (habitatLoadTimeoutRef.current) {
+      clearTimeout(habitatLoadTimeoutRef.current);
+    }
+    
+    habitatLoadTimeoutRef.current = setTimeout(() => {
+      if (hasLoadedHabitatsRef.current) {
+        loadExistingHabitats(zoom);
+      }
+    }, 500); // 500ms Debounce
+  }, [zoom, loadExistingHabitats]);
   
   const handleZoomChange = useCallback((newZoom: number) => {
     setZoom(newZoom);
@@ -580,11 +741,18 @@ export function LocationDetermination({
       return;
     }
     
-    console.log('Starte kontinuierliche GPS-Verfolgung');
+    // Sicherstellen, dass ein bereits laufender Watch beendet wird
+    if (watchPositionIdRef.current !== null) {
+      if (isDebug) console.log('Beende bereits laufenden GPS-Watch vor Neustart');
+      navigator.geolocation.clearWatch(watchPositionIdRef.current);
+      watchPositionIdRef.current = null;
+    }
+    
+    if (isDebug) console.log('Starte kontinuierliche GPS-Verfolgung');
 
     // Status-Badge nach 15 Sekunden automatisch ausblenden
     const hideStatusTimeout = setTimeout(() => {
-      console.log('GPS-Verfolgung beendet');
+      if (isDebug) console.log('GPS-Verfolgung beendet');
       setShowGpsStatus(false);
     }, 15000);
     
@@ -593,12 +761,6 @@ export function LocationDetermination({
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
         const now = Date.now();
-
-        // Wenn wieder gültige Daten kommen, einen evtl. alten Fehler ausblenden
-        if (gpsErrorMessage) {
-          setGpsErrorMessage(null);
-          setGpsErrorKind(null);
-        }
         
         // Sofort GPS-Status aktualisieren mit jedem Signal
         setGpsStats(prev => ({
@@ -652,22 +814,31 @@ export function LocationDetermination({
           }
         }
       },
-      (error) => {
-        const normalizedError = normalizeGeolocationError(error);
-        // Einzelner console.error für den Hauptfehler, Details mit console.log
-        console.error(`GPS-Verfolgung Fehler [${normalizedError.kind}]: ${normalizedError.userMessage}`);
-        // Details als console.log, damit sie nicht als separate Fehler gezählt werden
-        console.log("GPS-Fehler Details:", {
-          kind: normalizedError.kind,
-          code: normalizedError.code,
-          name: normalizedError.name,
-          message: normalizedError.message,
-          secureContext: typeof window !== 'undefined' ? window.isSecureContext : null,
-          ...(Object.keys(normalizedError.debug).length > 0 && { debug: normalizedError.debug })
-        });
+      (error: GeolocationPositionError) => {
+        // Detaillierte Fehlerbehandlung mit Code und Message
+        const errorCode = error.code || 'UNKNOWN';
+        const errorMessage = error.message || 'Unbekannter GPS-Fehler';
         
-        setGpsErrorMessage(normalizedError.userMessage);
-        setGpsErrorKind(normalizedError.kind);
+        // Fehlercodes: 1=PERMISSION_DENIED, 2=POSITION_UNAVAILABLE, 3=TIMEOUT
+        const errorMessages: Record<number, string> = {
+          1: 'GPS-Berechtigung verweigert',
+          2: 'GPS-Position nicht verfügbar',
+          3: 'GPS-Zeitüberschreitung'
+        };
+        
+        const userFriendlyMessage = errorMessages[errorCode as number] || errorMessage;
+        
+        if (isDebug) {
+          console.error("Fehler bei GPS-Verfolgung:", {
+            code: errorCode,
+            message: errorMessage,
+            userMessage: userFriendlyMessage
+          });
+        } else {
+          // In Produktion nur eine kurze Meldung loggen
+          console.warn(`GPS-Fehler (Code ${errorCode}): ${userFriendlyMessage}`);
+        }
+        
         setIsLoadingGPS(false); // Fehler bei GPS, Ladezustand beenden
         
         // Bei Fehler auch den Statustext anpassen
@@ -678,12 +849,12 @@ export function LocationDetermination({
       },
       { 
         enableHighAccuracy: true,  // GPS-Genauigkeit erzwingen (wichtig für Naturaufnahme)
-        timeout: 10000,            // 15 Sekunden Timeout - lieber länger warten als ungenau sein
+        timeout: 10000,            // 10 Sekunden Timeout
         maximumAge: 0              // Niemals Cache verwenden, immer neue Koordinaten abrufen
       }
     );
     
-    // Nach 5 Sekunden GPS-Ladescreen auf jeden Fall ausblenden (Timeout-Sicherung)
+    // Nach 8 Sekunden GPS-Ladescreen auf jeden Fall ausblenden (Timeout-Sicherung)
     const timeoutId = setTimeout(() => {
       setIsLoadingGPS(false);
     }, 8000);
@@ -707,11 +878,11 @@ export function LocationDetermination({
     
     // 1. Marker auf aktuelle Position setzen (immer)
     mapRef.current.updatePositionMarker(currentPosition[0], currentPosition[1]);
-    console.log("Positionsmarker aktualisiert:", currentPosition);
+          if (isDebug) console.log("Positionsmarker aktualisiert:", currentPosition);
     
     // 2. Einmalige Zentrierung und Zoom (nur beim ersten gültigen GPS-Update)
     if (!hasZoomedToGPS && mapInitializedRef.current) {
-      console.log("Einmalige Zentrierung auf GPS-Position:", currentPosition);
+      if (isDebug) console.log("Einmalige Zentrierung auf GPS-Position:", currentPosition);
       
       // Zentrierung mit hohem Zoom-Level
       mapRef.current.centerMap(currentPosition[0], currentPosition[1], 20);
@@ -735,16 +906,8 @@ export function LocationDetermination({
     // Map als initialisiert markieren
     mapInitializedRef.current = true;
     
-    console.log('Karte initialisiert mit niedrigem Zoom-Level');
+    if (isDebug) console.log('Karte initialisiert mit niedrigem Zoom-Level');
   }, []); // Leere Abhängigkeiten - nur einmal ausführen
-
-  // Habitate laden, sobald die Map bereit ist
-  useEffect(() => {
-    // Nicht an mapRef koppeln: die API kann unabhängig von der Leaflet-Initialisierung geladen werden.
-    // (Andernfalls kann es passieren, dass bei langsamem dynamischem Import nie geladen wird.)
-    console.log('Lade bestehende Habitate...');
-    loadExistingHabitats();
-  }, [loadExistingHabitats]); // Abhängig von loadExistingHabitats
 
   // Funktion zum Zentrieren auf die aktuelle GPS-Position (nur bei Button-Klick)
   const centerToCurrentGPS = useCallback(() => {
@@ -903,13 +1066,21 @@ export function LocationDetermination({
       // Aktuelle Polygon-Punkte von der Map holen
       
       // Im Bearbeitungsmodus die aktuellen Punkte direkt aus der Karte extrahieren
-      const currentPoints = mapRef.current?.getCurrentPolygonPoints() || [];
+      let currentPoints = mapRef.current?.getCurrentPolygonPoints() || [];
       
       // Prüfen, ob genug Punkte vorhanden sind
       if (currentPoints.length < 3) {
         setIsSavingPolygon(false);
         setShowPolygonWarning(true); // Schöne UI-Warnung anzeigen
         return;
+      }
+
+      // Normalisieren: Polygon schließen (erster Punkt am Ende), damit UI/Validierung konsistent ist.
+      if (currentPoints.length >= 3 && !isPolygonClosed(currentPoints)) {
+        const firstPoint = currentPoints[0];
+        if (firstPoint) {
+          currentPoints = [...currentPoints, [firstPoint[0], firstPoint[1]]];
+        }
       }
       
       // Mittelpunkt berechnen
@@ -930,6 +1101,7 @@ export function LocationDetermination({
       
       // Lokaler State für Polygon-Punkte aktualisieren
       setPolygonPoints(currentPoints);
+      onPolygonDraftChange?.([]);
       
       // Polygon als gespeichert markieren
       setPolygonSaved(true);
@@ -957,11 +1129,23 @@ export function LocationDetermination({
   };
 
   // Polygon neu beginnen
-  const restartPolygon = () => {
+  const restartPolygon = useCallback(() => {
     setPolygonPoints([]);
     setMetadata(prevMetadata => ({
       ...prevMetadata,
-      polygonPoints: []
+      polygonPoints: [],
+      // Koordinaten zurücksetzen, damit hasSavedPolygon korrekt funktioniert
+      latitude: 0,
+      longitude: 0,
+      // Standortinfos löschen, damit sie beim nächsten Durchlauf neu ermittelt werden
+      gemeinde: "",
+      flurname: "",
+      standort: "",
+      elevation: undefined,
+      exposition: undefined,
+      slope: undefined,
+      kataster: undefined,
+      plotsize: 0
     }));
     
     // Polygon-Speicherstatus zurücksetzen
@@ -969,7 +1153,7 @@ export function LocationDetermination({
     
     // Standortinformationsanzeige ausblenden
     setShowLocationInfo(false);
-  };
+  }, [setMetadata]);
 
   // "Nicht mehr anzeigen" Einstellungen speichern
   const saveWelcomePreference = (value: boolean) => {
@@ -994,6 +1178,20 @@ export function LocationDetermination({
       setShowLocationInfo(true);
     }
   }, [metadata.standort]);
+
+  // Standortinfo nur im "Standortdaten ermitteln"-Schritt anzeigen
+  // Bei Navigation zu anderen Schritten wird der Dialog ausgeblendet
+  useEffect(() => {
+    if (forceShowLocationInfo) {
+      setShowLocationInfo(true);
+    } else {
+      // Dialog ausblenden, wenn wir nicht mehr im Schritt "Standortdaten ermitteln" sind
+      // Ausnahme: Bestehendes Habitat im Bearbeitungsmodus (wird durch anderen useEffect gesteuert)
+      if (!selectedHabitatId) {
+        setShowLocationInfo(false);
+      }
+    }
+  }, [forceShowLocationInfo, selectedHabitatId]);
   
   // Referenz für den Map-Container
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -1012,10 +1210,10 @@ export function LocationDetermination({
 
   // Funktion zum manuellen Ein-/Ausblenden des GPS-Status-Badges
   const toggleGpsStatus = useCallback(() => {
-    console.log('GPS-Status-Badge angeklickt');
+    if (isDebug) console.log('GPS-Status-Badge angeklickt');
     setShowGpsStatus(prev => !prev);
     // Debugging-Information in der Konsole ausgeben
-    console.log('Neuer Status showGpsStatus:', !showGpsStatus);
+    if (isDebug) console.log('Neuer Status showGpsStatus:', !showGpsStatus);
   }, [showGpsStatus]);
 
   // Effekt zum automatischen Ausblenden der Polygon-Warnung
@@ -1039,13 +1237,16 @@ export function LocationDetermination({
           onCenterChange={handleCenterChange}
           onZoomChange={handleZoomChange}
           onPolygonChange={handlePolygonChange}
+          onPolygonDraftChange={onPolygonDraftChange}
+          onResetPolygon={restartPolygon}
           onAreaChange={handleAreaChange}
           editMode={mapMode === 'polygon'}
-          initialPolygon={polygonPoints}
-          hasPolygon={Boolean(polygonPoints && polygonPoints.length > 0)}
+          initialPolygon={initialPolygonForMap}
+          hasPolygon={initialPolygonForMap.length >= 3}
           showZoomControls={mapMode !== 'polygon'}
           showPositionMarker={true}
           habitats={existingHabitats}
+          displayMode={displayMode}
           onHabitatClick={handleHabitatClick}
           onClick={handleMapClick}
         />
@@ -1068,7 +1269,7 @@ export function LocationDetermination({
         {/* GPS Status-Anzeige (permanent oder durch Klick auf GPS-Icon aufrufbar) */}
         {showGpsStatus && (
           <div
-            className="absolute bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-3 text-xs max-w-[320px]"
+            className="absolute bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-2 text-xs"
             onClick={toggleGpsStatus}
             style={{
               zIndex: 1000, // Reduzierter z-index
@@ -1087,56 +1288,6 @@ export function LocationDetermination({
               </button>
             </div>
             <div className="space-y-1">
-              {gpsErrorMessage && (
-                <>
-                  <div className="text-red-600 leading-snug">
-                    <span className="font-medium">Fehler:</span> {gpsErrorMessage}
-                  </div>
-                  {gpsErrorKind === 'permission-denied' && (() => {
-                    const env = detectBrowserEnvironment();
-                    let instruction = '';
-                    
-                    if (env.isMobile) {
-                      if (env.isIOS && env.browser === 'safari') {
-                        instruction = 'Einstellungen → Safari → Standortdienste → "Fragen" oder "Erlauben"';
-                      } else if (env.isAndroid && env.browser === 'chrome') {
-                        instruction = 'In der Adressleiste auf das Schloss-Icon tippen → "Standort" → "Zulassen"';
-                      } else if (env.isIOS) {
-                        instruction = 'Einstellungen → Safari → Standortdienste → "Fragen" oder "Erlauben"';
-                      } else if (env.isAndroid) {
-                        instruction = 'In der Adressleiste auf das Schloss-Icon tippen → "Standort" → "Zulassen"';
-                      } else {
-                        instruction = 'Geräte-Einstellungen → Apps → Browser → Berechtigungen → Standort';
-                      }
-                    } else {
-                      // Desktop
-                      if (env.browser === 'chrome' || env.browser === 'edge') {
-                        instruction = 'Klicken Sie in der Adressleiste auf das Schloss-Icon und wählen Sie "Zulassen" bei Standort.';
-                      } else if (env.browser === 'firefox') {
-                        instruction = 'Klicken Sie in der Adressleiste auf das Schloss-Icon und wählen Sie "Zulassen" bei Standort.';
-                      } else if (env.browser === 'safari') {
-                        instruction = 'Safari → Einstellungen → Websites → Standortdienste → "Erlauben" für localhost';
-                      } else {
-                        instruction = 'Klicken Sie in der Adressleiste auf das Schloss-Icon und wählen Sie "Zulassen" bei Standort.';
-                      }
-                    }
-                    
-                    return (
-                      <div className="text-xs text-gray-700 leading-relaxed mt-3 pt-3 border-t border-gray-300 bg-gray-50/50 rounded p-2 -mx-1">
-                        <p className="mb-2 font-semibold text-gray-800">
-                          So erlauben Sie den Standortzugriff:
-                        </p>
-                        <p className="mb-2">
-                          {instruction}
-                        </p>
-                        <p className="text-gray-600 text-xs mt-2 pt-2 border-t border-gray-200">
-                          Nach dem Erlauben sollte der GPS-Status-Dialog die Fehlermeldung entfernen und stattdessen die GPS-Position anzeigen.
-                        </p>
-                      </div>
-                    );
-                  })()}
-                </>
-              )}
               <div className="flex justify-between">
                 <span>Messungen:</span>
                 <span className="font-medium">{gpsStats.messagesCount}</span>
@@ -1174,7 +1325,9 @@ export function LocationDetermination({
         )}
         
         {/* Standortinformationen/Habitat-Info (unten rechts) */}
-        {showLocationInfo && (
+        {/* Nur anzeigen, wenn forceShowLocationInfo aktiv ist (Schritt "Standortdaten ermitteln") 
+            oder wenn ein bestehendes Habitat ausgewählt ist */}
+        {showLocationInfo && (forceShowLocationInfo || selectedHabitatId) && (
           <div className="absolute bottom-11 right-3 z-[1000] bg-gray-800/30 backdrop-blur-sm rounded-lg shadow-lg p-3 max-w-[70vw]">
             <div className="flex justify-between items-start">
               <h3 className="text-[12px] font-semibold mb-1 text-white">
@@ -1245,6 +1398,13 @@ export function LocationDetermination({
                       {habitat.metadata?.verifiziert ? 'Verifiziert' : 'Nicht verifiziert'}
                     </div>
                     
+                    {habitat.metadata?.schutzstatus && (
+                      <>
+                        <div className="text-gray-200">Schutzstatus:</div>
+                        <div className="font-medium">{habitat.metadata.schutzstatus}</div>
+                      </>
+                    )}
+                    
                     {/* Standortdaten, wenn verfügbar */}
                     <div className="col-span-2 mt-2 border-t border-gray-600 pt-1">
                       <div className="font-semibold mb-1">Standortdaten</div>
@@ -1253,7 +1413,11 @@ export function LocationDetermination({
                     {/* Anzeige von Höhe, falls vorhanden */}
                     <div className="text-gray-200">Höhe:</div>
                     <div className="font-medium">
-                      {habitat.position ? `~${Math.round(habitat.position[0])} m` : '-'}
+                      {habitat.metadata?.elevation 
+                        ? (typeof habitat.metadata.elevation === 'number' 
+                            ? `~${Math.round(habitat.metadata.elevation)} m`
+                            : habitat.metadata.elevation)
+                        : '-'}
                     </div>
                     
                     {/* Falls ein Polygon existiert, Flächenberechnung anzeigen */}
@@ -1316,11 +1480,11 @@ export function LocationDetermination({
                   </div>
                 );
               })()
-            ) : isLoadingGeodata ? (
+            ) : (isLoadingGeodata || isLocationDataLoading) ? (
               // Ladeanzeige für Geodaten
               <div className="flex items-center justify-center py-2">
                 <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary"></div>
-                <span className="ml-2 text-[12px] text-white">Daten werden geladen...</span>
+                <span className="ml-2 text-[12px] text-white">Standortdaten werden ermittelt...</span>
               </div>
             ) : (
               // Standortinformationen
@@ -1383,32 +1547,7 @@ export function LocationDetermination({
           </div>
         )}
         
-        {/* UI-Overlay: Aktions-Buttons für Polygon-Modus (unten links) */}
-        {mapMode === 'polygon' && (
-          <div className="absolute bottom-4 left-4 z-[9999] bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={savePolygon}
-                disabled={isSavingPolygon || polygonSaved}
-                className="h-8 text-xs"
-              >
-                {isSavingPolygon ? 'Speichern...' : polygonSaved ? 'Umriss gespeichert' : 'Umriss speichern'}
-              </Button>
-              
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={restartPolygon}
-                disabled={isSavingPolygon}
-                className="h-8 text-xs"
-              >
-                Neu beginnen
-              </Button>
-            </div>
-          </div>
-        )}
+        {/* CTA-Panel entfernt: Navigation läuft zentral über die Bottom-Navigation in `NatureScout`. */}
         
         {/* UI-Overlay: Aktions-Buttons (oben links) */}
         {mapMode !== 'polygon' && (

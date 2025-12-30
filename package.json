@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:mongodb": "node scripts/test-mongodb-connection.js",
+    "test:api": "node scripts/test-habitat-api-performance.js"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.25.0",

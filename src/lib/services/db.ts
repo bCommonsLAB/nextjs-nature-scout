@@ -16,8 +16,16 @@ export async function connectToDatabase(): Promise<Db> {
 async function _connectToDatabase(): Promise<Db> {
   try {
     // Check if client exists and is connected
-    if (client?.connect && client.db(process.env.MONGODB_DATABASE_NAME)) {
-      return client.db(process.env.MONGODB_DATABASE_NAME);
+    if (client && client.db(process.env.MONGODB_DATABASE_NAME)) {
+      try {
+        // Prüfe, ob die Verbindung noch aktiv ist
+        await client.db('admin').admin().ping();
+        return client.db(process.env.MONGODB_DATABASE_NAME);
+      } catch {
+        // Verbindung ist nicht mehr aktiv, schließen und neu verbinden
+        await client.close();
+        client = null;
+      }
     }
 
     // Wenn keine Verbindung besteht, neue aufbauen
@@ -29,18 +37,16 @@ async function _connectToDatabase(): Promise<Db> {
     // Verbesserte Konfiguration für Produktionsumgebung
     client = new MongoClient(uri, {
       maxPoolSize: 20, // Erhöht für bessere Performance
-      minPoolSize: 10, // Erhöht für stabilere Verbindungen
-      serverSelectionTimeoutMS: 10000, // Reduziert von 30s auf 10s
-      socketTimeoutMS: 45000, // Reduziert von 75s auf 45s
-      connectTimeoutMS: 10000, // Reduziert von 30s auf 10s
-      retryWrites: true,
-      retryReads: true,
-      // Zusätzliche Optionen für bessere Stabilität
-      maxIdleTimeMS: 30000, // Verbindungen nach 30s Leerlauf schließen
-      heartbeatFrequencyMS: 10000, // Häufigere Heartbeats
+      minPoolSize: 5, // Reduziert für lokale Entwicklung (weniger Ressourcen)
+      serverSelectionTimeoutMS: 30000, // Erhöht auf 30s für stabilere Verbindungen
+      socketTimeoutMS: 45000, // Socket-Timeout
+      connectTimeoutMS: 30000, // Erhöht auf 30s für stabilere Verbindungen
       // Retry-Logik für Verbindungsfehler
       retryReads: true,
       retryWrites: true,
+      // Zusätzliche Optionen für bessere Stabilität
+      maxIdleTimeMS: 30000, // Verbindungen nach 30s Leerlauf schließen
+      heartbeatFrequencyMS: 10000, // Häufigere Heartbeats
       // Writable concern für bessere Konsistenz
       w: 'majority',
       wtimeoutMS: 5000
