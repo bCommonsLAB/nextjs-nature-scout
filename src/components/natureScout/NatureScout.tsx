@@ -4,22 +4,45 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Welcome } from "./Welcome";
 import { Summary } from "./Summary";
 import { UploadedImageList } from "./UploadedImageList";
 import { HabitatAnalysis } from "./HabitatAnalysis";
 import { SingleImageUpload } from "./SingleImageUpload";
 import { Bild, NatureScoutData, AnalyseErgebnis, llmInfo, PlantNetResult } from "@/types/nature-scout";
-import { LocationDetermination } from './LocationDetermination';
+import { LocationDetermination, isPolygonClosed } from './LocationDetermination';
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNatureScoutState } from "@/context/nature-scout-context";
 import { toast } from "sonner";
 
+function calculatePolygonCenter(points: Array<[number, number]>): [number, number] {
+  // Falls Polygon geschlossen ist (letzter Punkt = erster Punkt), den letzten Punkt nicht doppelt zählen.
+  const hasDuplicateClosingPoint =
+    points.length >= 2 &&
+    points[0]?.[0] === points[points.length - 1]?.[0] &&
+    points[0]?.[1] === points[points.length - 1]?.[1];
+
+  const effectivePoints = hasDuplicateClosingPoint ? points.slice(0, -1) : points;
+
+  if (effectivePoints.length === 0) {
+    return [0, 0];
+  }
+
+  const sum = effectivePoints.reduce(
+    (acc, point) => [acc[0] + point[0], acc[1] + point[1]] as [number, number],
+    [0, 0] as [number, number]
+  );
+
+  return [sum[0] / effectivePoints.length, sum[1] / effectivePoints.length];
+}
+
 const schritte = [
   "Willkommen",
   "Standort finden", 
   "Umriss zeichnen",
+  "Standortdaten ermitteln",
   "Panoramabild",
   "Detailbild", 
   "Pflanzenbild 1",
@@ -40,7 +63,11 @@ const schrittErklaerungen = [
   },
   {
     title: "Umriss zeichnen",
-    description: "Klicken Sie auf die Karte mindestens 3 Eckpunkte des Habitats. Wählen als letzen den ersten Punkt erneut aus klicken auf 'Umriss speichern'."
+    description: "Setzen Sie mindestens 3 Punkte und schließen Sie den Umriss, indem Sie den ersten Punkt erneut antippen. Danach: „Weiter“."
+  },
+  {
+    title: "Standortdaten ermitteln",
+    description: "Wir ermitteln jetzt die Standortdaten (Gemeinde, Flurname, Höhe, Hang, Exposition, Kataster). Danach: „Weiter“."
   },
   {
     title: "Panoramabild",
@@ -68,20 +95,10 @@ const schrittErklaerungen = [
   }
 ];
 
-// Weiter-Button-Labels für jeden Schritt
-const weiterButtonLabels = [
-  "Standort finden",      // Von Schritt 0 (Willkommen) 
-  "Umriss zeichnen",      // Von Schritt 1 (Standort finden)
-  "Panoramabild erfassen",         // Von Schritt 2 (Umriss zeichnen)
-  "Detailbild erfassen",           // Von Schritt 3 (Panoramabild)
-  "Pflanze 1 erfassen",       // Von Schritt 4 (Detailbild)
-  "Pflanze 2 erfassen",       // Von Schritt 5 (Pflanzenbild 1)
-  "zur Analyse",              // Von Schritt 6 (Pflanzenbild 2)
-  "Habitat speichern", // Von Schritt 7 (Habitat analysieren)
-  "Neues Habitat erfassen"           // Von Schritt 8 (Verifizierung)
-];
+// UX: Die Buttons unten heißen immer „Zurück“ / „Weiter“.
+// Was genau passiert, erklären wir via Tooltip (title-Attribut) und via HelpBubble.
 
-// Schwebende Sprechblasen-Komponente
+// Schwebende Sprechblasen-Komponente mit Overlay und automatischem Ausblenden
 function FloatingHelpBubble({ 
   title, 
   description, 
@@ -97,82 +114,143 @@ function FloatingHelpBubble({
   navigationHeight?: number;
   viewportHeight?: number;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  // Automatisches Ausblenden bei Klicks außerhalb des Dialogs
+  useEffect(() => {
+    if (!isVisible) return;
+
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      
+      // Schließe nur, wenn der Klick außerhalb des Dialogs ist
+      if (dialogRef.current && !dialogRef.current.contains(target)) {
+        onClose();
+      }
+    };
+
+    // Event-Listener hinzufügen (mit kleiner Verzögerung, damit der initiale Render nicht sofort schließt)
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('click', handleClickOutside, true); // capture phase
+      document.addEventListener('touchstart', handleClickOutside, true);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('click', handleClickOutside, true);
+      document.removeEventListener('touchstart', handleClickOutside, true);
+    };
+  }, [isVisible, onClose]);
+
+  // Animation beim Ein-/Ausblenden
   useEffect(() => {
     if (isVisible) {
-      // Automatisch nach 5 Sekunden ausblenden
+      setIsAnimating(true);
+      return undefined;
+    } else {
+      // Kurze Verzögerung für Ausblend-Animation
+      const timer = setTimeout(() => setIsAnimating(false), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isVisible]);
+
+  // Automatisch nach 8 Sekunden ausblenden (Fallback)
+  useEffect(() => {
+    if (isVisible) {
       const timer = setTimeout(() => {
         onClose();
       }, 8000);
-      
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [isVisible, onClose]);
 
-  if (!isVisible) return null;
-
-  // Dynamische Positionierung
-  const bottomPosition = navigationHeight > 0 ? navigationHeight + 16 : 100; // 16px Abstand zur Navigation
+  if (!isVisible && !isAnimating) return null;
 
   return (
     <div 
-      className="fixed left-4 right-4 z-[9999] transition-all duration-300 ease-in-out"
+      ref={dialogRef}
+      className={`fixed left-0 right-0 z-[9999] transition-transform duration-300 ease-out ${
+        isVisible ? 'translate-y-0' : 'translate-y-full'
+      }`}
       style={{ 
-        bottom: `${bottomPosition}px`,
-        maxHeight: viewportHeight > 0 ? `${Math.min(viewportHeight * 0.3, 200)}px` : '200px'
+        bottom: 0,
+        paddingBottom: navigationHeight > 0 ? `${navigationHeight}px` : '0px',
       }}
     >
-      <div className="bg-blue-50 border border-blue-200 rounded-lg shadow-lg p-4 max-w-md mx-auto">
-        <div className="flex items-start gap-3">
-          <div className="flex-1">
-            <h3 className="text-m font-semibold text-blue-900">
+      {/* Dialog von unten einblendend (transparent hell, keine runden Ecken) */}
+      <div className="bg-white/30 backdrop-blur-sm mx-auto max-w-2xl">
+        {/* Inhalt */}
+        <div className="px-6 py-3">
+          <div>
+            <h3 className="text-sm font-semibold text-black mb-1">
               {title}
             </h3>
-            <p className="text-m text-blue-800 leading-relaxed">
+            <p className="text-xs text-gray-900 leading-relaxed">
               {description}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="flex-shrink-0 text-blue-400 hover:text-blue-600 transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
       </div>
     </div>
   );
 }
 
-function isNextButtonDisabled(schritt: number, metadata: NatureScoutData, isAnyUploadActive: boolean): boolean {
+function isNextButtonDisabled(args: {
+  schritt: number;
+  metadata: NatureScoutData;
+  isAnyUploadActive: boolean;
+  canFinalizePolygon: boolean;
+  isLocationDataLoading: boolean;
+  isLocationDataReady: boolean;
+}): boolean {
+  const {
+    schritt,
+    metadata,
+    isAnyUploadActive,
+    canFinalizePolygon,
+    isLocationDataLoading,
+    isLocationDataReady
+  } = args;
+
   if (schritt === schritte.length - 1) return true;
   if (isAnyUploadActive) return true;
 
   switch (schritt) {
     case 0: // Willkommen
       return false;
-    
+
     case 1: // Standort finden
-      return false; // Immer möglich zu "Umriss zeichnen" zu wechseln
-    
+      return false;
+
     case 2: // Umriss zeichnen
-      return !metadata.gemeinde || !metadata.flurname || !metadata.latitude || !metadata.longitude;
-    
-    case 3: // Panoramabild
+      // „Weiter“ bedeutet hier: Umriss speichern
+      return !canFinalizePolygon;
+
+    case 3: // Standortdaten ermitteln
+      // „Weiter“ erst aktiv, wenn Daten fertig geladen
+      return isLocationDataLoading || !isLocationDataReady;
+
+    case 4: { // Panoramabild
       const hasPanorama = metadata.bilder.some(b => b.imageKey === "Panoramabild");
       return !hasPanorama;
-    
-    case 4: // Detailbild
+    }
+
+    case 5: { // Detailbild
       const hasDetail = metadata.bilder.some(b => b.imageKey === "Detailansicht");
       return !hasDetail;
-    
-    case 5: // Pflanzenbild 1
+    }
+
+    case 6: { // Pflanzenbild 1
       const hasPlant1 = metadata.bilder.some(b => b.imageKey === "Detailbild_1");
       return !hasPlant1;
-    
-    case 6: // Pflanzenbild 2
+    }
+
+    case 7: // Pflanzenbild 2
       return false;
-    
-    case 7: // Habitat speicher & analysieren
+
+    case 8: // Habitat analysieren
       return !metadata.analyseErgebnis || !metadata.llmInfo;
 
     default:
@@ -203,6 +281,87 @@ export default function NatureScout() {
   const [shouldScrollToNext, setShouldScrollToNext] = useState(false);
   const [isAnyUploadActive, setIsAnyUploadActive] = useState(false);
   const [showHelpBubble, setShowHelpBubble] = useState(true); // State für die Sprechblase
+
+  // UX-State für den Umriss-Schritt (nur für Navigation/Tooltips, NICHT persistiert)
+  const [draftPolygonPoints, setDraftPolygonPoints] = useState<Array<[number, number]>>([]);
+  const [isLocationDataLoading, setIsLocationDataLoading] = useState(false);
+  const [isLocationDataReady, setIsLocationDataReady] = useState(false);
+
+  // Umriss ist „finalisierbar“, wenn er geschlossen und mindestens 3 Punkte hat.
+  // Quelle: persistente Punkte (CREATED) oder Draft-Punkte (während Zeichnen).
+  const pointsForPolygonGate = draftPolygonPoints.length > 0 ? draftPolygonPoints : (metadata.polygonPoints || []);
+  const canFinalizePolygon = (() => {
+    if (!pointsForPolygonGate || pointsForPolygonGate.length < 3) return false;
+    return isPolygonClosed(pointsForPolygonGate);
+  })();
+
+  // Tooltip-Texte für die Bottom-Navigation (kurz und eindeutig)
+  const nextTooltip = (() => {
+    switch (aktiverSchritt) {
+      case 0:
+        return "Weiter: Standort finden";
+      case 1:
+        return "Weiter: Umriss zeichnen";
+      case 2:
+        if (!pointsForPolygonGate || pointsForPolygonGate.length === 0) return "Weiter ist gesperrt: zuerst Punkte setzen";
+        if (pointsForPolygonGate.length < 3) return "Weiter ist gesperrt: mindestens 3 Punkte setzen";
+        if (!isPolygonClosed(pointsForPolygonGate)) return "Weiter ist gesperrt: Umriss schließen (ersten Punkt antippen)";
+        return "Weiter: Umriss speichern";
+      case 3:
+        return isLocationDataLoading ? "Standortdaten werden geladen..." : "Weiter: Bilder erfassen";
+      case 4:
+        return "Weiter: Detailbild erfassen";
+      case 5:
+        return "Weiter: Pflanzenbild 1 erfassen";
+      case 6:
+        return "Weiter: Pflanzenbild 2 erfassen";
+      case 7:
+        return "Weiter: zur Analyse";
+      case 8:
+        return "Weiter: Habitat speichern";
+      case 9:
+        return "Fertig";
+      default:
+        return "Weiter";
+    }
+  })();
+
+  const backTooltip = (() => {
+    switch (aktiverSchritt) {
+      case 0:
+        return "Zurück zur Startseite";
+      case 2:
+        // Wenn schon begonnen, bedeutet „Zurück“: neu zeichnen (statt Schrittwechsel)
+        if (draftPolygonPoints.length > 0) return "Zurück: Umriss verwerfen und neu zeichnen";
+        return "Zurück: Standort finden";
+      case 3:
+        return "Zurück: Umriss zeichnen";
+      default:
+        return "Zurück";
+    }
+  })();
+
+  // Tooltip: funktioniert auch für disabled Buttons nur über Wrapper (span).
+  function ButtonWithTooltip({
+    tooltip,
+    children
+  }: {
+    tooltip: string;
+    children: React.ReactNode;
+  }) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex" tabIndex={0}>
+            {children}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          <p className="max-w-[260px] text-sm leading-snug">{tooltip}</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
   
   // Refs für dynamische Höhenberechnung
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -214,8 +373,45 @@ export default function NatureScout() {
 
   // Sprechblase bei Schrittwechsel anzeigen
   useEffect(() => {
+    // Für "Standortdaten ermitteln" ist die Sprechblase redundant/störend (die Statusanzeige passiert im Standort-Panel).
+    if (aktiverSchritt === 3) {
+      setShowHelpBubble(false);
+      return;
+    }
     setShowHelpBubble(true);
   }, [aktiverSchritt]);
+
+  // Wenn der Nutzer zurück zu "Standort finden" geht (Standort ändern),
+  // müssen Standortinformationen verworfen werden, damit sie später neu berechnet werden.
+  useEffect(() => {
+    if (aktiverSchritt !== 1) return;
+
+    const hasLocationInfo = Boolean(
+      metadata.gemeinde ||
+      metadata.flurname ||
+      metadata.standort ||
+      metadata.elevation ||
+      metadata.exposition ||
+      metadata.slope ||
+      metadata.kataster
+    );
+
+    if (!hasLocationInfo) return;
+
+    setIsLocationDataReady(false);
+
+    setMetadata(prev => ({
+      ...prev,
+      // Nur Standort-bezogene Felder löschen
+      gemeinde: "",
+      flurname: "",
+      standort: "",
+      elevation: undefined,
+      exposition: undefined,
+      slope: undefined,
+      kataster: undefined
+    }));
+  }, [aktiverSchritt, metadata.gemeinde, metadata.flurname, metadata.standort, metadata.elevation, metadata.exposition, metadata.slope, metadata.kataster, setMetadata]);
 
   // Dynamische Höhenberechnung
   useEffect(() => {
@@ -223,8 +419,13 @@ export default function NatureScout() {
       // Viewport-Höhe
       setViewportHeight(window.innerHeight);
       
-      // Navigation-Höhe (fixed, daher konstant)
-      setNavigationHeight(80); // Ungefähre Höhe der fixed Navigation
+      // Navigation-Höhe dynamisch messen
+      if (navigationRef.current) {
+        const height = navigationRef.current.offsetHeight;
+        setNavigationHeight(height);
+      } else {
+        setNavigationHeight(80); // Fallback
+      }
       
       // HelpBubble-Höhe (geschätzt, da sie noch nicht gerendert ist)
       setHelpBubbleHeight(120); // Ungefähre Höhe der Sprechblase
@@ -236,7 +437,21 @@ export default function NatureScout() {
     // Bei Resize neu berechnen
     window.addEventListener('resize', updateHeights);
     
-    return () => window.removeEventListener('resize', updateHeights);
+    // MutationObserver für dynamische Navigation-Höhe
+    const observer = new MutationObserver(updateHeights);
+    if (navigationRef.current) {
+      observer.observe(navigationRef.current, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'class']
+      });
+    }
+    
+    return () => {
+      window.removeEventListener('resize', updateHeights);
+      observer.disconnect();
+    };
   }, [aktiverSchritt]); // Bei Schrittwechsel neu berechnen
 
   // Scrolle zur Progressbar, wenn sich der aktive Schritt ändert
@@ -429,6 +644,95 @@ export default function NatureScout() {
     setShouldScrollToNext(true);
   }, []);
 
+  // Beim Eintritt in den Schritt "Standortdaten ermitteln" triggern wir die Geodaten-Abfrage.
+  // (Das passiert bewusst NICHT beim Polygon-Speichern, damit der Flow sauber getrennt ist.)
+  // Reagiert auch auf Änderungen von polygonPoints, damit bei Verschieben von Punkten neu berechnet wird.
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function run() {
+      if (aktiverSchritt !== 3) return;
+
+      // Mittelpunkt aus aktuellen Polygon-Punkten berechnen
+      // (falls sich das Polygon geändert hat, z.B. durch Verschieben von Punkten)
+      const polygonPoints = metadata.polygonPoints || [];
+      let lat: number;
+      let lon: number;
+
+      if (polygonPoints.length >= 3) {
+        [lat, lon] = calculatePolygonCenter(polygonPoints);
+        // Koordinaten aktualisieren, falls sie sich geändert haben
+        setMetadata(prev => {
+          if (prev.latitude !== lat || prev.longitude !== lon) {
+            return {
+              ...prev,
+              latitude: lat,
+              longitude: lon
+            };
+          }
+          return prev;
+        });
+      } else {
+        // Fallback auf gespeicherte Koordinaten, falls kein Polygon vorhanden
+        lat = metadata.latitude;
+        lon = metadata.longitude;
+      }
+
+      // Ohne gültige Koordinaten macht ein Geobrowser-Call keinen Sinn.
+      if (!lat || !lon || lat === 0 || lon === 0) {
+        setIsLocationDataReady(false);
+        return;
+      }
+
+      // Jedes Mal neu berechnen, wenn wir in diesen Schritt wechseln
+      // (auch wenn bereits Daten vorhanden sind, da sich das Polygon geändert haben könnte)
+      setIsLocationDataLoading(true);
+      setIsLocationDataReady(false);
+
+      try {
+        const url = `/api/geobrowser?lat=${lat}&lon=${lon}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Geo-API Fehler: ${res.status}`);
+        const data = await res.json();
+
+        if (isCancelled) return;
+
+        // Vor dem Setzen sicherstellen, dass alte Daten überschrieben werden
+        setMetadata(prev => ({
+          ...prev,
+          standort: data.standort || 'Standort konnte nicht ermittelt werden',
+          gemeinde: data.gemeinde || 'unbekannt',
+          flurname: data.flurname || 'unbekannt',
+          elevation: data.elevation || 'unbekannt',
+          exposition: data.exposition || 'unbekannt',
+          slope: data.slope || 'unbekannt',
+          kataster: data.kataster
+        }));
+
+        setIsLocationDataReady(true);
+      } catch (e) {
+        // Wichtig: Wir blockieren Nutzer nicht dauerhaft.
+        // Bei Fehler markieren wir den Schritt als „fertig“, aber setzen Platzhalterwerte.
+        if (isCancelled) return;
+
+        setMetadata(prev => ({
+          ...prev,
+          standort: prev.standort || 'Standort konnte nicht ermittelt werden',
+          gemeinde: prev.gemeinde || 'unbekannt',
+          flurname: prev.flurname || 'unbekannt'
+        }));
+        setIsLocationDataReady(true);
+      } finally {
+        if (!isCancelled) setIsLocationDataLoading(false);
+      }
+    }
+
+    run();
+    return () => {
+      isCancelled = true;
+    };
+  }, [aktiverSchritt, metadata.polygonPoints, metadata.latitude, metadata.longitude, metadata.gemeinde, metadata.flurname, metadata.standort, setMetadata]);
+
   // Effekt für das Scrollen zum Weiter-Button
   useEffect(() => {
     if (shouldScrollToNext && nextButtonRef.current) {
@@ -470,7 +774,7 @@ export default function NatureScout() {
           scrollToNext={scrollToNext}
           onSkipToImages={skipToImagesUpload}
         />;
-      case 3: // Panoramabild
+      case 4: // Panoramabild
         return <SingleImageUpload 
           metadata={metadata} 
           setMetadata={setMetadata} 
@@ -482,7 +786,7 @@ export default function NatureScout() {
           onUploadActiveChange={handleUploadActiveChange}
           requiredOrientation="landscape"
         />;
-      case 4: // Detailbild
+      case 5: // Detailbild
         return <SingleImageUpload 
           metadata={metadata} 
           setMetadata={setMetadata} 
@@ -494,7 +798,7 @@ export default function NatureScout() {
           onUploadActiveChange={handleUploadActiveChange}
           requiredOrientation="portrait"
         />;
-      case 5: // Pflanzenbild 1
+      case 6: // Pflanzenbild 1
         return <SingleImageUpload 
           metadata={metadata} 
           setMetadata={setMetadata} 
@@ -506,7 +810,7 @@ export default function NatureScout() {
           onUploadActiveChange={handleUploadActiveChange}
           requiredOrientation="portrait"
         />;
-      case 6: // Pflanzenbild 2
+      case 7: // Pflanzenbild 2
         return <SingleImageUpload 
           metadata={metadata} 
           setMetadata={setMetadata} 
@@ -518,7 +822,7 @@ export default function NatureScout() {
           onUploadActiveChange={handleUploadActiveChange}
           requiredOrientation="portrait"
         />;
-      case 7: // Habitat analysieren
+      case 8: // Habitat analysieren
         return (
           <div className="space-y-4">
             <div>
@@ -533,7 +837,7 @@ export default function NatureScout() {
             </div>
           </div>
         );
-      case 8: // Verifizierung
+      case 9: // Verifizierung
         return (
           <>
             <Summary 
@@ -542,7 +846,7 @@ export default function NatureScout() {
           </>
         );
       default:
-        return null; // Für Schritte 1 und 2 wird LocationDetermination separat gerendert
+        return null; // Für Schritte 1-3 wird LocationDetermination separat gerendert
     }
   };
 
@@ -607,8 +911,8 @@ export default function NatureScout() {
                     ) : null
                   )}
                 
-                {/* Persistente LocationDetermination für Schritte 1 und 2 */}
-                {(aktiverSchritt === 1 || aktiverSchritt === 2) ? (
+        {/* Persistente LocationDetermination für Schritte 1, 2 und 3 */}
+        {(aktiverSchritt === 1 || aktiverSchritt === 2 || aktiverSchritt === 3) ? (
                   <div className="p-0">
                     {isLoading ? (
                       <div className="flex justify-center py-12">
@@ -620,7 +924,10 @@ export default function NatureScout() {
                         metadata={metadata} 
                         setMetadata={setMetadata} 
                         scrollToNext={scrollToNext}
-                        mapMode={aktiverSchritt === 1 ? 'navigation' : 'polygon'}
+                mapMode={aktiverSchritt === 2 ? 'polygon' : 'navigation'}
+                onPolygonDraftChange={setDraftPolygonPoints}
+                isLocationDataLoading={aktiverSchritt === 3 ? isLocationDataLoading : false}
+                forceShowLocationInfo={aktiverSchritt === 3}
                       />
                     )}
                   </div>
@@ -658,35 +965,113 @@ export default function NatureScout() {
           paddingBottom: 'env(safe-area-inset-bottom, 6px)'
         }}
       >
-        <div className="container mx-auto flex justify-between items-center">
-          <Button 
-            onClick={() => aktiverSchritt === 0 ? router.push('/') : setAktiverSchritt(prev => prev - 1)} 
-            disabled={aktiverSchritt === 0 && false}
-            variant="outline"
-            className="gap-1"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Zurück
-          </Button>
+        <TooltipProvider>
+          <div className="container mx-auto flex justify-between items-center">
+            <ButtonWithTooltip tooltip={backTooltip}>
+              <Button 
+                onClick={() => {
+                  if (aktiverSchritt === 0) {
+                    router.push('/');
+                    return;
+                  }
 
-          <Button 
-            ref={nextButtonRef}
-            onClick={() => {
-              if (aktiverSchritt === 8) {
-                // Letzter Schritt: Neuen Habitat erfassen
-                handleNeuerHabitat();
-              } else {
-                // Normale Navigation zum nächsten Schritt
-                setAktiverSchritt(prev => prev + 1);
-              }
-            }} 
-            disabled={isNextButtonDisabled(aktiverSchritt, metadata, isAnyUploadActive)}
-            className="gap-1"
-          >
-            {weiterButtonLabels[aktiverSchritt] || "Weiter"}
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
+                  if (aktiverSchritt === 2) {
+                    // Spezialfall: Umriss zeichnen
+                    if (draftPolygonPoints.length > 0) {
+                      // „Zurück“ bedeutet: Neu zeichnen (während des Zeichnens)
+                      setDraftPolygonPoints([]);
+                      setMetadata(prev => ({
+                        ...prev,
+                        polygonPoints: [],
+                        latitude: 0,
+                        longitude: 0,
+                        gemeinde: "",
+                        flurname: "",
+                        standort: ""
+                      }));
+                      return;
+                    }
+
+                    // Noch nicht begonnen -> zurück zu Standort finden
+                    setAktiverSchritt(1);
+                    return;
+                  }
+
+                  if (aktiverSchritt === 3) {
+                    // Standortdaten ermitteln -> zurück zu Umriss zeichnen
+                    setAktiverSchritt(2);
+                    return;
+                  }
+
+                  setAktiverSchritt(prev => prev - 1);
+                }} 
+                disabled={aktiverSchritt === 0 && false}
+                variant="outline"
+                className="gap-1"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Zurück
+              </Button>
+            </ButtonWithTooltip>
+
+            <ButtonWithTooltip tooltip={nextTooltip}>
+              <Button 
+                ref={nextButtonRef}
+                onClick={() => {
+                  if (aktiverSchritt === 9) return;
+
+                  // Explizite Behandlung für Schritt 0 (Willkommen) - direkt zu Schritt 1
+                  if (aktiverSchritt === 0) {
+                    setAktiverSchritt(1);
+                    return;
+                  }
+
+                  if (aktiverSchritt === 8) {
+                    handleNeuerHabitat();
+                    return;
+                  }
+
+                  if (aktiverSchritt === 2) {
+                    // „Weiter" bedeutet hier: Umriss speichern, danach zum Standortdaten-Schritt
+                    const points = (metadata.polygonPoints || []);
+                    if (points.length < 3 || !isPolygonClosed(points)) return;
+
+                    // Speichern (minimal): Mittelpunkt in Metadaten schreiben (für Geobrowser im nächsten Schritt).
+                    const [centerLat, centerLng] = calculatePolygonCenter(points);
+                    setMetadata(prev => ({
+                      ...prev,
+                      latitude: centerLat,
+                      longitude: centerLng
+                    }));
+
+                    setIsLocationDataReady(false);
+                    setAktiverSchritt(3);
+                    return;
+                  }
+
+                  if (aktiverSchritt === 3) {
+                    setAktiverSchritt(4);
+                    return;
+                  }
+
+                  setAktiverSchritt(prev => prev + 1);
+                }} 
+                disabled={isNextButtonDisabled({
+                  schritt: aktiverSchritt,
+                  metadata,
+                  isAnyUploadActive,
+                  canFinalizePolygon,
+                  isLocationDataLoading,
+                  isLocationDataReady
+                })}
+                className="gap-1"
+              >
+                Weiter
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </ButtonWithTooltip>
+          </div>
+        </TooltipProvider>
       </div>
       
       {/* Schwebende Sprechblase */}

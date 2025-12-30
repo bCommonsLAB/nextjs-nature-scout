@@ -63,6 +63,14 @@ export async function createAnalyseJobsIndexes(): Promise<void> {
   await collection.createIndex({ deleted: 1, updatedAt: -1 });
   await collection.createIndex({ deleted: 1, verified: 1, updatedAt: -1 });
   
+  // Verbundindex für Geo-Queries mit Sortierung nach updatedAt
+  // Optimiert für Bounds-Filterung + Sortierung nach neuesten Einträgen
+  await collection.createIndex({ 
+    'metadata.latitude': 1, 
+    'metadata.longitude': 1, 
+    updatedAt: -1 
+  });
+  
   // Text-Index für die Suchfunktion (für Freitextsuche)
   await collection.createIndex(
     { 

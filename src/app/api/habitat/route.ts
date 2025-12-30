@@ -241,6 +241,7 @@ export async function GET(request: Request) {
         'metadata.bilder': 1, // Alle Bilder abrufen statt nur das erste
         'metadata.latitude': 1, // Koordinaten hinzufügen
         'metadata.longitude': 1,
+        'metadata.polygonPoints': 1, // Polygon-Punkte für Export hinzufügen
         'metadata.standort': 1, // Standort hinzufügen
         'metadata.organizationId': 1, // Organisationsdaten hinzufügen
         'metadata.organizationName': 1,

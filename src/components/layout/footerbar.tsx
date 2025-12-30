@@ -14,8 +14,8 @@ export function Footer() {
               width={213}
               height={36}
               priority
-              className="h-[36px] object-contain"
-              style={{ width: 'auto' }}
+              className="object-contain"
+              style={{ width: 'auto', height: '36px' }}
             />
           </Link>
         </div>
