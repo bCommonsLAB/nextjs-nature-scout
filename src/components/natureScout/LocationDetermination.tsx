@@ -11,6 +11,93 @@ import 'leaflet-draw/dist/leaflet.draw.css';
 
 import type { MapNoSSRHandle } from "@/components/map/MapNoSSR";
 import { useRouter, useSearchParams } from "next/navigation";
+import { detectBrowserEnvironment } from "@/lib/utils";
+
+interface NormalizedGeolocationError {
+  code: number | null;
+  name: string | null;
+  message: string | null;
+  kind: 'permission-denied' | 'position-unavailable' | 'timeout' | 'unknown';
+  userMessage: string;
+  debug: Record<string, unknown>;
+}
+
+function serializeUnknownError(error: unknown): Record<string, unknown> {
+  // Spezielle Behandlung für GeolocationPositionError (DOM-Exception mit nicht-enumerable Properties)
+  // Prüfe, ob es ein GeolocationPositionError ist, indem wir auf die spezifischen Properties zugreifen
+  if (typeof error === 'object' && error !== null) {
+    const err = error as any;
+    // GeolocationPositionError hat 'code' und 'message' als nicht-enumerable Properties
+    // Versuche direkt darauf zuzugreifen
+    if (typeof err.code === 'number' && typeof err.message === 'string') {
+      return {
+        name: err.name || 'GeolocationPositionError',
+        message: err.message,
+        code: err.code,
+        // Versuche auch andere mögliche Properties
+        ...(err.stack ? { stack: err.stack } : {})
+      };
+    }
+  }
+
+  // Standard Error-Behandlung
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    };
+  }
+
+  // Fallback: Versuche alle Properties zu extrahieren
+  if (typeof error === 'object' && error !== null) {
+    const keys = new Set<string>([
+      ...Object.keys(error as Record<string, unknown>),
+      ...Object.getOwnPropertyNames(error)
+    ]);
+
+    const result: Record<string, unknown> = {};
+    for (const key of keys) {
+      try {
+        const value = (error as any)[key];
+        if (typeof value !== 'function') {
+          result[key] = value;
+        }
+      } catch {
+        // Ignorieren: manche Properties können Getter haben, die werfen
+      }
+    }
+
+    return result;
+  }
+
+  return { value: error };
+}
+
+function normalizeGeolocationError(error: unknown): NormalizedGeolocationError {
+  const debug = serializeUnknownError(error);
+  const code = typeof debug.code === 'number' ? debug.code : null;
+  const name = typeof debug.name === 'string' ? debug.name : null;
+  const message = typeof debug.message === 'string' ? debug.message : null;
+
+  // GeolocationPositionError codes (DOM): 1=PERMISSION_DENIED, 2=POSITION_UNAVAILABLE, 3=TIMEOUT
+  const kind: NormalizedGeolocationError['kind'] =
+    code === 1 ? 'permission-denied'
+    : code === 2 ? 'position-unavailable'
+    : code === 3 ? 'timeout'
+    : 'unknown';
+
+  const userMessage =
+    kind === 'permission-denied'
+      ? 'Standortzugriff verweigert. Bitte Standort-Berechtigung im Browser erlauben.'
+      : kind === 'position-unavailable'
+        ? 'GPS-Position ist aktuell nicht verfügbar (kein Fix). Bitte kurz warten oder nach draußen gehen.'
+        : kind === 'timeout'
+          ? 'GPS-Timeout. Bitte erneut versuchen oder kurz warten.'
+          : 'Unbekannter GPS-Fehler. Bitte Browser-Konsole prüfen.';
+
+  return { code, name, message, kind, userMessage, debug };
+}
 
 // Dynamisch geladene Karte ohne SSR
 const MapNoSSR = dynamic(() => import('@/components/map/MapNoSSR'), {
@@ -110,7 +197,7 @@ function convertToMapHabitat(apiHabitat: HabitatFromAPI): MapHabitat | null {
   const habitatFamily = apiHabitat.verifiedResult?.habitatfamilie || apiHabitat.result?.habitatfamilie;
 
   // Standardposition aus Lat/Lng
-  const position: [number, number] = [
+  let position: [number, number] = [
     Number(apiHabitat.metadata.latitude || 0), 
     Number(apiHabitat.metadata.longitude || 0)
   ];
@@ -196,6 +283,15 @@ function convertToMapHabitat(apiHabitat: HabitatFromAPI): MapHabitat | null {
     }
   }
 
+  // Wenn keine Lat/Lng vorhanden sind, aber ein Polygon existiert, verwende den ersten Punkt als Marker-Position.
+  // Das stellt sicher, dass Marker-only Darstellung (Zoom <= 14) trotzdem etwas anzeigen kann.
+  if ((position[0] === 0 && position[1] === 0) && polygon && polygon.length > 0) {
+    const first = polygon[0];
+    if (first) {
+      position = [first[0], first[1]];
+    }
+  }
+
   let color = '#22c55e'; // Grün für niederwertige Flächen (Standard)
   let transparenz = 0.5;
   // Farbe basierend auf Schutzstatus bestimmen
@@ -260,6 +356,11 @@ export function LocationDetermination({
     messagesCount: 0,
     lastUpdate: 0
   });
+
+  // Letzter GPS-Fehler als UI-Text (kurz und verständlich)
+  const [gpsErrorMessage, setGpsErrorMessage] = useState<string | null>(null);
+  // Fehler-Typ für gezielte Hinweise
+  const [gpsErrorKind, setGpsErrorKind] = useState<'permission-denied' | 'position-unavailable' | 'timeout' | 'unknown' | null>(null);
   
   // Zustand für das Anzeigen des GPS-Statusbadges
   const [showGpsStatus, setShowGpsStatus] = useState<boolean>(true);
@@ -492,6 +593,12 @@ export function LocationDetermination({
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
         const now = Date.now();
+
+        // Wenn wieder gültige Daten kommen, einen evtl. alten Fehler ausblenden
+        if (gpsErrorMessage) {
+          setGpsErrorMessage(null);
+          setGpsErrorKind(null);
+        }
         
         // Sofort GPS-Status aktualisieren mit jedem Signal
         setGpsStats(prev => ({
@@ -546,7 +653,21 @@ export function LocationDetermination({
         }
       },
       (error) => {
-        console.error("Fehler bei GPS-Verfolgung:", error);
+        const normalizedError = normalizeGeolocationError(error);
+        // Einzelner console.error für den Hauptfehler, Details mit console.log
+        console.error(`GPS-Verfolgung Fehler [${normalizedError.kind}]: ${normalizedError.userMessage}`);
+        // Details als console.log, damit sie nicht als separate Fehler gezählt werden
+        console.log("GPS-Fehler Details:", {
+          kind: normalizedError.kind,
+          code: normalizedError.code,
+          name: normalizedError.name,
+          message: normalizedError.message,
+          secureContext: typeof window !== 'undefined' ? window.isSecureContext : null,
+          ...(Object.keys(normalizedError.debug).length > 0 && { debug: normalizedError.debug })
+        });
+        
+        setGpsErrorMessage(normalizedError.userMessage);
+        setGpsErrorKind(normalizedError.kind);
         setIsLoadingGPS(false); // Fehler bei GPS, Ladezustand beenden
         
         // Bei Fehler auch den Statustext anpassen
@@ -616,6 +737,14 @@ export function LocationDetermination({
     
     console.log('Karte initialisiert mit niedrigem Zoom-Level');
   }, []); // Leere Abhängigkeiten - nur einmal ausführen
+
+  // Habitate laden, sobald die Map bereit ist
+  useEffect(() => {
+    // Nicht an mapRef koppeln: die API kann unabhängig von der Leaflet-Initialisierung geladen werden.
+    // (Andernfalls kann es passieren, dass bei langsamem dynamischem Import nie geladen wird.)
+    console.log('Lade bestehende Habitate...');
+    loadExistingHabitats();
+  }, [loadExistingHabitats]); // Abhängig von loadExistingHabitats
 
   // Funktion zum Zentrieren auf die aktuelle GPS-Position (nur bei Button-Klick)
   const centerToCurrentGPS = useCallback(() => {
@@ -939,7 +1068,7 @@ export function LocationDetermination({
         {/* GPS Status-Anzeige (permanent oder durch Klick auf GPS-Icon aufrufbar) */}
         {showGpsStatus && (
           <div
-            className="absolute bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-2 text-xs"
+            className="absolute bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-3 text-xs max-w-[320px]"
             onClick={toggleGpsStatus}
             style={{
               zIndex: 1000, // Reduzierter z-index
@@ -958,6 +1087,56 @@ export function LocationDetermination({
               </button>
             </div>
             <div className="space-y-1">
+              {gpsErrorMessage && (
+                <>
+                  <div className="text-red-600 leading-snug">
+                    <span className="font-medium">Fehler:</span> {gpsErrorMessage}
+                  </div>
+                  {gpsErrorKind === 'permission-denied' && (() => {
+                    const env = detectBrowserEnvironment();
+                    let instruction = '';
+                    
+                    if (env.isMobile) {
+                      if (env.isIOS && env.browser === 'safari') {
+                        instruction = 'Einstellungen → Safari → Standortdienste → "Fragen" oder "Erlauben"';
+                      } else if (env.isAndroid && env.browser === 'chrome') {
+                        instruction = 'In der Adressleiste auf das Schloss-Icon tippen → "Standort" → "Zulassen"';
+                      } else if (env.isIOS) {
+                        instruction = 'Einstellungen → Safari → Standortdienste → "Fragen" oder "Erlauben"';
+                      } else if (env.isAndroid) {
+                        instruction = 'In der Adressleiste auf das Schloss-Icon tippen → "Standort" → "Zulassen"';
+                      } else {
+                        instruction = 'Geräte-Einstellungen → Apps → Browser → Berechtigungen → Standort';
+                      }
+                    } else {
+                      // Desktop
+                      if (env.browser === 'chrome' || env.browser === 'edge') {
+                        instruction = 'Klicken Sie in der Adressleiste auf das Schloss-Icon und wählen Sie "Zulassen" bei Standort.';
+                      } else if (env.browser === 'firefox') {
+                        instruction = 'Klicken Sie in der Adressleiste auf das Schloss-Icon und wählen Sie "Zulassen" bei Standort.';
+                      } else if (env.browser === 'safari') {
+                        instruction = 'Safari → Einstellungen → Websites → Standortdienste → "Erlauben" für localhost';
+                      } else {
+                        instruction = 'Klicken Sie in der Adressleiste auf das Schloss-Icon und wählen Sie "Zulassen" bei Standort.';
+                      }
+                    }
+                    
+                    return (
+                      <div className="text-xs text-gray-700 leading-relaxed mt-3 pt-3 border-t border-gray-300 bg-gray-50/50 rounded p-2 -mx-1">
+                        <p className="mb-2 font-semibold text-gray-800">
+                          So erlauben Sie den Standortzugriff:
+                        </p>
+                        <p className="mb-2">
+                          {instruction}
+                        </p>
+                        <p className="text-gray-600 text-xs mt-2 pt-2 border-t border-gray-200">
+                          Nach dem Erlauben sollte der GPS-Status-Dialog die Fehlermeldung entfernen und stattdessen die GPS-Position anzeigen.
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
               <div className="flex justify-between">
                 <span>Messungen:</span>
                 <span className="font-medium">{gpsStats.messagesCount}</span>

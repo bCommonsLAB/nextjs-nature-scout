@@ -46,6 +46,13 @@ interface HabitateEntry {
     schutzstatus?: string;
     zusammenfassung?: string;
   };
+  verifiedResult?: {
+    habitattyp?: string;
+    schutzstatus?: string;
+    habitatfamilie?: string;
+    kommentar?: string;
+    zusammenfassung?: string;
+  };
   error?: string;
 }
 
@@ -333,9 +340,88 @@ function HabitatPageContent() {
     }
   };
   
-  // Funktion zum Herunterladen aller Habitat-Daten
+  // Funktion zum Herunterladen aller Habitat-Daten (für Admins)
   const handleDownloadHabitatData = () => {
     window.location.href = '/api/habitat/download';
+  };
+
+  // Funktion zum Umwandeln des Schutzstatus in Farbwerte
+  const mapSchutzstatusToColor = (schutzstatus: string | undefined): string => {
+    if (!schutzstatus) return 'GREEN';
+    
+    const statusLower = schutzstatus.toLowerCase();
+    
+    // RED = gesetzlich geschützt
+    if (statusLower.includes('gesetzlich')) {
+      return 'RED';
+    }
+    
+    // YELLOW = hochwertig (schützenswert, ökologisch hochwertig)
+    if (statusLower.includes('hochwertig') || statusLower.includes('schützenswert')) {
+      return 'YELLOW';
+    }
+    
+    // GREEN = niederwertig (ökologisch niederwertig, standardvegetation)
+    return 'GREEN';
+  };
+
+  // Funktion zum Exportieren der aktuell gefilterten Habitate in flacher Struktur
+  const handleExportFilteredHabitats = async () => {
+    try {
+      // Baue Query-Parameter mit aktuellen Filtern auf
+      const queryParams = new URLSearchParams({
+        sortBy,
+        sortOrder
+      });
+      
+      // Füge alle aktiven Filter hinzu
+      if (search) queryParams.set('search', search);
+      if (selectedPerson) queryParams.set('person', selectedPerson);
+      if (selectedGemeinde) queryParams.set('gemeinde', selectedGemeinde);
+      if (selectedHabitat) queryParams.set('habitat', selectedHabitat);
+      if (selectedHabitatFamilie) queryParams.set('habitatfamilie', selectedHabitatFamilie);
+      if (selectedSchutzstatus) queryParams.set('schutzstatus', selectedSchutzstatus);
+      if (selectedOrganization) queryParams.set('organization', selectedOrganization);
+
+      // Rufe die serverseitige Export-API auf
+      const response = await fetch(`/api/habitat/export?${queryParams.toString()}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unbekannter Fehler' }));
+        throw new Error(errorData.error || `Fehler beim Exportieren: ${response.status}`);
+      }
+      
+      // Lade die JSON-Daten
+      const jsonString = await response.text();
+      
+      // Erstelle Blob und Download-Link
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Dateiname aus Content-Disposition Header extrahieren oder Standard verwenden
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `habitat-export-${new Date().toISOString().split('T')[0]}.json`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+      link.download = filename;
+      
+      // Trigger Download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Aufräumen
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Fehler beim Exportieren:', error);
+      alert(error instanceof Error ? error.message : 'Fehler beim Exportieren der Habitate. Bitte versuchen Sie es erneut.');
+    }
   };
   
   // Funktion zum Löschen aller Einträge ohne result-Objekt
@@ -383,6 +469,19 @@ function HabitatPageContent() {
         </div>
         
         <div className="flex flex-wrap gap-2">
+          {/* Export-Button für gefilterte Habitate (für alle mit Berechtigung) */}
+          {hasAdvancedPermissions && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+              onClick={handleExportFilteredHabitats}
+              disabled={!data || !data.entries || data.entries.length === 0}
+            >
+              <Download className="h-4 w-4" />
+              JSON exportieren
+            </Button>
+          )}
           {isAdmin && (
             <>
               <Button
@@ -392,7 +491,7 @@ function HabitatPageContent() {
                 onClick={handleDownloadHabitatData}
               >
                 <Download className="h-4 w-4" />
-                Daten herunterladen
+                Alle Daten herunterladen
               </Button>
             </>
           )}

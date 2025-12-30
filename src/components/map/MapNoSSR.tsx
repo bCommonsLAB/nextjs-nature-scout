@@ -82,6 +82,8 @@ declare module 'leaflet' {
 interface Habitat {
   id: string;                          // Eindeutige ID des Habitats
   name: string;                        // Name des Habitats
+  // Punkt-Position für Marker (Lat/Lng). Optional, weil manche Datensätze nur Polygone haben.
+  position?: [number, number];
   polygon?: Array<[number, number]>;   // Polygon-Punkte für die Darstellung
   color?: string;                      // Optional: Individuelle Farbe für das Habitat
   schutzstatus?: string;               // Optional: Schutzstatus (geschützt/hochwertig/niederwertig)
@@ -153,6 +155,7 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
   const activeDrawHandlerRef = useRef<any>(null);               // Aktiver Draw-Handler für Polygon-Zeichnung
   const positionMarkerRef = useRef<L.Marker | null>(null);      // Positionsmarker
   const habitatPolygonsRef = useRef<L.LayerGroup | null>(null); // Layer-Gruppe für Habitat-Polygone
+  const habitatMarkersRef = useRef<L.LayerGroup | null>(null);  // Layer-Gruppe für Habitat-Marker
   
   // Separate Ref für die Marker-Position, um sie von der Map-Position zu trennen
   const markerPositionRef = useRef<[number, number]>([0, 0]);
@@ -302,6 +305,54 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
     return polygon;
   }, [onHabitatClick]);
 
+  // Einfache Validierung, damit wir nicht aus Versehen bei (0,0) Marker setzen.
+  function isValidLatLng(position?: [number, number]): position is [number, number] {
+    if (!position) return false;
+    const [lat, lng] = position;
+    if (typeof lat !== 'number' || typeof lng !== 'number') return false;
+    if (Number.isNaN(lat) || Number.isNaN(lng)) return false;
+    if (lat === 0 && lng === 0) return false;
+    return Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  }
+
+  // Habitat-Marker erstellen (leichtgewichtige Darstellung)
+  const createHabitatMarker = useCallback((habitat: Habitat) => {
+    if (!isValidLatLng(habitat.position)) return null;
+
+    // Farbe basierend auf Schutzstatus bestimmen (Fallback auf habitat.color)
+    let color = '#22c55e'; // Grün (Standard)
+    if (habitat.schutzstatus === 'gesetzlich geschützt') {
+      color = '#ef4444'; // Rot
+    } else if (habitat.schutzstatus === 'ökologisch hochwertig') {
+      color = '#eab308'; // Gelb
+    } else if (habitat.color) {
+      color = habitat.color;
+    }
+
+    const icon = L.divIcon({
+      className: 'custom-habitat-marker',
+      html: `<div class="custom-habitat-marker__dot" style="background:${color}"></div>`,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7]
+    });
+
+    const marker = L.marker(habitat.position, {
+      icon,
+      pane: 'habitatMarkerPane',
+      zIndexOffset: 1000
+    });
+
+    marker.bindPopup(
+      `<strong>${habitat.name}</strong>${habitat.schutzstatus ? `<br><span style="color:${color}">Status: ${habitat.schutzstatus}</span>` : ''}`
+    );
+
+    if (onHabitatClick) {
+      marker.on('click', () => onHabitatClick(habitat.id));
+    }
+
+    return marker;
+  }, [onHabitatClick]);
+
   // Funktion zum Aktualisieren der Habitat-Anzeige
   const updateHabitatDisplay = useCallback(() => {
     if (!mapRef.current || habitats.length === 0) return;
@@ -317,30 +368,48 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
       console.log('Habitat-Polygon-Layer erstellt');
     }
 
-    // Prüfen, ob Polygone bereits erstellt wurden
-    if (habitatPolygonsRef.current.getLayers().length === 0) {
-      
-      let polygonCount = 0;
-      
-      // Für jedes Habitat die Polygone erstellen
-      habitats.forEach(habitat => {
-        // Wenn ein Polygon verfügbar ist, dieses erstellen
-        if (habitat.polygon && habitat.polygon.length >= 3) {
-          try {
-            const polygon = createHabitatPolygon(habitat);
-            if (polygon && habitatPolygonsRef.current) {
-              habitatPolygonsRef.current.addLayer(polygon);
-              polygonCount++;
-            }
-          } catch (error) {
-            console.error(`Fehler beim Erstellen des Polygons für Habitat ${habitat.id}:`, error);
-          }
-        }
-      });
-      
-      console.log(`Habitat-Polygone erstellt: ${polygonCount} Polygone`);
+    if (!habitatMarkersRef.current) {
+      habitatMarkersRef.current = L.layerGroup().addTo(mapRef.current);
+      console.log('Habitat-Marker-Layer erstellt');
     }
-  }, [habitats, createHabitatPolygon]);
+
+    // Immer neu zeichnen: sonst bleiben Marker-only Datensätze unsichtbar
+    habitatPolygonsRef.current.clearLayers();
+    habitatMarkersRef.current.clearLayers();
+
+    const shouldShowPolygons = zoom > 14;
+    let polygonCount = 0;
+    let markerCount = 0;
+
+    habitats.forEach(habitat => {
+      // Polygone nur bei hohem Zoom (Performance)
+      if (shouldShowPolygons && habitat.polygon && habitat.polygon.length >= 3) {
+        try {
+          const polygon = createHabitatPolygon(habitat);
+          if (polygon && habitatPolygonsRef.current) {
+            habitatPolygonsRef.current.addLayer(polygon);
+            polygonCount++;
+            return;
+          }
+        } catch (error) {
+          console.error(`Fehler beim Erstellen des Polygons für Habitat ${habitat.id}:`, error);
+        }
+      }
+
+      // Fallback: Marker (auch in Polygon-Mode, wenn kein Polygon vorhanden ist)
+      try {
+        const marker = createHabitatMarker(habitat);
+        if (marker && habitatMarkersRef.current) {
+          habitatMarkersRef.current.addLayer(marker);
+          markerCount++;
+        }
+      } catch (error) {
+        console.error(`Fehler beim Erstellen des Markers für Habitat ${habitat.id}:`, error);
+      }
+    });
+
+    console.log('Habitat-Layer gezeichnet', { polygonCount, markerCount, shouldShowPolygons });
+  }, [habitats, createHabitatPolygon, createHabitatMarker, zoom]);
 
   // Funktion zur Berechnung der Fläche eines Polygons in Quadratmetern
   // Verwendet die Geodesic-Berechnung für genaue Ergebnisse auf der Erdkugel
@@ -377,6 +446,12 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
         zoomSnap: 0.5,               // Zoom in 0.5-Schritten
         wheelPxPerZoomLevel: 120     // Mausrad-Sensitivität
       }).setView(position, zoom);
+
+      // Pane für Habitat-Marker (sicher über Tiles/Overlays)
+      if (!mapRef.current.getPane('habitatMarkerPane')) {
+        const pane = mapRef.current.createPane('habitatMarkerPane');
+        pane.style.zIndex = '650';
+      }
       
       // Debug: Zoom-Events loggen für Fehlersuche
       mapRef.current.on('zoomstart', () => {

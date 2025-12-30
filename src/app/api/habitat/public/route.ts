@@ -264,109 +264,164 @@ export async function GET(request: Request) {
     const total = await collection.countDocuments(filter);
     const skip = (page - 1) * limit;
     
-    // Erstelle Sortierung
-    const sort: MongoSort = {};
-    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+  // Erstelle Sortierung
+  const sort: MongoSort = {};
+  sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+  
+  // Prüfe, ob minimale Ansicht für Kartenansicht gewünscht ist
+  const view = searchParams.get('view');
+  const isMapView = view === 'map';
+  
+  // Projektion basierend auf Ansichtstyp
+  const projection: any = isMapView ? {
+    // Minimale Ansicht für Karten: Koordinaten, Schutzstatus und minimale Info-Daten für Anzeige
+    jobId: 1,
+    verified: 1,
+    'metadata.latitude': 1,
+    'metadata.longitude': 1,
+    'metadata.polygonPoints': 1,
+    'metadata.gemeinde': 1,
+    'metadata.flurname': 1,
+    'metadata.elevation': 1,
+    'result.habitattyp': 1,
+    'result.schutzstatus': 1,
+    'verifiedResult.habitattyp': 1,
+    'verifiedResult.schutzstatus': 1
+  } : {
+    // Vollständige Ansicht für Listenansicht
+    jobId: 1,
+    status: 1,
+    updatedAt: 1,
+    verified: 1,
+    'metadata.erfassungsperson': 1,
+    'metadata.email': 1,  // Email des Erfassers hinzufügen, um später zu prüfen
+    'metadata.gemeinde': 1,
+    'metadata.flurname': 1,
+    'metadata.bilder': 1,
+    'metadata.latitude': 1,
+    'metadata.longitude': 1,
+    'metadata.standort': 1,
+    'metadata.polygonPoints': 1,
+    'metadata.organizationId': 1,
+    'metadata.organizationName': 1,
+    'metadata.organizationLogo': 1,
+    'result.habitattyp': 1,
+    'result.schutzstatus': 1,
+    'result.habitatfamilie': 1,
+    'result.zusammenfassung': 1,
+    'verifiedResult.habitattyp': 1,
+    'verifiedResult.schutzstatus': 1,
+    'verifiedResult.habitatfamilie': 1,
+    'metadata.kommentar': 1
+  };
+  
+  // Daten abrufen und für Frontend projizieren
+  const entries = await collection
+    .find(filter)
+    .sort(sort)
+    .skip(skip)
+    .limit(limit)
+    .project(projection)
+    .toArray();
     
-    // Daten abrufen und für Frontend projizieren
-    const entries = await collection
-      .find(filter)
-      .sort(sort)
-      .skip(skip)
-      .limit(limit)
-      .project({
-        jobId: 1,
-        status: 1,
-        updatedAt: 1,
-        verified: 1,
-        'metadata.erfassungsperson': 1,
-        'metadata.email': 1,  // Email des Erfassers hinzufügen, um später zu prüfen
-        'metadata.gemeinde': 1,
-        'metadata.flurname': 1,
-        'metadata.bilder': 1,
-        'metadata.latitude': 1,
-        'metadata.longitude': 1,
-        'metadata.standort': 1,
-        'metadata.polygonPoints': 1,
-        'metadata.organizationId': 1,
-        'metadata.organizationName': 1,
-        'metadata.organizationLogo': 1,
-        'result.habitattyp': 1,
-        'result.schutzstatus': 1,
-        'result.habitatfamilie': 1,
-        'result.zusammenfassung': 1,
-        'verifiedResult.habitattyp': 1,
-        'verifiedResult.schutzstatus': 1,
-        'verifiedResult.habitatfamilie': 1,
-        'metadata.kommentar': 1
-      })
-      .toArray();
+    // Für Map-View: Minimale Verarbeitung (nur Schutzstatus normalisieren)
+    // Für normale View: Vollständige Anonymisierung
+    let processedEntries;
     
-    // Sammle alle einzigartigen E-Mails aus den Einträgen
-    const emailsToCheck = Array.from(new Set<string>(
-      entries
-        .map(entry => entry.metadata?.email)
-        .filter(Boolean)
-    ));
-    
-    // Lade Benutzerinformationen für alle E-Mails in einem einzigen Aufruf
-    const usersData = await usersCollection.find(
-      { email: { $in: emailsToCheck } },
-      { projection: { email: 1, habitat_name_visibility: 1, organizationId: 1 } }
-    ).toArray();
-    
-    // Erstelle eine Map für schnellen Zugriff auf Benutzerinformationen
-    const userVisibilityMap = new Map<string, {
-      habitat_name_visibility: string;
-      organizationId: string | null;
-    }>();
-    
-    usersData.forEach(user => {
-      userVisibilityMap.set(user.email, {
-        habitat_name_visibility: user.habitat_name_visibility || 'private',
-        organizationId: user.organizationId
+    if (isMapView) {
+      // Minimale Verarbeitung für Kartenansicht - Koordinaten, Schutzstatus und minimale Info-Daten
+      processedEntries = entries.map(entry => {
+        // Schutzstatus normalisieren (verifiziert hat Priorität)
+        const schutzstatus = entry.verifiedResult?.schutzstatus || entry.result?.schutzstatus;
+        return {
+          jobId: entry.jobId,
+          verified: entry.verified,
+          metadata: {
+            latitude: entry.metadata?.latitude,
+            longitude: entry.metadata?.longitude,
+            polygonPoints: entry.metadata?.polygonPoints,
+            gemeinde: entry.metadata?.gemeinde,
+            flurname: entry.metadata?.flurname,
+            elevation: entry.metadata?.elevation
+          },
+          result: {
+            habitattyp: entry.result?.habitattyp,
+            schutzstatus: schutzstatus ? normalizeSchutzstatus(schutzstatus) : undefined
+          },
+          verifiedResult: entry.verifiedResult?.habitattyp || entry.verifiedResult?.schutzstatus ? {
+            habitattyp: entry.verifiedResult?.habitattyp,
+            schutzstatus: entry.verifiedResult?.schutzstatus ? normalizeSchutzstatus(entry.verifiedResult.schutzstatus) : undefined
+          } : undefined
+        };
       });
-    });
-    
-    // Anonymisiere Einträge basierend auf den Sichtbarkeitseinstellungen
-    // Im anonymen Fall: Gar keine Erfasser anzeigen
-    // Nur für eingeloggte Nutzer: Zeige Personen basierend auf Sichtbarkeitseinstellungen
-    const anonymizedEntries = entries.map(entry => {
-      // Prüfe, ob der Erfasser des Habitats angezeigt werden darf
-      const userEmail = entry.metadata?.email;
-      const userData = userEmail ? userVisibilityMap.get(userEmail) : null;
+    } else {
+      // Vollständige Verarbeitung für Listenansicht
+      // Sammle alle einzigartigen E-Mails aus den Einträgen
+      const emailsToCheck = Array.from(new Set<string>(
+        entries
+          .map(entry => entry.metadata?.email)
+          .filter(Boolean)
+      ));
       
-      // Im anonymen Fall (kein currentUserOrgId): Gar keine Erfasser anzeigen
-      if (!currentUserOrgId) {
-        entry.metadata.erfassungsperson = '';
-      }
-      // Für eingeloggte Nutzer: Prüfe Sichtbarkeitseinstellungen
-      else if (!userData) {
-        // Wenn keine Benutzerinformationen gefunden wurden, vorsichtshalber anonymisieren
-        entry.metadata.erfassungsperson = '';
-      } 
-      // Anonymisieren, wenn keine öffentliche Sichtbarkeit UND nicht in derselben Organisation
-      else if (
-        userData.habitat_name_visibility !== 'public' &&
-        !(currentUserOrgId && userData.organizationId && 
-          userData.organizationId.toString() === currentUserOrgId.toString())
-      ) {
-        entry.metadata.erfassungsperson = '';
-      }
+      // Lade Benutzerinformationen für alle E-Mails in einem einzigen Aufruf
+      const usersData = await usersCollection.find(
+        { email: { $in: emailsToCheck } },
+        { projection: { email: 1, habitat_name_visibility: 1, organizationId: 1 } }
+      ).toArray();
       
-      // E-Mail-Adresse entfernen, da sie nur für die Prüfung benötigt wurde
-      delete entry.metadata.email;
+      // Erstelle eine Map für schnellen Zugriff auf Benutzerinformationen
+      const userVisibilityMap = new Map<string, {
+        habitat_name_visibility: string;
+        organizationId: string | null;
+      }>();
       
-      // Schutzstatus normalisieren
-      if (entry.result?.schutzstatus) {
-        entry.result.schutzstatus = normalizeSchutzstatus(entry.result.schutzstatus);
-      }
+      usersData.forEach(user => {
+        userVisibilityMap.set(user.email, {
+          habitat_name_visibility: user.habitat_name_visibility || 'private',
+          organizationId: user.organizationId
+        });
+      });
       
-      return entry;
-    });
+      // Anonymisiere Einträge basierend auf den Sichtbarkeitseinstellungen
+      // Im anonymen Fall: Gar keine Erfasser anzeigen
+      // Nur für eingeloggte Nutzer: Zeige Personen basierend auf Sichtbarkeitseinstellungen
+      processedEntries = entries.map(entry => {
+        // Prüfe, ob der Erfasser des Habitats angezeigt werden darf
+        const userEmail = entry.metadata?.email;
+        const userData = userEmail ? userVisibilityMap.get(userEmail) : null;
+        
+        // Im anonymen Fall (kein currentUserOrgId): Gar keine Erfasser anzeigen
+        if (!currentUserOrgId) {
+          entry.metadata.erfassungsperson = '';
+        }
+        // Für eingeloggte Nutzer: Prüfe Sichtbarkeitseinstellungen
+        else if (!userData) {
+          // Wenn keine Benutzerinformationen gefunden wurden, vorsichtshalber anonymisieren
+          entry.metadata.erfassungsperson = '';
+        } 
+        // Anonymisieren, wenn keine öffentliche Sichtbarkeit UND nicht in derselben Organisation
+        else if (
+          userData.habitat_name_visibility !== 'public' &&
+          !(currentUserOrgId && userData.organizationId && 
+            userData.organizationId.toString() === currentUserOrgId.toString())
+        ) {
+          entry.metadata.erfassungsperson = '';
+        }
+        
+        // E-Mail-Adresse entfernen, da sie nur für die Prüfung benötigt wurde
+        delete entry.metadata.email;
+        
+        // Schutzstatus normalisieren
+        if (entry.result?.schutzstatus) {
+          entry.result.schutzstatus = normalizeSchutzstatus(entry.result.schutzstatus);
+        }
+        
+        return entry;
+      });
+    }
     
     return NextResponse.json({
-      entries: anonymizedEntries,
+      entries: processedEntries,
       filterOptions,
       pagination: {
         total,

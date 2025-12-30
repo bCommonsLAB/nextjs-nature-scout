@@ -435,14 +435,16 @@ export default function LoginForm() {
             <DialogTitle className="text-xl font-bold text-[#2D3321] text-center">
               Authentifizierungssystem aktualisiert
             </DialogTitle>
-            <DialogDescription className="text-center text-[#637047] space-y-3 pt-2">
-              <p>
-                Wir haben das Authentifizierungssystem aktualisiert und es kann sein, 
-                dass alte Passwörter nicht mehr funktionieren.
-              </p>
-              <p>
-                Können Sie bitte mit "Passwort zurücksetzen" ein neues Passwort erstellen?
-              </p>
+            <DialogDescription asChild>
+              <div className="text-center text-[#637047] space-y-3 pt-2">
+                <p>
+                  Wir haben das Authentifizierungssystem aktualisiert und es kann sein,
+                  dass alte Passwörter nicht mehr funktionieren.
+                </p>
+                <p>
+                  Können Sie bitte mit "Passwort zurücksetzen" ein neues Passwort erstellen?
+                </p>
+              </div>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-col space-y-3 sm:space-y-0 sm:flex-row sm:space-x-3">
