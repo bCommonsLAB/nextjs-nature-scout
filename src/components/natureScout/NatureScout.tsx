@@ -122,7 +122,17 @@ function FloatingHelpBubble({
     if (!isVisible) return;
 
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
-      const target = e.target as Node;
+      const target = e.target as HTMLElement;
+      
+      // Prüfe, ob der Klick auf einen Navigation-Button (Zurück/Weiter) ist
+      // Verwende data-navigation-button Attribut für zuverlässige Erkennung
+      const clickedNavigationButton = target.closest('[data-navigation-button]');
+      
+      // WICHTIG: Navigation-Buttons komplett ignorieren - deren Click-Handler schließt den Dialog selbst
+      // Der Event-Listener soll nur für Klicks außerhalb des Dialogs reagieren
+      if (clickedNavigationButton) {
+        return; // Event komplett ignorieren, Button-Handler läuft normal weiter
+      }
       
       // Schließe nur, wenn der Klick außerhalb des Dialogs ist
       if (dialogRef.current && !dialogRef.current.contains(target)) {
@@ -131,15 +141,17 @@ function FloatingHelpBubble({
     };
 
     // Event-Listener hinzufügen (mit kleiner Verzögerung, damit der initiale Render nicht sofort schließt)
+    // WICHTIG: NICHT im capture phase für Navigation-Buttons, damit deren Events zuerst laufen
     const timeoutId = setTimeout(() => {
-      document.addEventListener('click', handleClickOutside, true); // capture phase
-      document.addEventListener('touchstart', handleClickOutside, true);
+      // Verwende bubble phase (false) statt capture phase, damit Button-Events zuerst laufen
+      document.addEventListener('click', handleClickOutside, false);
+      document.addEventListener('touchstart', handleClickOutside, false);
     }, 100);
 
     return () => {
       clearTimeout(timeoutId);
-      document.removeEventListener('click', handleClickOutside, true);
-      document.removeEventListener('touchstart', handleClickOutside, true);
+      document.removeEventListener('click', handleClickOutside, false);
+      document.removeEventListener('touchstart', handleClickOutside, false);
     };
   }, [isVisible, onClose]);
 
@@ -969,7 +981,11 @@ export default function NatureScout() {
           <div className="container mx-auto flex justify-between items-center">
             <ButtonWithTooltip tooltip={backTooltip}>
               <Button 
+                data-navigation-button="back"
                 onClick={() => {
+                  // Dialog schließen als Side-Effekt, bevor der Schritt wechselt
+                  setShowHelpBubble(false);
+                  
                   if (aktiverSchritt === 0) {
                     router.push('/');
                     return;
@@ -978,7 +994,7 @@ export default function NatureScout() {
                   if (aktiverSchritt === 2) {
                     // Spezialfall: Umriss zeichnen
                     if (draftPolygonPoints.length > 0) {
-                      // „Zurück“ bedeutet: Neu zeichnen (während des Zeichnens)
+                      // „Zurück" bedeutet: Neu zeichnen (während des Zeichnens)
                       setDraftPolygonPoints([]);
                       setMetadata(prev => ({
                         ...prev,
@@ -1017,7 +1033,11 @@ export default function NatureScout() {
             <ButtonWithTooltip tooltip={nextTooltip}>
               <Button 
                 ref={nextButtonRef}
+                data-navigation-button="next"
                 onClick={() => {
+                  // Dialog schließen als Side-Effekt, bevor der Schritt wechselt
+                  setShowHelpBubble(false);
+                  
                   if (aktiverSchritt === 9) return;
 
                   // Explizite Behandlung für Schritt 0 (Willkommen) - direkt zu Schritt 1

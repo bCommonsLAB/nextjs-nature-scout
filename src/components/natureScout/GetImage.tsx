@@ -7,6 +7,7 @@ import { Bild, PlantNetResponse, PlantNetResult } from "@/types/nature-scout";
 import { toast } from "sonner";
 import Image from 'next/image';
 import { Button } from "../ui/button";
+import { detectBrowserEnvironment } from "@/lib/utils";
 
 interface GetImageProps {
   imageTitle: string;
@@ -100,15 +101,19 @@ export function GetImage({
   }, []);
 
   // Mobile-Erkennung und Orientierung
+  // Verwendet detectBrowserEnvironment() für zuverlässige Mobile-Erkennung
+  // Zeigt Orientierungshinweis nur auf echten Mobile-Geräten an, nicht auf Desktop
   useEffect(() => {
     const checkOrientation = () => {
       const landscape = window.innerWidth > window.innerHeight;
-      const mobile = window.innerWidth <= 1024;
+      // Verwende detectBrowserEnvironment() für zuverlässige Mobile-Erkennung
+      const { isMobile: isMobileDevice } = detectBrowserEnvironment();
       
       setIsLandscape(landscape);
-      setIsMobile(mobile);
+      setIsMobile(isMobileDevice);
       
-      if (mobile && requiredOrientation) {
+      // Zeige Dialog nur auf echten Mobile-Geräten, nicht auf Desktop
+      if (isMobileDevice && requiredOrientation) {
         if (requiredOrientation === 'landscape' && !landscape) {
           setShowOrientationDialog(true);
         } else if (requiredOrientation === 'portrait' && landscape) {
@@ -117,6 +122,7 @@ export function GetImage({
           setShowOrientationDialog(false);
         }
       } else {
+        // Auf Desktop immer ausblenden
         setShowOrientationDialog(false);
       }
     };
@@ -500,6 +506,8 @@ export function GetImage({
   }
 
   // Dialoge und UI-Komponenten
+  // Orientierungs-Dialog: Zeigt Hinweis für Quer-/Hochformat
+  // Kann vom Nutzer geschlossen werden, falls Datei-Upload statt Foto-Aufnahme gewünscht ist
   const OrientationDialog = () => {
     if (!showOrientationDialog) return null;
 
@@ -507,7 +515,16 @@ export function GetImage({
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000] p-4">
-        <div className="bg-white rounded-lg p-6 max-w-sm text-center shadow-xl">
+        <div className="bg-white rounded-lg p-6 max-w-sm text-center shadow-xl relative">
+          {/* Schließen-Button oben rechts */}
+          <button
+            onClick={() => setShowOrientationDialog(false)}
+            className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="Dialog schließen"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          
           <div className="flex justify-center mb-4">
             <Smartphone 
               className={`h-12 w-12 text-blue-500 transition-transform duration-500 ${
@@ -526,6 +543,15 @@ export function GetImage({
               : "Bitte drehen Sie Ihr Gerät ins Hochformat für die optimale Aufnahme."
             }
           </p>
+          
+          {/* Schließen-Button unten */}
+          <Button 
+            onClick={() => setShowOrientationDialog(false)}
+            variant="outline"
+            className="w-full"
+          >
+            Überspringen
+          </Button>
         </div>
       </div>
     );
