@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
-import { ShieldCheck, Plus, ShieldAlert, X, Download, Trash2 } from 'lucide-react';
+import { ShieldCheck, Plus, ShieldAlert, X, Download, Trash2, Database } from 'lucide-react';
 import { HabitateList } from './components/HabitateList';
 import { SearchBar } from './components/SearchBar';
 import { 
@@ -84,6 +84,8 @@ function HabitatPageContent() {
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationResult, setMigrationResult] = useState<{ success: boolean; message: string } | null>(null);
   
   const page = Number(searchParams.get('page') || '1');
   const search = searchParams.get('search') || '';
@@ -345,6 +347,71 @@ function HabitatPageContent() {
     window.location.href = '/api/habitat/download';
   };
 
+  // Funktion zum Ausführen der protectionStatus-Migration (für Admins)
+  const handleMigrateProtectionStatus = async () => {
+    if (!isAdmin) {
+      alert('Nur Administratoren können die Migration durchführen.');
+      return;
+    }
+
+    // Bestätigungsdialog
+    const confirmed = window.confirm(
+      'Möchten Sie die Migration für protectionStatus durchführen?\n\n' +
+      'Dies wird für alle Habitate den protectionStatus basierend auf dem schutzstatus berechnen und setzen.\n\n' +
+      'Diese Aktion kann einige Zeit in Anspruch nehmen.'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsMigrating(true);
+    setMigrationResult(null);
+
+    try {
+      const response = await fetch('/api/habitat/migrate-protection-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Fehler bei der Migration');
+      }
+
+      if (result.success) {
+        const stats = result.statistics;
+        setMigrationResult({
+          success: true,
+          message: `Migration erfolgreich abgeschlossen!\n\n` +
+            `Statistiken:\n` +
+            `- Gesamt: ${stats.total}\n` +
+            `- Migriert: ${stats.migrated}\n` +
+            `- Übersprungen: ${stats.skipped}\n` +
+            `- Fehler: ${stats.errors}`
+        });
+
+        // Seite neu laden, um aktualisierte Daten anzuzeigen
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        throw new Error('Migration fehlgeschlagen');
+      }
+    } catch (error) {
+      console.error('Fehler bei der Migration:', error);
+      setMigrationResult({
+        success: false,
+        message: error instanceof Error ? error.message : 'Unbekannter Fehler bei der Migration'
+      });
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
   // Funktion zum Umwandeln des Schutzstatus in Farbwerte
   const mapSchutzstatusToColor = (schutzstatus: string | undefined): string => {
     if (!schutzstatus) return 'GREEN';
@@ -493,6 +560,16 @@ function HabitatPageContent() {
                 <Download className="h-4 w-4" />
                 Alle Daten herunterladen
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+                onClick={handleMigrateProtectionStatus}
+                disabled={isMigrating}
+              >
+                <Database className="h-4 w-4" />
+                {isMigrating ? 'Migration läuft...' : 'protectionStatus migrieren'}
+              </Button>
             </>
           )}
           {hasAdvancedPermissions && isExpert && (
@@ -514,6 +591,19 @@ function HabitatPageContent() {
         </div>
       </div>
       
+      {/* Migrations-Ergebnis anzeigen */}
+      {migrationResult && (
+        <Alert className={`mb-6 ${migrationResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+          <ShieldAlert className={`h-4 w-4 ${migrationResult.success ? 'text-green-600' : 'text-red-600'}`} />
+          <AlertTitle className={migrationResult.success ? 'text-green-800' : 'text-red-800'}>
+            {migrationResult.success ? 'Migration erfolgreich' : 'Migration fehlgeschlagen'}
+          </AlertTitle>
+          <AlertDescription className={migrationResult.success ? 'text-green-700' : 'text-red-700'}>
+            <pre className="whitespace-pre-wrap font-mono text-sm">{migrationResult.message}</pre>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {!hasAdvancedPermissions && (
         <Alert className="mb-6 bg-blue-50">
           <ShieldAlert className="h-4 w-4" />

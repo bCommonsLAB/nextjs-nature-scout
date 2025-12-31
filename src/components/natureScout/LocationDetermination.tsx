@@ -5,7 +5,7 @@ import { NatureScoutData, GeocodingResult } from "@/types/nature-scout";
 import dynamic from 'next/dynamic';
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { LocateFixed, AlertTriangle, X } from "lucide-react";
+import { LocateFixed, AlertTriangle, X, Loader2 } from "lucide-react";
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 
@@ -18,6 +18,66 @@ const MapNoSSR = dynamic(() => import('@/components/map/MapNoSSR'), {
   ssr: false,
   loading: () => <div className="flex items-center justify-center h-full">Karte wird geladen...</div>
 });
+
+// React-Komponente für den "Neu beginnen" Button
+function ResetPolygonButton({ 
+  position,
+  mapRef,
+  onClick 
+}: { 
+  position: { lat: number; lng: number };
+  mapRef: React.RefObject<MapNoSSRHandle>;
+  onClick: () => void;
+}) {
+  const [pixelPosition, setPixelPosition] = useState<{ x: number; y: number } | null>(null);
+  
+  useEffect(() => {
+    const updatePosition = () => {
+      if (mapRef.current) {
+        const pixelPos = mapRef.current.getResetButtonPixelPosition();
+        if (pixelPos) {
+          setPixelPosition(pixelPos);
+        }
+      }
+    };
+    
+    // Position sofort aktualisieren
+    updatePosition();
+    
+    // Position bei Zoom- oder Pan-Änderungen aktualisieren
+    const interval = setInterval(updatePosition, 100);
+    return () => clearInterval(interval);
+  }, [position, mapRef]);
+  
+  if (!pixelPosition) {
+    return null;
+  }
+  
+  return (
+    <div 
+      className="absolute z-[10000] pointer-events-none"
+      style={{
+        top: `${pixelPosition.y}px`,
+        left: `${pixelPosition.x}px`,
+        transform: 'translate(-50%, -50%)',
+      }}
+    >
+      <Button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('ResetPolygonButton: Button-Klick erkannt');
+          onClick();
+        }}
+        className="pointer-events-auto bg-white/95 hover:bg-white border border-gray-200 shadow-lg rounded-full px-4 py-2 text-sm font-semibold text-gray-900"
+        aria-label="Umriss neu beginnen"
+      >
+        <span className="text-sm font-semibold">Neu beginnen</span>
+      </Button>
+    </div>
+  );
+}
 
 // Typen für den Map-Modus
 type MapMode = 'navigation' | 'polygon' | 'none';
@@ -272,6 +332,7 @@ interface HabitatFromAPI {
     schutzstatus?: string;
   };
   verified?: boolean;
+  protectionStatus?: 'red' | 'yellow' | 'green';
 }
 
 // Typdefinition für anzeigbare Habitate auf der Karte
@@ -398,20 +459,40 @@ function convertToMapHabitat(apiHabitat: HabitatFromAPI): MapHabitat | null {
     }
   }
 
-  // Schutzstatus mit Priorität für verifizierte Ergebnisse
-  const schutzstatus = apiHabitat.verifiedResult?.schutzstatus || apiHabitat.result?.schutzstatus;
+  // Verwende protectionStatus direkt, mit Fallback auf schutzstatus für alte Daten
+  let protectionStatus: 'red' | 'yellow' | 'green' = apiHabitat.protectionStatus || 'green';
+  
+  // Fallback: Wenn protectionStatus fehlt, berechne aus schutzstatus
+  if (!apiHabitat.protectionStatus) {
+    const schutzstatus = apiHabitat.verifiedResult?.schutzstatus || apiHabitat.result?.schutzstatus;
+    if (schutzstatus) {
+      const statusLower = typeof schutzstatus === 'string' ? schutzstatus.toLowerCase() : '';
+      if (statusLower.includes('gesetzlich')) {
+        protectionStatus = 'red';
+      } else if (statusLower.includes('hochwertig') || statusLower.includes('schützenswert')) {
+        protectionStatus = 'yellow';
+      } else {
+        protectionStatus = 'green';
+      }
+    }
+  }
   
   let color = '#22c55e'; // Grün für niederwertige Flächen (Standard)
   let transparenz = 0.5;
-  // Farbe basierend auf Schutzstatus bestimmen
-  if (schutzstatus === 'gesetzlich geschützt') {
+  
+  // Farbe basierend auf protectionStatus bestimmen
+  if (protectionStatus === 'red') {
     color = '#ef4444'; // Rot für geschützte Flächen
-  } else if (schutzstatus === 'ökologisch hochwertig') {
+  } else if (protectionStatus === 'yellow') {
     color = '#eab308'; // Gelb für hochwertige Flächen
   }
+  
   if (apiHabitat.verified) {
-    transparenz=0.9;
-  }  
+    transparenz = 0.9;
+  }
+  
+  // Schutzstatus für Metadaten (für Anzeige)
+  const schutzstatus = apiHabitat.verifiedResult?.schutzstatus || apiHabitat.result?.schutzstatus;  
 
   // Position muss vorhanden sein ODER Polygon muss vorhanden sein
   if (!position && !polygon) {
@@ -544,6 +625,7 @@ export function LocationDetermination({
   const [polygonPoints, setPolygonPoints] = useState<Array<[number, number]>>(
     metadata.polygonPoints || []
   );
+  const [resetButtonPosition, setResetButtonPosition] = useState<{ lat: number; lng: number } | null>(null);
 
   // Wichtig: referenziell stabiles leeres Polygon, damit `MapNoSSR` nicht bei jedem Render
   // den `initialPolygon`-Effekt triggert und damit Leaflet.Draw abbricht.
@@ -1219,30 +1301,44 @@ export function LocationDetermination({
 
   // Polygon neu beginnen
   const restartPolygon = useCallback(() => {
+    console.log('LocationDetermination: restartPolygon aufgerufen');
+    console.log('LocationDetermination: Aktuelle polygonPoints:', polygonPoints.length);
+    console.log('LocationDetermination: Aktuelle metadata.polygonPoints:', metadata.polygonPoints?.length || 0);
+    
+    // WICHTIG: Zuerst die State-Variablen zurücksetzen, damit initialPolygonForMap sofort leer wird
     setPolygonPoints([]);
-    setMetadata(prevMetadata => ({
-      ...prevMetadata,
-      polygonPoints: [],
-      // Koordinaten zurücksetzen, damit hasSavedPolygon korrekt funktioniert
-      latitude: 0,
-      longitude: 0,
-      // Standortinfos löschen, damit sie beim nächsten Durchlauf neu ermittelt werden
-      gemeinde: "",
-      flurname: "",
-      standort: "",
-      elevation: undefined,
-      exposition: undefined,
-      slope: undefined,
-      kataster: undefined,
-      plotsize: 0
-    }));
+    setMetadata(prevMetadata => {
+      console.log('LocationDetermination: Setze metadata.polygonPoints auf []');
+      return {
+        ...prevMetadata,
+        polygonPoints: [],
+        // Koordinaten zurücksetzen, damit hasSavedPolygon korrekt funktioniert
+        latitude: 0,
+        longitude: 0,
+        // Standortinfos löschen, damit sie beim nächsten Durchlauf neu ermittelt werden
+        gemeinde: "",
+        flurname: "",
+        standort: "",
+        elevation: undefined,
+        exposition: undefined,
+        slope: undefined,
+        kataster: undefined,
+        plotsize: 0
+      };
+    });
+    
+    // WICHTIG: Auch onPolygonChange mit einem leeren Array aufrufen,
+    // damit die Map-Komponente das Polygon sofort entfernt
+    handlePolygonChange([]);
     
     // Polygon-Speicherstatus zurücksetzen
     setPolygonSaved(false);
     
     // Standortinformationsanzeige ausblenden
     setShowLocationInfo(false);
-  }, [setMetadata]);
+    
+    console.log('LocationDetermination: restartPolygon abgeschlossen - Polygon sollte jetzt gelöscht sein');
+  }, [setMetadata, handlePolygonChange, polygonPoints, metadata.polygonPoints]);
 
   // "Nicht mehr anzeigen" Einstellungen speichern
   const saveWelcomePreference = (value: boolean) => {
@@ -1338,7 +1434,17 @@ export function LocationDetermination({
           displayMode={displayMode}
           onHabitatClick={handleHabitatClick}
           onClick={handleMapClick}
+          onResetButtonPositionChange={setResetButtonPosition}
         />
+        
+        {/* React-Button für "Neu beginnen" - wird über der Karte positioniert */}
+        {resetButtonPosition && mapMode === 'polygon' && initialPolygonForMap.length >= 3 && (
+          <ResetPolygonButton 
+            position={resetButtonPosition}
+            mapRef={mapRef}
+            onClick={restartPolygon} 
+          />
+        )}
         
         {/* Status-Anzeige während Habitate geladen werden */}
         {isLoadingHabitats && (
@@ -1350,8 +1456,16 @@ export function LocationDetermination({
         {/* Verbesserter GPS-Ladehinweis (in der Mitte des Bildschirms mit höherem z-index) */}
         {isLoadingGPS && (
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-700 text-white py-3 px-6 rounded-lg shadow-xl text-base font-medium flex items-center gap-3 z-[9999]">
-            <div className="w-4 h-4 bg-white rounded-full animate-ping"></div>
+            <Loader2 className="w-5 h-5 animate-spin" />
             GPS-Position wird ermittelt...
+          </div>
+        )}
+        
+        {/* Lade-Symbol für Standortdatenermittlung */}
+        {isLocationDataLoading && (
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-700 text-white py-3 px-6 rounded-lg shadow-xl text-base font-medium flex items-center gap-3 z-[9999]">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            Standortdaten werden ermittelt...
           </div>
         )}
 
@@ -1467,7 +1581,7 @@ export function LocationDetermination({
         {/* Nur anzeigen, wenn forceShowLocationInfo aktiv ist (Schritt "Standortdaten ermitteln") 
             oder wenn ein bestehendes Habitat ausgewählt ist */}
         {showLocationInfo && (forceShowLocationInfo || selectedHabitatId) && (
-          <div className="absolute bottom-11 right-3 z-[1000] bg-gray-800/30 backdrop-blur-sm rounded-lg shadow-lg p-3 max-w-[70vw]">
+          <div className="absolute bottom-11 right-3 z-[1000] bg-gray-800/50 backdrop-blur-sm rounded-lg shadow-lg p-3 max-w-[70vw]">
             <div className="flex justify-between items-start">
               <h3 className="text-[12px] font-semibold mb-1 text-white">
                 {selectedHabitatId ? "Bestehendes Habitat" : "Standortinformationen"}
@@ -1725,29 +1839,31 @@ export function LocationDetermination({
         {/* Entferne alte Buttons für Speichern/Neu (wurden nach oben verschoben) */}
         {!showLocationInfo && (
           <>
-            {/* Schöne Polygon-Warnung */}
+            {/* Schöne Polygon-Warnung (gleiches Design wie Standortdaten-Info) */}
             {showPolygonWarning && (
               <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-[9999] max-w-sm">
-                <Alert className="bg-amber-50 border-amber-200 text-amber-800 shadow-lg">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg shadow-lg p-3">
                   <div className="flex justify-between items-start">
-                    <AlertDescription className="flex-grow pr-2">
-                      <div className="font-semibold mb-1">Polygon nicht geschlossen</div>
-                      <div className="text-sm">
+                    <div className="flex-grow pr-2">
+                      <div className="flex items-center gap-2 mb-1">
+                        <AlertTriangle className="h-4 w-4 text-white" />
+                        <div className="font-semibold text-white text-sm">Polygon nicht geschlossen</div>
+                      </div>
+                      <div className="text-xs text-gray-200">
                         Bitte klicken Sie zum Abschluss wieder auf den ersten Punkt, 
                         damit ein geschlossenes Polygon entsteht.
                       </div>
-                    </AlertDescription>
+                    </div>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 text-amber-600 hover:text-amber-800 hover:bg-amber-100"
+                      className="h-6 w-6 text-white/70 hover:text-white hover:bg-transparent"
                       onClick={() => setShowPolygonWarning(false)}
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
-                </Alert>
+                </div>
               </div>
             )}
           </>

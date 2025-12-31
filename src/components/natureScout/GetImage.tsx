@@ -515,11 +515,11 @@ export function GetImage({
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000] p-4">
-        <div className="bg-white rounded-lg p-6 max-w-sm text-center shadow-xl relative">
+        <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-6 max-w-sm text-center shadow-xl relative">
           {/* Schließen-Button oben rechts */}
           <button
             onClick={() => setShowOrientationDialog(false)}
-            className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 transition-colors"
+            className="absolute top-2 right-2 text-white/70 hover:text-white transition-colors"
             aria-label="Dialog schließen"
           >
             <X className="h-5 w-5" />
@@ -527,17 +527,17 @@ export function GetImage({
           
           <div className="flex justify-center mb-4">
             <Smartphone 
-              className={`h-12 w-12 text-blue-500 transition-transform duration-500 ${
+              className={`h-12 w-12 text-white transition-transform duration-500 ${
                 isRequiringLandscape ? 'rotate-90' : 'rotate-0'
               }`} 
             />
           </div>
           
-          <h3 className="text-lg font-semibold mb-2 text-gray-900">
+          <h3 className="text-lg font-semibold mb-2 text-white">
             {isRequiringLandscape ? "Querformat benötigt" : "Hochformat benötigt"}
           </h3>
           
-          <p className="text-gray-600 mb-4">
+          <p className="text-gray-200 mb-4">
             {isRequiringLandscape 
               ? "Bitte drehen Sie Ihr Gerät ins Querformat für die bestmögliche Aufnahme des Panoramabilds."
               : "Bitte drehen Sie Ihr Gerät ins Hochformat für die optimale Aufnahme."
@@ -548,7 +548,7 @@ export function GetImage({
           <Button 
             onClick={() => setShowOrientationDialog(false)}
             variant="outline"
-            className="w-full"
+            className="w-full bg-white/20 hover:bg-white/30 text-white border-white/30"
           >
             Überspringen
           </Button>
@@ -562,20 +562,20 @@ export function GetImage({
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000] p-4">
-        <div className="bg-white rounded-lg p-6 max-w-sm text-center shadow-xl">
+        <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-6 max-w-sm text-center shadow-xl">
           <div className="flex justify-center mb-4">
             {cameraAvailable === false ? (
-              <AlertTriangle className="h-8 w-8 text-amber-500" />
+              <AlertTriangle className="h-8 w-8 text-white" />
             ) : (
-              <Camera className="h-8 w-8 text-blue-500" />
+              <Camera className="h-8 w-8 text-white" />
             )}
           </div>
           
-          <h3 className="text-lg font-semibold mb-2 text-gray-900">
+          <h3 className="text-lg font-semibold mb-2 text-white">
             {cameraAvailable === false ? "Keine Kamera verfügbar" : "Kamera-Hinweis"}
           </h3>
           
-          <div className="text-gray-600 mb-4 space-y-2">
+          <div className="text-gray-200 mb-4 space-y-2">
             {cameraAvailable === false ? (
               <>
                 <p>Auf diesem Gerät wurde keine Kamera gefunden.</p>
@@ -595,7 +595,7 @@ export function GetImage({
           
           <Button 
             onClick={() => setShowCameraHint(false)}
-            className="w-full"
+            className="w-full bg-white/20 hover:bg-white/30 text-white border-white/30"
           >
             Verstanden
           </Button>

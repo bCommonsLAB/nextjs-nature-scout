@@ -98,6 +98,7 @@ export interface AnalysisJob {
   error?: string | null;
   startTime: Date;
   updatedAt: Date;
+  protectionStatus?: 'red' | 'yellow' | 'green';
 }
 
 

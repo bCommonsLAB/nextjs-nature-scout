@@ -51,9 +51,12 @@ export async function GET(request: Request) {
     }
     
     // Basisfilter - bei öffentlicher Route immer nur verifizierte Habitate
+    // WICHTIG: Zeige nur Habitate mit protectionStatus "red" oder "yellow"
+    // Habitate mit "green" oder ohne protectionStatus werden nicht angezeigt
     const baseFilter: any = { 
       deleted: { $ne: true },
-      verified: true 
+      verified: true,
+      protectionStatus: { $in: ['red', 'yellow'] }
     };
     
     let results: FilterOption[] = [];
@@ -108,17 +111,25 @@ export async function GET(request: Request) {
         break;
         
       case 'schutzstati':
+        // Verwende protectionStatus direkt - keine Fallbacks, keine Konvertierung
         const schutzstatusList = await collection.aggregate([
           { $match: baseFilter },
-          { $group: { _id: '$result.schutzstatus', count: { $sum: 1 } } },
-          { $match: { _id: { $ne: null } } },
+          {
+            $group: {
+              _id: '$protectionStatus', // Nur protectionStatus verwenden
+              count: { $sum: 1 }
+            }
+          },
+          { $match: { _id: { $ne: null } } }, // Nur Werte mit protectionStatus
           { $sort: { _id: 1 } }
         ]).toArray();
         
+        // Gebe nur protectionStatus-Werte "red" und "yellow" zurück
+        // "green" wird nicht angezeigt, da diese Habitate nicht für die öffentliche Seite gedacht sind
         results = schutzstatusList
-          .filter(item => item._id)
+          .filter(item => item._id === 'red' || item._id === 'yellow')
           .map(item => ({
-            value: normalizeSchutzstatus(item._id),
+            value: item._id, // Direkt protectionStatus-Wert (red, yellow)
             count: item.count
           }));
         break;

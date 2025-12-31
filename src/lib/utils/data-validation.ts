@@ -3,6 +3,31 @@ import { NatureScoutData, AnalyseErgebnis, AnalysisJob } from "@/types/nature-sc
 type SchutzstatusObject = Record<string, number>;
 
 /**
+ * Konvertiert einen schutzstatus zu einem protectionStatus (red, yellow, green)
+ * @param schutzstatus Der zu konvertierende schutzstatus (String oder Objekt)
+ * @returns 'red' | 'yellow' | 'green'
+ */
+export function schutzstatusToProtectionStatus(schutzstatus: unknown): 'red' | 'yellow' | 'green' {
+  if (!schutzstatus) return 'green';
+  
+  const normalized = normalizeSchutzstatus(schutzstatus);
+  const normalizedLower = normalized.toLowerCase();
+  
+  // RED = gesetzlich geschützt
+  if (normalizedLower.includes('gesetzlich')) {
+    return 'red';
+  }
+  
+  // YELLOW = hochwertig (schützenswert, ökologisch hochwertig)
+  if (normalizedLower.includes('hochwertig') || normalizedLower.includes('schützenswert')) {
+    return 'yellow';
+  }
+  
+  // GREEN = niederwertig (ökologisch niederwertig, standardvegetation, standard)
+  return 'green';
+}
+
+/**
  * Normalisiert den schutzstatus, wenn er als Objekt statt als String vorliegt
  * @param schutzstatus Der zu prüfende schutzstatus
  * @returns Einen validen String-schutzstatus

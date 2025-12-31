@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { HabitatCard } from '@/components/landing/HabitatCard';
@@ -16,6 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { MultiSelectFilter } from './components/MultiSelectFilter';
 import { Badge } from '@/components/ui/badge';
+import { HabitatOverviewMap } from '@/components/map/HabitatOverviewMap';
 
 interface HabitatEntry {
   jobId: string;
@@ -33,6 +34,7 @@ interface HabitatEntry {
     schutzstatus?: string;
     habitatfamilie?: string;
   };
+  protectionStatus?: 'red' | 'yellow' | 'green';
 }
 
 interface HabitatPageProps {
@@ -60,10 +62,11 @@ function UnsereHabitateContent() {
   const verifizierungsstatus = searchParams.get('verifizierungsstatus') || 'alle';
 
   // Filterarrays aus URL-Parametern extrahieren
+  // Unterstütze sowohl protectionStatus (neu) als auch schutzstatus (alt) für Rückwärtskompatibilität
   const gemeindeParam = searchParams.get('gemeinde') || '';
   const habitatParam = searchParams.get('habitat') || '';
   const habitatfamilieParam = searchParams.get('habitatfamilie') || '';
-  const schutzstatusParam = searchParams.get('schutzstatus') || '';
+  const protectionStatusParam = searchParams.get('protectionStatus') || searchParams.get('schutzstatus') || '';
   const personParam = searchParams.get('person') || '';
   const organizationParam = searchParams.get('organization') || '';
   
@@ -71,12 +74,88 @@ function UnsereHabitateContent() {
   const [gemeindeValues, setGemeindeValues] = useState<string[]>(gemeindeParam ? gemeindeParam.split(',') : []);
   const [habitatValues, setHabitatValues] = useState<string[]>(habitatParam ? habitatParam.split(',') : []);
   const [habitatfamilieValues, setHabitatfamilieValues] = useState<string[]>(habitatfamilieParam ? habitatfamilieParam.split(',') : []);
-  const [schutzstatusValues, setSchutzstatusValues] = useState<string[]>(schutzstatusParam ? schutzstatusParam.split(',') : []);
+  const [schutzstatusValues, setSchutzstatusValues] = useState<string[]>(protectionStatusParam ? protectionStatusParam.split(',') : []);
   const [personValues, setPersonValues] = useState<string[]>(personParam ? personParam.split(',') : []);
   const [organizationValues, setOrganizationValues] = useState<string[]>(organizationParam ? organizationParam.split(',') : []);
   const [verifizierungValues, setVerifizierungValues] = useState<string[]>(
     verifizierungsstatus !== 'alle' ? [verifizierungsstatus] : []
   );
+  
+  // Filter-Werte aktualisieren, wenn sich URL-Parameter ändern
+  useEffect(() => {
+    const gemeindeParam = searchParams.get('gemeinde') || '';
+    const habitatParam = searchParams.get('habitat') || '';
+    const habitatfamilieParam = searchParams.get('habitatfamilie') || '';
+    // Unterstütze sowohl protectionStatus (neu) als auch schutzstatus (alt)
+    const protectionStatusParam = searchParams.get('protectionStatus') || searchParams.get('schutzstatus') || '';
+    const personParam = searchParams.get('person') || '';
+    const organizationParam = searchParams.get('organization') || '';
+    const verifizierungsstatus = searchParams.get('verifizierungsstatus') || 'alle';
+    
+    setGemeindeValues(gemeindeParam ? gemeindeParam.split(',') : []);
+    setHabitatValues(habitatParam ? habitatParam.split(',') : []);
+    setHabitatfamilieValues(habitatfamilieParam ? habitatfamilieParam.split(',') : []);
+    setSchutzstatusValues(protectionStatusParam ? protectionStatusParam.split(',') : []);
+    setPersonValues(personParam ? personParam.split(',') : []);
+    setOrganizationValues(organizationParam ? organizationParam.split(',') : []);
+    setVerifizierungValues(verifizierungsstatus !== 'alle' ? [verifizierungsstatus] : []);
+    setSearchInput(searchParams.get('search') || '');
+  }, [searchParams]);
+  
+  // URL-Parameter aktualisieren, wenn sich Filter ändern
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    
+    // Aktualisiere protectionStatus Parameter (nicht schutzstatus)
+    if (schutzstatusValues.length > 0) {
+      params.set('protectionStatus', schutzstatusValues.join(','));
+      // Entferne alten schutzstatus Parameter, falls vorhanden
+      params.delete('schutzstatus');
+    } else {
+      params.delete('protectionStatus');
+      params.delete('schutzstatus');
+    }
+    
+    // Aktualisiere andere Filter-Parameter
+    if (gemeindeValues.length > 0) {
+      params.set('gemeinde', gemeindeValues.join(','));
+    } else {
+      params.delete('gemeinde');
+    }
+    
+    if (habitatValues.length > 0) {
+      params.set('habitat', habitatValues.join(','));
+    } else {
+      params.delete('habitat');
+    }
+    
+    if (habitatfamilieValues.length > 0) {
+      params.set('habitatfamilie', habitatfamilieValues.join(','));
+    } else {
+      params.delete('habitatfamilie');
+    }
+    
+    if (personValues.length > 0) {
+      params.set('person', personValues.join(','));
+    } else {
+      params.delete('person');
+    }
+    
+    if (organizationValues.length > 0) {
+      params.set('organization', organizationValues.join(','));
+    } else {
+      params.delete('organization');
+    }
+    
+    // Setze page auf 1, wenn Filter geändert werden
+    params.set('page', '1');
+    
+    // Aktualisiere URL nur, wenn sich etwas geändert hat
+    const newUrl = `/unsere-habitate?${params.toString()}`;
+    if (window.location.pathname + window.location.search !== newUrl) {
+      router.replace(newUrl);
+    }
+  }, [schutzstatusValues, gemeindeValues, habitatValues, habitatfamilieValues, personValues, organizationValues, router, searchParams]);
   
   // Aktive Filter zählen
   const activeFilterCount = [
@@ -107,7 +186,8 @@ function UnsereHabitateContent() {
         if (gemeindeValues.length > 0) queryParams.set('gemeinde', gemeindeValues.join(','));
         if (habitatValues.length > 0) queryParams.set('habitat', habitatValues.join(','));
         if (habitatfamilieValues.length > 0) queryParams.set('habitatfamilie', habitatfamilieValues.join(','));
-        if (schutzstatusValues.length > 0) queryParams.set('schutzstatus', schutzstatusValues.join(','));
+        // Verwende protectionStatus statt schutzstatus
+        if (schutzstatusValues.length > 0) queryParams.set('protectionStatus', schutzstatusValues.join(','));
         if (personValues.length > 0) queryParams.set('person', personValues.join(','));
         if (organizationValues.length > 0) queryParams.set('organization', organizationValues.join(','));
         
@@ -125,8 +205,8 @@ function UnsereHabitateContent() {
         if (result.entries && result.entries.length > 0) {
           console.log('Geladene Habitate:', result.entries.slice(0, 3).map((entry: HabitatEntry) => ({
             jobId: entry.jobId,
-            schutzstatus: entry.result?.schutzstatus,
-            mappedStatus: mapSchutzstatusToStatus(entry.result?.schutzstatus || '')
+            protectionStatus: entry.protectionStatus,
+            mappedStatus: mapProtectionStatusToStatus(entry.protectionStatus)
           })));
         }
         
@@ -217,19 +297,31 @@ function UnsereHabitateContent() {
     router.push(`/unsere-habitate?${params.toString()}`);
   };
   
-  // Hilfsfunktion zum Umwandeln des Schutzstatus in ein lesbares Format für die HabitatCard
-  const mapSchutzstatusToStatus = (schutzstatus: string): string => {
-    switch (schutzstatus?.toLowerCase()) {
-      case 'gesetzlich geschützt':
+  // Hilfsfunktion zum Umwandeln von protectionStatus in ein lesbares Format für die HabitatCard
+  const mapProtectionStatusToStatus = (protectionStatus?: 'red' | 'yellow' | 'green'): string => {
+    switch (protectionStatus) {
+      case 'red':
         return 'gesetzlich';
-      case 'schützenswert':
-      case 'ökologisch hochwertig':
+      case 'yellow':
         return 'hochwertig';
-      case 'ökologisch niederwertig':
-      case 'standardvegetation':
+      case 'green':
         return 'standard';
       default:
         return 'standard';
+    }
+  };
+  
+  // Konvertiere protectionStatus-Wert zu lesbarem Text für die Anzeige
+  const protectionStatusToDisplayText = (protectionStatus: string): string => {
+    switch (protectionStatus) {
+      case 'red':
+        return 'gesetzlich geschützt';
+      case 'yellow':
+        return 'ökologisch hochwertig';
+      case 'green':
+        return 'ökologisch niederwertig';
+      default:
+        return protectionStatus;
     }
   };
   
@@ -283,6 +375,16 @@ function UnsereHabitateContent() {
                 </div>
               </div>
               
+              {/* Schutzstatus Filter */}
+              <div className="space-y-2">
+                <MultiSelectFilter
+                  type="schutzstati"
+                  value={schutzstatusValues}
+                  onValueChange={(value) => setSchutzstatusValues(value)}
+                  placeholder="Schutzstatus"
+                />
+              </div>
+              
               {/* Gemeinde Filter */}
               <div className="space-y-2">
                 <MultiSelectFilter
@@ -310,16 +412,6 @@ function UnsereHabitateContent() {
                   value={habitatfamilieValues}
                   onValueChange={(value) => setHabitatfamilieValues(value)}
                   placeholder="Habitat Gruppe"
-                />
-              </div>
-              
-              {/* Schutzstatus Filter */}
-              <div className="space-y-2">
-                <MultiSelectFilter
-                  type="schutzstati"
-                  value={schutzstatusValues}
-                  onValueChange={(value) => setSchutzstatusValues(value)}
-                  placeholder="Schutzstatus"
                 />
               </div>
               
@@ -376,7 +468,7 @@ function UnsereHabitateContent() {
                   )}
                   {schutzstatusValues.length > 0 && (
                     <Badge variant="secondary" className="text-xs">
-                      Schutzstatus: {schutzstatusValues.join(', ')}
+                      Schutzstatus: {schutzstatusValues.map(v => protectionStatusToDisplayText(v)).join(', ')}
                     </Badge>
                   )}
                   {personValues.length > 0 && (
@@ -423,6 +515,29 @@ function UnsereHabitateContent() {
             </div>
           )}
           
+          {/* Kartenansicht aller Habitate - über der Galerie */}
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold mb-4">Habitate auf der Karte</h2>
+            <p className="text-gray-600 mb-6">
+              Erkunden Sie alle erfassten Habitate auf einer interaktiven Karte
+            </p>
+            <div className="w-full rounded-lg overflow-hidden shadow-lg">
+              <HabitatOverviewMap 
+                height="600px" 
+                  filters={useMemo(() => ({
+                  search: searchInput || undefined,
+                  gemeinde: gemeindeValues.length > 0 ? gemeindeValues : undefined,
+                  habitat: habitatValues.length > 0 ? habitatValues : undefined,
+                  habitatfamilie: habitatfamilieValues.length > 0 ? habitatfamilieValues : undefined,
+                  protectionStatus: schutzstatusValues.length > 0 ? schutzstatusValues : undefined,
+                  person: personValues.length > 0 ? personValues : undefined,
+                  organization: organizationValues.length > 0 ? organizationValues : undefined,
+                  verifizierungsstatus: verifizierungsstatus !== 'alle' ? verifizierungsstatus : 'verifiziert'
+                }), [searchInput, gemeindeValues, habitatValues, habitatfamilieValues, schutzstatusValues, personValues, organizationValues, verifizierungsstatus])}
+              />
+            </div>
+          </div>
+
           {!loading && !error && data && data.entries.length === 0 && (
             <div className="bg-gray-50 border border-gray-200 p-8 rounded-lg my-4 text-center">
               <h3 className="text-lg font-medium mb-2">Keine Habitate gefunden</h3>
@@ -449,7 +564,7 @@ function UnsereHabitateContent() {
                       title={habitat.result?.habitattyp || 'Unbekanntes Habitat'}
                       location={habitat.metadata.gemeinde || 'Unbekannter Ort'}
                       recorder={habitat.metadata.erfassungsperson || ''}
-                      status={mapSchutzstatusToStatus(habitat.result?.schutzstatus || '')}
+                      status={mapProtectionStatusToStatus(habitat.protectionStatus)}
                       org={habitat.metadata.organizationName || ''}
                       orgLogo={habitat.metadata.organizationLogo || ''}
                     />

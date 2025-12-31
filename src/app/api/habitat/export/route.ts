@@ -25,6 +25,7 @@ interface MongoDocument extends Document {
   updatedAt: string;
   verified?: boolean;
   verifiedAt?: string;
+  protectionStatus?: 'red' | 'yellow' | 'green';
   metadata?: {
     erfassungsperson?: string;
     email?: string;
@@ -59,24 +60,20 @@ interface MongoDocument extends Document {
   error?: string;
 }
 
-// Funktion zum Umwandeln des Schutzstatus in Farbwerte
-function mapSchutzstatusToColor(schutzstatus: string | undefined): string {
-  if (!schutzstatus) return 'GREEN';
+// Funktion zum Umwandeln des protectionStatus in Farbwerte (für Fallback)
+function mapProtectionStatusToColor(protectionStatus: 'red' | 'yellow' | 'green' | undefined): string {
+  if (!protectionStatus) return 'GREEN';
   
-  const statusLower = schutzstatus.toLowerCase();
-  
-  // RED = gesetzlich geschützt
-  if (statusLower.includes('gesetzlich')) {
-    return 'RED';
+  switch (protectionStatus) {
+    case 'red':
+      return 'RED';
+    case 'yellow':
+      return 'YELLOW';
+    case 'green':
+      return 'GREEN';
+    default:
+      return 'GREEN';
   }
-  
-  // YELLOW = hochwertig (schützenswert, ökologisch hochwertig)
-  if (statusLower.includes('hochwertig') || statusLower.includes('schützenswert')) {
-    return 'YELLOW';
-  }
-  
-  // GREEN = niederwertig (ökologisch niederwertig, standardvegetation)
-  return 'GREEN';
 }
 
 export async function GET(request: Request) {
@@ -198,7 +195,8 @@ export async function GET(request: Request) {
         'metadata.longitude': 1,
         'metadata.polygonPoints': 1,
         'result.schutzstatus': 1,
-        'verifiedResult.schutzstatus': 1
+        'verifiedResult.schutzstatus': 1,
+        protectionStatus: 1
       })
       .toArray();
     
@@ -209,8 +207,25 @@ export async function GET(request: Request) {
     
     // Transformiere die Daten in eine flache Struktur
     const exportedData = entries.map((entry: MongoDocument) => {
-      // Verwende verifiedResult.schutzstatus falls vorhanden, sonst result.schutzstatus als Fallback
-      const schutzstatus = entry.verifiedResult?.schutzstatus || entry.result?.schutzstatus;
+      // Verwende protectionStatus direkt, mit Fallback auf schutzstatus für alte Daten
+      let protectionStatus: 'red' | 'yellow' | 'green' | undefined = entry.protectionStatus;
+      
+      // Fallback: Wenn protectionStatus fehlt, berechne aus schutzstatus
+      if (!protectionStatus) {
+        const schutzstatus = entry.verifiedResult?.schutzstatus || entry.result?.schutzstatus;
+        if (schutzstatus) {
+          const statusLower = typeof schutzstatus === 'string' ? schutzstatus.toLowerCase() : '';
+          if (statusLower.includes('gesetzlich')) {
+            protectionStatus = 'red';
+          } else if (statusLower.includes('hochwertig') || statusLower.includes('schützenswert')) {
+            protectionStatus = 'yellow';
+          } else {
+            protectionStatus = 'green';
+          }
+        } else {
+          protectionStatus = 'green';
+        }
+      }
       
       // URL für das Habitat (momentan leer, später: `${baseUrl}/habitat/${entry.jobId}`)
       const url = ''; // TODO: Später mit Link füllen: `${baseUrl}/habitat/${entry.jobId}`
@@ -223,7 +238,7 @@ export async function GET(request: Request) {
         longitude: entry.metadata?.longitude || null,
         polygonPoints: entry.metadata?.polygonPoints || null,
         updatedAt: entry.updatedAt || '',
-        schutzstatus: mapSchutzstatusToColor(schutzstatus),
+        protectionStatus: mapProtectionStatusToColor(protectionStatus),
         url: url
       };
     });

@@ -11,6 +11,20 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+// Konvertiere protectionStatus-Wert zu lesbarem Text für die Anzeige
+function protectionStatusToDisplayText(protectionStatus: string): string {
+  switch (protectionStatus) {
+    case 'red':
+      return 'gesetzlich geschützt';
+    case 'yellow':
+      return 'ökologisch hochwertig';
+    case 'green':
+      return 'ökologisch niederwertig';
+    default:
+      return protectionStatus;
+  }
+}
+
 interface FilterOption {
   value: string;
   count: number;
@@ -163,7 +177,7 @@ export function MultiSelectFilter({
                     className="text-xs cursor-pointer flex justify-between w-full"
                   >
                     <span className="truncate max-w-[70%]" title={option.value}>
-                      {option.value} ({option.count})
+                      {type === 'schutzstati' ? protectionStatusToDisplayText(option.value) : option.value} ({option.count})
                     </span>
                   </label>
                 </div>

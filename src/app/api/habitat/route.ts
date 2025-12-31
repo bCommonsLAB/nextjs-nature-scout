@@ -156,7 +156,38 @@ export async function GET(request: Request) {
     
     const schutzstatus = searchParams.get('schutzstatus');
     if (schutzstatus) {
-      filter['result.schutzstatus'] = schutzstatus;
+      // Konvertiere schutzstatus-Werte zu protectionStatus-Werten
+      const schutzstatusValues = schutzstatus.split(',').map(s => decodeURIComponent(s.trim()));
+      const protectionStatusValues: ('red' | 'yellow' | 'green')[] = [];
+      
+      for (const s of schutzstatusValues) {
+        const normalized = s.toLowerCase();
+        if (normalized.includes('gesetzlich')) {
+          protectionStatusValues.push('red');
+        } else if (normalized.includes('hochwertig') || normalized.includes('schützenswert')) {
+          protectionStatusValues.push('yellow');
+        } else if (normalized.includes('niederwertig') || normalized.includes('standard')) {
+          protectionStatusValues.push('green');
+        }
+      }
+      
+      // Filter nach protectionStatus
+      // WICHTIG: Kein Fallback - Habitate ohne protectionStatus werden nicht gefiltert
+      if (protectionStatusValues.length > 0) {
+        if (!filter['$and']) {
+          filter['$and'] = [];
+        }
+        
+        // Entferne Duplikate für $in-Query
+        const uniqueValues = [...new Set(protectionStatusValues)];
+        
+        // Filter: Nur nach protectionStatus filtern
+        if (uniqueValues.length === 1) {
+          filter['$and'].push({ protectionStatus: uniqueValues[0] });
+        } else {
+          filter['$and'].push({ protectionStatus: { $in: uniqueValues } });
+        }
+      }
     }
     
     const pruefstatus = searchParams.get('pruefstatus');

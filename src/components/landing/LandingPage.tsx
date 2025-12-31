@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Info, Sparkles } from "lucide-react";
 import Link from 'next/link';
 import { useUser } from "@/context/auth-context";
+import { HabitatOverviewMap } from "@/components/map/HabitatOverviewMap";
 //console.log('LandingPage wird gerendert');
 
 const colors = {
@@ -75,6 +76,7 @@ interface HabitatEntry {
     habitattyp?: string;
     schutzstatus?: string;
   };
+  protectionStatus?: 'red' | 'yellow' | 'green';
 }
 
 
@@ -199,6 +201,7 @@ export function NatureScoutPage() {
             </div>
           </section>
 
+
           <section className="landing-section flex overflow-hidden flex-col px-16 py-16 w-full bg-[#FAFFF3] max-md:px-5">
             <h2>Wertvolle Habitate in Südtirol</h2>
             <div>
@@ -236,6 +239,23 @@ export function NatureScoutPage() {
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
+          </section>
+          {/* Kartenansicht aller Habitate */}
+
+
+          <section className="landing-section flex overflow-hidden flex-col px-16 py-16 w-full bg-white max-md:px-5">
+            <div className="mb-6 text-center w-full">
+              Erkunden Sie alle wertvollen Habitate auf einer interaktiven Karte
+            </div>
+            <div className="w-full rounded-lg overflow-hidden shadow-lg">
+              <HabitatOverviewMap 
+                height="600px" 
+                filters={{
+                  schutzstatus: ['gesetzlich geschützt', 'ökologisch hochwertig'],
+                  verifizierungsstatus: 'verifiziert'
+                }}
+              />
+            </div>
           </section>
 
           <section className="landing-section flex overflow-hidden flex-col px-16 pt-28 pb-16 w-full bg-[#E9F5DB] max-md:px-5 max-md:pt-24">

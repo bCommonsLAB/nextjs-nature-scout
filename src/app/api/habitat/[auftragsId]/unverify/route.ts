@@ -50,6 +50,7 @@ export async function POST(
     }
     
     // Verifizierung zurücknehmen
+    // WICHTIG: protectionStatus wird entfernt, da es nur von Experten beim Verifizieren gesetzt werden darf
     const result = await collection.updateOne(
       { jobId },
       { 
@@ -57,7 +58,8 @@ export async function POST(
           verified: "",
           verifiedAt: "",
           verifiedBy: "",
-          verifiedResult: ""
+          verifiedResult: "",
+          protectionStatus: "" // Entferne protectionStatus, da Verifizierung zurückgenommen wurde
         },
         $set: {
           updatedAt: new Date()

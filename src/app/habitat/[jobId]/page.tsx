@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -116,6 +117,9 @@ interface HabitatData {
 export default function HabitateDetailPage() {
   const { jobId } = useParams();
   const router = useRouter();
+  const { data: session, status } = useSession();
+  const isAuthenticated = !!session?.user;
+  
   const [data, setData] = useState<HabitatData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -124,6 +128,16 @@ export default function HabitateDetailPage() {
   const [isExpert, setIsExpert] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+  
+  // Prüfe Authentifizierung - umleiten wenn nicht eingeloggt
+  useEffect(() => {
+    if (status === 'loading') return; // Warte auf Session-Laden
+    
+    if (!isAuthenticated) {
+      // Umleiten zur Homepage, wenn nicht eingeloggt
+      router.push('/');
+    }
+  }, [isAuthenticated, status, router]);
   
   // Hilfsfunktion für Retry-Logik mit exponentieller Verzögerung
   const fetchWithRetry = async (url: string, maxRetries = 3, delay = 1000): Promise<Response> => {
@@ -177,6 +191,11 @@ export default function HabitateDetailPage() {
         if (habitatResponse.status === 'fulfilled') {
           const habitatResult = habitatResponse.value;
           if (!habitatResult.ok) {
+            // Wenn 403 (Zugriff verweigert), umleiten zur Homepage
+            if (habitatResult.status === 403) {
+              router.push('/');
+              return;
+            }
             throw new Error(`Fehler beim Laden der Daten: ${habitatResult.status}`);
           }
           const habitatData = await habitatResult.json();

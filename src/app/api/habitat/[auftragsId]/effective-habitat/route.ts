@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
 import { UserService } from '@/lib/services/user-service';
 import { requireAuth } from '@/lib/server-auth';
+import { schutzstatusToProtectionStatus } from '@/lib/utils/data-validation';
 
 export async function PATCH(
   request: Request,
@@ -88,6 +89,9 @@ export async function PATCH(
     // Aktuelles Datum für die Verifizierung
     const now = new Date();
     
+    // Berechne protectionStatus basierend auf schutzstatus
+    const protectionStatus = schutzstatusToProtectionStatus(schutzstatus);
+    
     // Update durchführen mit Aggregation Pipeline
     const result = await collection.updateOne(
       { jobId },
@@ -110,6 +114,8 @@ export async function PATCH(
               userName,
               role: isAdmin ? 'admin' : 'experte'
             },
+            // Setze protectionStatus basierend auf verifiedResult.schutzstatus
+            protectionStatus: protectionStatus,
             // Füge den History-Eintrag hinzu
             history: {
               $cond: {

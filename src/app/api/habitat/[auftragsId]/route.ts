@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
 import { UserService } from '@/lib/services/user-service';
 import { requireAuth } from '@/lib/server-auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export async function GET(
   request: Request, 
@@ -11,16 +13,6 @@ export async function GET(
   const jobId = auftragsId;
   
   try {
-    // Echte Authentifizierung
-    const currentUser = await requireAuth();
-    const userEmail = currentUser.email;
-    
-    // Überprüfen, ob Benutzer erweiterte Rechte hat (Admin oder Experte)
-    const isAdmin = await UserService.isAdmin(userEmail);
-    const isExpert = await UserService.isExpert(userEmail);
-    const hasAdvancedPermissions = isAdmin || isExpert;
-    
-    
     const db = await connectToDatabase();
     const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
     
@@ -30,6 +22,45 @@ export async function GET(
       return NextResponse.json(
         { error: 'Eintrag nicht gefunden' },
         { status: 404 }
+      );
+    }
+    
+    // Prüfe, ob der Eintrag öffentlich ist (verifiziert und mit protectionStatus red oder yellow)
+    const isPublic = entry.verified === true && 
+                     entry.protectionStatus && 
+                     (entry.protectionStatus === 'red' || entry.protectionStatus === 'yellow');
+    
+    // Optionale Authentifizierung - keine Fehler, falls nicht eingeloggt
+    let currentUser = null;
+    let userEmail: string | null = null;
+    let hasAdvancedPermissions = false;
+    
+    try {
+      const session = await getServerSession(authOptions);
+      if (session?.user?.email) {
+        currentUser = { email: session.user.email };
+        userEmail = session.user.email;
+        
+        // Überprüfen, ob Benutzer erweiterte Rechte hat (Admin oder Experte)
+        const isAdmin = await UserService.isAdmin(userEmail);
+        const isExpert = await UserService.isExpert(userEmail);
+        hasAdvancedPermissions = isAdmin || isExpert;
+      }
+    } catch (authError) {
+      // Authentifizierung fehlgeschlagen - Route funktioniert trotzdem für öffentliche Habitate
+      console.log('Optionale Authentifizierung fehlgeschlagen - prüfe öffentlichen Zugriff');
+    }
+    
+    // Wenn der Eintrag öffentlich ist, erlaube Zugriff für alle
+    if (isPublic) {
+      return NextResponse.json(entry);
+    }
+    
+    // Wenn nicht öffentlich, prüfe Authentifizierung
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: 'Zugriff verweigert. Dieser Eintrag ist nicht öffentlich verfügbar.' },
+        { status: 403 }
       );
     }
     

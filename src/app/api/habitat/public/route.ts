@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Sort as MongoSort } from 'mongodb';
 import { connectToDatabase } from '@/lib/services/db';
-import { normalizeSchutzstatus } from '@/lib/utils/data-validation';
+import { normalizeSchutzstatus, schutzstatusToProtectionStatus } from '@/lib/utils/data-validation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
@@ -88,6 +88,16 @@ export async function GET(request: Request) {
     }
     // Bei 'alle' wird kein Verifizierungsfilter hinzugefügt
 
+    // WICHTIG: Standardfilter für öffentliche Route
+    // Zeige nur Habitate mit protectionStatus "red" oder "yellow"
+    // Habitate mit "green" oder ohne protectionStatus werden nicht angezeigt
+    if (!filter['$and']) {
+      filter['$and'] = [];
+    }
+    filter['$and'].push({
+      protectionStatus: { $in: ['red', 'yellow'] }
+    });
+
     // Füge weitere Filter hinzu
     const gemeinde = searchParams.get('gemeinde');
     if (gemeinde) {
@@ -148,19 +158,54 @@ export async function GET(request: Request) {
       }
     }
     
+    // Unterstütze sowohl protectionStatus (neu) als auch schutzstatus (alt) für Rückwärtskompatibilität
+    // WICHTIG: Wenn ein expliziter Filter gesetzt ist, überschreibe den Standardfilter
+    const protectionStatus = searchParams.get('protectionStatus');
     const schutzstatus = searchParams.get('schutzstatus');
-    if (schutzstatus) {
-      // Prüfen, ob es mehrere Werte sind (durch Komma getrennt)
-      const schutzstatusValues = schutzstatus.split(',');
-      if (schutzstatusValues.length > 1) {
-        if (!filter['$or']) filter['$or'] = [];
-        // ODER-Verknüpfung für mehrere Schutzstatus
-        const schutzstatusConditions = schutzstatusValues.map(s => ({ 
-          'result.schutzstatus': { $regex: `^${s}$`, $options: 'i' }
-        }));
-        filter['$or'].push(...schutzstatusConditions);
-      } else {
-        filter['result.schutzstatus'] = schutzstatus;
+    
+    if (protectionStatus) {
+      // Direkt protectionStatus-Werte verwenden (red, yellow, green)
+      const protectionStatusValues = protectionStatus.split(',').map(s => decodeURIComponent(s.trim()).toLowerCase()) as ('red' | 'yellow' | 'green')[];
+      const validValues = protectionStatusValues.filter(v => v === 'red' || v === 'yellow' || v === 'green');
+      
+      if (validValues.length > 0) {
+        // Entferne den Standardfilter und setze den expliziten Filter
+        filter['$and'] = filter['$and']?.filter((f: any) => !f.protectionStatus) || [];
+        
+        // Entferne Duplikate für $in-Query
+        const uniqueValues = [...new Set(validValues)];
+        
+        // Filter: Nur nach protectionStatus filtern
+        // WICHTIG: Kein Fallback - Habitate ohne protectionStatus werden nicht gefiltert
+        if (uniqueValues.length === 1) {
+          filter['$and'].push({ protectionStatus: uniqueValues[0] });
+        } else {
+          filter['$and'].push({ protectionStatus: { $in: uniqueValues } });
+        }
+      }
+    } else if (schutzstatus) {
+      // Rückwärtskompatibilität: Konvertiere alte schutzstatus-Werte zu protectionStatus
+      const schutzstatusValues = schutzstatus.split(',').map(s => decodeURIComponent(s.trim()));
+      const protectionStatusValues: ('red' | 'yellow' | 'green')[] = [];
+      
+      for (const s of schutzstatusValues) {
+        const protectionStatus = schutzstatusToProtectionStatus(s);
+        if (!protectionStatusValues.includes(protectionStatus)) {
+          protectionStatusValues.push(protectionStatus);
+        }
+      }
+      
+      if (protectionStatusValues.length > 0) {
+        // Entferne den Standardfilter und setze den expliziten Filter
+        filter['$and'] = filter['$and']?.filter((f: any) => !f.protectionStatus) || [];
+        
+        const uniqueValues = [...new Set(protectionStatusValues)];
+        
+        if (uniqueValues.length === 1) {
+          filter['$and'].push({ protectionStatus: uniqueValues[0] });
+        } else {
+          filter['$and'].push({ protectionStatus: { $in: uniqueValues } });
+        }
       }
     }
     
@@ -245,10 +290,23 @@ export async function GET(request: Request) {
         { $sort: { _id: 1 } }
       ]).toArray();
       
-      // Schutzstatus abrufen
+      // Schutzstatus abrufen - verwende protectionStatus für verifizierte Habitate
+      // Für verifizierte Habitate sollte protectionStatus vorhanden sein
       const schutzstatusList = await collection.aggregate([
         { $match: baseFilter },
-        { $group: { _id: '$result.schutzstatus' } },
+        {
+          $group: {
+            _id: {
+              $ifNull: ['$protectionStatus', {
+                $cond: {
+                  if: { $ne: ['$verifiedResult.schutzstatus', null] },
+                  then: '$verifiedResult.schutzstatus',
+                  else: '$result.schutzstatus'
+                }
+              }]
+            }
+          }
+        },
         { $match: { _id: { $ne: null } } },
         { $sort: { _id: 1 } }
       ]).toArray();
@@ -269,20 +327,70 @@ export async function GET(request: Request) {
         { $sort: { _id: 1 } }
       ]).toArray();
       
+      // Konvertiere protectionStatus-Werte zurück zu lesbaren schutzstatus-Werten
+      const schutzstatusOptions = schutzstatusList
+        .map(item => item._id)
+        .filter(Boolean)
+        .map(status => {
+          if (status === 'red' || status === 'yellow' || status === 'green') {
+            // protectionStatus-Wert: konvertiere zu lesbarem schutzstatus
+            switch (status) {
+              case 'red':
+                return 'gesetzlich geschützt';
+              case 'yellow':
+                return 'ökologisch hochwertig';
+              case 'green':
+                return 'ökologisch niederwertig';
+              default:
+                return normalizeSchutzstatus(status);
+            }
+          } else {
+            // Alte schutzstatus-Werte: normalisieren
+            return normalizeSchutzstatus(status);
+          }
+        });
+      
       filterOptions = {
         gemeinden: gemeindenAgg.map(item => item._id).filter(Boolean),
         habitattypen: habitattypenAgg.map(item => item._id).filter(Boolean),
         habitatfamilien: habitatfamilienAgg.map(item => item._id).filter(Boolean),
-        schutzstatusList: schutzstatusList.map(item => item._id).filter(Boolean).map(status => 
-          normalizeSchutzstatus(status)
-        ),
+        schutzstatusList: schutzstatusOptions,
         personen: personen.map(item => item._id).filter(Boolean),
         organizations: organisationen.map(item => item._id).filter(Boolean)
       };
     }
     
+    // Stelle sicher, dass der Filter korrekt strukturiert ist
+    // Wenn sowohl $or als auch $and vorhanden sind, müssen wir sie korrekt kombinieren
+    let finalFilter: MongoFilter = filter;
+    if (filter['$or'] && filter['$and']) {
+      // Wenn sowohl $or als auch $and vorhanden sind, müssen wir sie in einem $and kombinieren
+      const { $or, $and, ...restFilter } = filter;
+      finalFilter = {
+        ...restFilter,
+        $and: [
+          { $or: $or },
+          ...$and
+        ]
+      };
+    } else {
+      finalFilter = filter;
+    }
+    
+    // Debug: Logge den Filter für Fehlerdiagnose
+    if (schutzstatus) {
+      const schutzstatusValues = schutzstatus.split(',').map(s => decodeURIComponent(s.trim()));
+      console.log('Schutzstatus-Filter (vereinfacht):', {
+        schutzstatusParam: schutzstatus,
+        schutzstatusValues: schutzstatusValues,
+        filterStructure: JSON.stringify(finalFilter, null, 2),
+        hasOr: !!filter['$or'],
+        hasAnd: !!filter['$and']
+      });
+    }
+    
     // Zähle die Gesamtanzahl der Einträge mit diesem Filter
-    const total = await collection.countDocuments(filter);
+    const total = await collection.countDocuments(finalFilter);
     const skip = (page - 1) * limit;
     
   // Erstelle Sortierung
@@ -316,7 +424,8 @@ export async function GET(request: Request) {
     'result.habitattyp': 1,
     'result.schutzstatus': 1,
     'verifiedResult.habitattyp': 1,
-    'verifiedResult.schutzstatus': 1
+    'verifiedResult.schutzstatus': 1,
+    protectionStatus: 1
   } : {
     // Vollständige Ansicht für Listenansicht
     jobId: 1,
@@ -342,12 +451,13 @@ export async function GET(request: Request) {
     'verifiedResult.habitattyp': 1,
     'verifiedResult.schutzstatus': 1,
     'verifiedResult.habitatfamilie': 1,
-    'metadata.kommentar': 1
+    'metadata.kommentar': 1,
+    protectionStatus: 1
   };
   
   // Daten abrufen und für Frontend projizieren
   const entries = await collection
-    .find(filter)
+    .find(finalFilter)
     .sort(sort)
     .skip(bounds ? 0 : skip) // Bei Geo-Queries kein Skip (immer Top 100)
     .limit(effectiveLimit)
@@ -381,7 +491,8 @@ export async function GET(request: Request) {
           verifiedResult: entry.verifiedResult?.habitattyp || entry.verifiedResult?.schutzstatus ? {
             habitattyp: entry.verifiedResult?.habitattyp,
             schutzstatus: entry.verifiedResult?.schutzstatus ? normalizeSchutzstatus(entry.verifiedResult.schutzstatus) : undefined
-          } : undefined
+          } : undefined,
+          protectionStatus: entry.protectionStatus
         };
       });
     } else {

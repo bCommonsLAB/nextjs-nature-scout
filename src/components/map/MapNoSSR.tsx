@@ -82,10 +82,19 @@ declare module 'leaflet' {
 interface Habitat {
   id: string;                          // Eindeutige ID des Habitats
   name: string;                        // Name des Habitats
+  position?: [number, number];        // Optional: Position des Habitats (Lat/Lng)
   polygon?: Array<[number, number]>;   // Polygon-Punkte für die Darstellung
   color?: string;                      // Optional: Individuelle Farbe für das Habitat
   schutzstatus?: string;               // Optional: Schutzstatus (geschützt/hochwertig/niederwertig)
   transparenz?: number;                // Optional: Transparenzwert (0.0 - 1.0)
+  metadata?: {                         // Optional: Zusätzliche Metadaten
+    gemeinde?: string;
+    flurname?: string;
+    erfasser?: string;
+    verifiziert?: boolean;
+    elevation?: string | number;
+    schutzstatus?: string;
+  };
 }
 
 // Methoden, die nach außen exponiert werden
@@ -94,6 +103,8 @@ export interface MapNoSSRHandle {
   getCurrentPolygonPoints: () => Array<[number, number]>;
   updatePositionMarker: (lat: number, lng: number) => void;
   getBounds: () => { minLat: number; minLng: number; maxLat: number; maxLng: number } | null;
+  getResetButtonPosition: () => { lat: number; lng: number } | null;  // Position für React-Button
+  getResetButtonPixelPosition: () => { x: number; y: number } | null;  // Pixel-Position für React-Button
 }
 
 // Props-Interface für die MapNoSSR-Komponente
@@ -120,6 +131,7 @@ interface MapNoSSRProps {
   onClick?: () => void;                // Callback für Klick auf die Karte außerhalb eines Habitats
   schutzstatus?: string;               // Optionaler Schutzstatus für das eigene Polygon (geschützt/hochwertig/niederwertig)
   displayMode?: 'markers' | 'polygons'; // Anzeigemodus: Marker bei niedrigem Zoom, Polygone bei hohem Zoom
+  onResetButtonPositionChange?: (position: { lat: number; lng: number } | null) => void;  // Callback für Button-Position
 }
 
 // Komponente mit forwardRef, um Ref-Funktionen nach außen zu exponieren
@@ -141,7 +153,8 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
   onHabitatClick,
   onClick,
   schutzstatus = 'niederwertig',  // Standardwert: niederwertig
-  displayMode = 'polygons'  // Standardwert: Polygone
+  displayMode = 'polygons',  // Standardwert: Polygone
+  onResetButtonPositionChange  // Callback für Button-Position
 }, ref) => {
   const isDebug = process.env.NEXT_PUBLIC_MAP_DEBUG === 'true';
   // Debug-Log für Rendering und Zustandsänderungen
@@ -167,7 +180,9 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
   const drawnItemsRef = useRef<L.FeatureGroup | null>(null);    // Gruppe aller gezeichneten Elemente
   const activeDrawHandlerRef = useRef<any>(null);               // Aktiver Draw-Handler für Polygon-Zeichnung
   const positionMarkerRef = useRef<L.Marker | null>(null);      // Positionsmarker
-  const resetPolygonMarkerRef = useRef<L.Marker | null>(null);  // Button-Marker in Polygon-Mitte
+  const resetPolygonMarkerRef = useRef<L.Marker | null>(null);  // Button-Marker in Polygon-Mitte (wird nicht mehr verwendet, aber für Cleanup behalten)
+  const resetButtonClickHandlerRef = useRef<((e: MouseEvent | TouchEvent) => void) | null>(null);  // Referenz auf Click-Handler für Cleanup
+  const [resetButtonPosition, setResetButtonPosition] = useState<{ lat: number; lng: number } | null>(null);  // Position für React-Button
   const habitatPolygonsRef = useRef<L.LayerGroup | null>(null); // Layer-Gruppe für Habitat-Polygone
   const habitatMarkersRef = useRef<L.LayerGroup | null>(null); // Layer-Gruppe für Habitat-Marker
   
@@ -236,6 +251,20 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
         maxLat: bounds.getNorth(),
         maxLng: bounds.getEast()
       };
+    },
+    
+    // Methode zum Abrufen der Pixel-Position des Reset-Buttons
+    getResetButtonPixelPosition: () => {
+      if (!mapRef.current || !polygonLayerRef.current) return null;
+      try {
+        const bounds = polygonLayerRef.current.getBounds();
+        const center = bounds.getCenter();
+        const pixelPoint = mapRef.current.latLngToContainerPoint(center);
+        return { x: pixelPoint.x, y: pixelPoint.y };
+      } catch (error) {
+        console.error('Fehler beim Berechnen der Button-Pixel-Position:', error);
+        return null;
+      }
     },
     
     // Methode zum Aktualisieren des Positionsmarkers
@@ -749,17 +778,42 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
       initialPolygon.length >= 3;
 
     if (!shouldShow) {
+      // Alten Marker entfernen, falls vorhanden
       if (resetPolygonMarkerRef.current) {
         resetPolygonMarkerRef.current.remove();
         resetPolygonMarkerRef.current = null;
+      }
+      // Button-Position zurücksetzen
+      if (onResetButtonPositionChange) {
+        onResetButtonPositionChange(null);
       }
       return;
     }
 
     const polygon = polygonLayerRef.current;
-    if (!polygon) return;
+    if (!polygon) {
+      // Button-Position zurücksetzen, wenn kein Polygon vorhanden
+      if (onResetButtonPositionChange) {
+        onResetButtonPositionChange(null);
+      }
+      return;
+    }
 
     const center = polygon.getBounds().getCenter();
+    
+    // Button-Position nach außen geben für React-Komponente
+    if (onResetButtonPositionChange) {
+      // Alten Leaflet-Marker entfernen, wenn React-Button verwendet wird
+      if (resetPolygonMarkerRef.current) {
+        resetPolygonMarkerRef.current.remove();
+        resetPolygonMarkerRef.current = null;
+      }
+      onResetButtonPositionChange({ lat: center.lat, lng: center.lng });
+      // Wenn React-Button verwendet wird, keinen Leaflet-Marker erstellen
+      return;
+    }
+    
+    // Alte Leaflet-Marker-Implementierung (nur wenn kein React-Button verwendet wird)
     const icon = L.divIcon({
       className: 'ns-reset-polygon-icon',
       html: `
@@ -784,6 +838,71 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
       iconAnchor: [55, 15]
     });
 
+    // Hilfsfunktion zum Registrieren des Button-Handlers
+    const registerButtonHandler = (marker: L.Marker) => {
+      const el = marker.getElement();
+      if (!el) {
+        console.warn('MapNoSSR: Marker-Element nicht gefunden');
+        return;
+      }
+      
+      // Leaflet Events blockieren, damit der Button nicht die Karte triggert
+      L.DomEvent.disableClickPropagation(el);
+      L.DomEvent.disableScrollPropagation(el);
+
+      // WICHTIG: Click direkt auf dem Button abfangen.
+      // Bei divIcon kann der Klick sonst auf der Karte "verpuffen" (z.B. wenn Leaflet den Button nicht als Marker-Click interpretiert).
+      const btn = el.querySelector('button') as HTMLButtonElement;
+      if (!btn) {
+        console.warn('MapNoSSR: Button-Element nicht gefunden im Marker');
+        return;
+      }
+
+      // Cursor-Feedback
+      btn.style.cursor = 'pointer';
+      btn.style.pointerEvents = 'auto';
+      
+      // Stelle sicher, dass der Button über anderen Elementen liegt
+      btn.style.position = 'relative';
+      btn.style.zIndex = '10000';
+
+      // Alten Handler entfernen, falls vorhanden
+      if (resetButtonClickHandlerRef.current) {
+        btn.removeEventListener('click', resetButtonClickHandlerRef.current);
+        btn.removeEventListener('touchend', resetButtonClickHandlerRef.current);
+      }
+      
+      // Bereits vorhandene Leaflet-Handler entfernen
+      L.DomEvent.off(btn);
+
+      // Native Event-Handler direkt registrieren (robuster als Leaflet's DomEvent)
+      const handleButtonClick = (e: MouseEvent | TouchEvent) => {
+        console.log('MapNoSSR: Button-Klick erkannt', e);
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        
+        if (onResetPolygon) {
+          console.log('MapNoSSR: onResetPolygon wird aufgerufen');
+          onResetPolygon();
+        } else {
+          console.warn('MapNoSSR: onResetPolygon ist nicht definiert');
+        }
+      };
+      
+      // Handler-Referenz speichern für späteres Cleanup
+      resetButtonClickHandlerRef.current = handleButtonClick;
+      
+      // Event-Listener mit capture: true hinzufügen, damit wir die Events früh abfangen
+      btn.addEventListener('click', handleButtonClick, { capture: true });
+      btn.addEventListener('touchend', handleButtonClick, { capture: true });
+      
+      // Auch mousedown für bessere Kompatibilität
+      btn.addEventListener('mousedown', (e: MouseEvent) => {
+        e.stopPropagation();
+      }, { capture: true });
+    };
+
     if (!resetPolygonMarkerRef.current) {
       resetPolygonMarkerRef.current = L.marker(center, {
         icon,
@@ -792,54 +911,79 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
         zIndexOffset: 1000
       }).addTo(mapRef.current);
 
+      // Handler nach dem Hinzufügen registrieren
       resetPolygonMarkerRef.current.on('add', () => {
-        const el = resetPolygonMarkerRef.current?.getElement();
-        if (!el) return;
-        L.DomEvent.disableClickPropagation(el);
-        L.DomEvent.disableScrollPropagation(el);
-
-        // WICHTIG: Click direkt auf dem Button abfangen.
-        // Bei divIcon kann der Klick sonst auf der Karte "verpuffen" (z.B. wenn Leaflet den Button nicht als Marker-Click interpretiert).
-        const btn = el.querySelector('button');
-        if (!btn) return;
-
-        // Cursor-Feedback
-        (btn as HTMLElement).style.cursor = 'pointer';
-
-        // Bereits vorhandene Handler entfernen und neu registrieren
-        L.DomEvent.off(btn);
-        L.DomEvent.on(btn, 'click', (e: Event) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onResetPolygon?.();
-        });
+        registerButtonHandler(resetPolygonMarkerRef.current!);
       });
 
       // Fallback: Klick auf Marker-Fläche (nicht Button) ebenfalls unterstützen
+      // Entferne alte Handler zuerst, um Mehrfachregistrierung zu vermeiden
+      resetPolygonMarkerRef.current.off('click');
       resetPolygonMarkerRef.current.on('click', (e: any) => {
+        console.log('MapNoSSR: Marker-Klick erkannt (Fallback)', e);
+        console.log('MapNoSSR: onResetPolygon verfügbar?', !!onResetPolygon);
         if (e?.originalEvent) {
           e.originalEvent.preventDefault?.();
           e.originalEvent.stopPropagation?.();
         }
-        onResetPolygon?.();
+        if (onResetPolygon) {
+          console.log('MapNoSSR: onResetPolygon wird aufgerufen (Fallback)');
+          try {
+            onResetPolygon();
+            console.log('MapNoSSR: onResetPolygon erfolgreich aufgerufen');
+          } catch (error) {
+            console.error('MapNoSSR: Fehler beim Aufruf von onResetPolygon', error);
+          }
+        } else {
+          console.warn('MapNoSSR: onResetPolygon ist nicht definiert (Fallback)');
+        }
       });
     } else {
       resetPolygonMarkerRef.current.setLatLng(center);
       resetPolygonMarkerRef.current.setIcon(icon);
 
-      // Wenn der Marker schon existiert, kann das DOM-Element bereits da sein: Button-Handler refreshen
-      const el = resetPolygonMarkerRef.current.getElement();
-      const btn = el?.querySelector('button');
-      if (btn) {
-        L.DomEvent.off(btn);
-        L.DomEvent.on(btn, 'click', (e: Event) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onResetPolygon?.();
-        });
-      }
+      // Marker-Click-Handler auch beim Update neu registrieren
+      resetPolygonMarkerRef.current.off('click');
+      resetPolygonMarkerRef.current.on('click', (e: any) => {
+        console.log('MapNoSSR: Marker-Klick erkannt (Update-Fallback)', e);
+        console.log('MapNoSSR: onResetPolygon verfügbar?', !!onResetPolygon);
+        if (e?.originalEvent) {
+          e.originalEvent.preventDefault?.();
+          e.originalEvent.stopPropagation?.();
+        }
+        if (onResetPolygon) {
+          console.log('MapNoSSR: onResetPolygon wird aufgerufen (Update-Fallback)');
+          try {
+            onResetPolygon();
+            console.log('MapNoSSR: onResetPolygon erfolgreich aufgerufen (Update-Fallback)');
+          } catch (error) {
+            console.error('MapNoSSR: Fehler beim Aufruf von onResetPolygon (Update-Fallback)', error);
+          }
+        } else {
+          console.warn('MapNoSSR: onResetPolygon ist nicht definiert (Update-Fallback)');
+        }
+      });
+
+      // WICHTIG: Nach setIcon wird das DOM-Element neu erstellt.
+      // Wir müssen warten, bis Leaflet das Element neu erstellt hat.
+      // Verwende requestAnimationFrame für zuverlässige Registrierung nach DOM-Update
+      requestAnimationFrame(() => {
+        if (resetPolygonMarkerRef.current) {
+          const el = resetPolygonMarkerRef.current.getElement();
+          if (el && el.querySelector('button')) {
+            registerButtonHandler(resetPolygonMarkerRef.current);
+          } else {
+            // Fallback: Wenn das Element noch nicht bereit ist, nochmal versuchen
+            setTimeout(() => {
+              if (resetPolygonMarkerRef.current) {
+                registerButtonHandler(resetPolygonMarkerRef.current);
+              }
+            }, 50);
+          }
+        }
+      });
     }
-  }, [editMode, initialPolygon.length, onResetPolygon]);
+  }, [editMode, initialPolygon.length, onResetPolygon, onResetButtonPositionChange]);
 
   // Zoom-Controls dynamisch ein-/ausblenden basierend auf dem showZoomControls-Prop
   useEffect(() => {
@@ -1113,7 +1257,29 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
     
     // Bestehende Polygone entfernen
     drawnItemsRef.current.clearLayers();
+    
+    // Event-Listener entfernen, wenn das Polygon gelöscht wird
+    if (polygonLayerRef.current && polygonLayerRef.current.editing) {
+      polygonLayerRef.current.editing.disable();
+    }
+    
+    // Event-Listener von der Map IMMER entfernen, wenn das Polygon gelöscht wird
+    // (nicht nur wenn initialPolygon leer ist, da diese Events das Polygon sonst wiederherstellen könnten)
+    if (mapRef.current) {
+      console.log('MapNoSSR: Entferne Event-Listener von der Map');
+      mapRef.current.off('draw:editvertex');
+      mapRef.current.off('draw:editmove');
+      mapRef.current.off('dragend');
+      mapRef.current.off('mouseup');
+    }
+    
     polygonLayerRef.current = null;
+    
+    // Wenn initialPolygon leer ist, sicherstellen, dass auch onAreaChange zurückgesetzt wird
+    if (initialPolygon.length === 0 && onAreaChange) {
+      console.log('MapNoSSR: Setze Fläche auf 0, da Polygon gelöscht wurde');
+      onAreaChange(0);
+    }
     
     // Neues Polygon mit den aktuellen Punkten erstellen, wenn vorhanden
     if (initialPolygon.length > 0) {

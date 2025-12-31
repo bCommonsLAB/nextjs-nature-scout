@@ -191,15 +191,15 @@ function FloatingHelpBubble({
         paddingBottom: navigationHeight > 0 ? `${navigationHeight}px` : '0px',
       }}
     >
-      {/* Dialog von unten einblendend (transparent hell, keine runden Ecken) */}
-      <div className="bg-white/30 backdrop-blur-sm mx-auto max-w-2xl">
+      {/* Dialog von unten einblendend (gleiches Design wie Standortdaten-Info) */}
+      <div className="bg-gray-800/50 backdrop-blur-sm mx-auto max-w-2xl">
         {/* Inhalt */}
         <div className="px-6 py-3">
           <div>
-            <h3 className="text-sm font-semibold text-black mb-1">
+            <h3 className="text-sm font-semibold text-white mb-1">
               {title}
             </h3>
-            <p className="text-xs text-gray-900 leading-relaxed">
+            <p className="text-xs text-gray-200 leading-relaxed">
               {description}
             </p>
           </div>
@@ -216,6 +216,7 @@ function isNextButtonDisabled(args: {
   canFinalizePolygon: boolean;
   isLocationDataLoading: boolean;
   isLocationDataReady: boolean;
+  isExpert?: boolean;
 }): boolean {
   const {
     schritt,
@@ -226,8 +227,13 @@ function isNextButtonDisabled(args: {
     isLocationDataReady
   } = args;
 
-  if (schritt === schritte.length - 1) return true;
+  // Schritt 9 (Verifizierung) ist nicht der letzte Schritt für Experten - Button bleibt aktiv
+  // Nur wenn der Benutzer kein Experte ist, wird Schritt 8 zum letzten Schritt
+  // (wird im onClick-Handler behandelt)
   if (isAnyUploadActive) return true;
+  
+  // Schritt 9 (Verifizierung) ist für Experten aktiv, für Nicht-Experten wird er nie erreicht
+  if (schritt === 9) return false;
 
   switch (schritt) {
     case 0: // Willkommen
@@ -298,6 +304,25 @@ export default function NatureScout() {
   const [draftPolygonPoints, setDraftPolygonPoints] = useState<Array<[number, number]>>([]);
   const [isLocationDataLoading, setIsLocationDataLoading] = useState(false);
   const [isLocationDataReady, setIsLocationDataReady] = useState(false);
+  
+  // Experten-Status für Zugriff auf Verifizierung
+  const [isExpert, setIsExpert] = useState<boolean>(false);
+  
+  // Experten-Status prüfen
+  useEffect(() => {
+    async function checkExpertStatus() {
+      try {
+        const expertResponse = await fetch('/api/users/isExpert');
+        const expertData = await expertResponse.json();
+        setIsExpert(expertData.isExpert || false);
+      } catch (error) {
+        console.error('Fehler beim Überprüfen des Experten-Status:', error);
+        setIsExpert(false);
+      }
+    }
+    
+    checkExpertStatus();
+  }, []);
 
   // Umriss ist „finalisierbar“, wenn er geschlossen und mindestens 3 Punkte hat.
   // Quelle: persistente Punkte (CREATED) oder Draft-Punkte (während Zeichnen).
@@ -323,6 +348,8 @@ export default function NatureScout() {
         return isLocationDataLoading ? "Standortdaten werden geladen..." : "Weiter: Bilder erfassen";
       case 4:
         return "Weiter: Detailbild erfassen";
+      case 9:
+        return "Neues Habitat erfassen";
       case 5:
         return "Weiter: Pflanzenbild 1 erfassen";
       case 6:
@@ -1038,8 +1065,6 @@ export default function NatureScout() {
                   // Dialog schließen als Side-Effekt, bevor der Schritt wechselt
                   setShowHelpBubble(false);
                   
-                  if (aktiverSchritt === 9) return;
-
                   // Explizite Behandlung für Schritt 0 (Willkommen) - direkt zu Schritt 1
                   if (aktiverSchritt === 0) {
                     setAktiverSchritt(1);
@@ -1047,6 +1072,15 @@ export default function NatureScout() {
                   }
 
                   if (aktiverSchritt === 8) {
+                    // Alle Benutzer (Experten und Nicht-Experten) werden zum Summary-Schritt weitergeleitet
+                    setAktiverSchritt(9);
+                    return;
+                  }
+                  
+                  if (aktiverSchritt === 9) {
+                    // Im Summary/Verifizierungs-Schritt: 
+                    // Nach dem Anzeigen des Summary zurück zum ersten Schritt
+                    // (Für Experten wird die Verifizierung im Summary-Dialog selbst behandelt)
                     handleNeuerHabitat();
                     return;
                   }
@@ -1082,11 +1116,12 @@ export default function NatureScout() {
                   isAnyUploadActive,
                   canFinalizePolygon,
                   isLocationDataLoading,
-                  isLocationDataReady
+                  isLocationDataReady,
+                  isExpert
                 })}
                 className="gap-1"
               >
-                Weiter
+                {aktiverSchritt === 9 ? "Neues Habitat erfassen" : "Weiter"}
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </ButtonWithTooltip>
