@@ -14,6 +14,7 @@ export default withAuth(
         const publicRoutes = [
           '/',
           '/habitat/karte',
+          '/handbuch',
           '/api/habitat/public',
           '/api/public-filter-options',
           '/api/organizations',

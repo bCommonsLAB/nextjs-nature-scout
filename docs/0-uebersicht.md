@@ -84,7 +84,7 @@ src/
   styles/                        # Globale Styles
 ```
 
-Eine detaillierte Beschreibung der Drei-Schichten-Architektur (Frontend, Logic-Layer, Data-Layer), der Datenspeicherung und der generischen Objekte finden Sie in der [Datenhaltungs-Dokumentation](./6-datenhaltung.md).
+Eine detaillierte technische Beschreibung der Architektur und Datenhaltung ist aktuell nicht Teil dieses Anwenderhandbuchs.
 
 ### Datenfluss
 
@@ -200,5 +200,4 @@ Detaillierte Dokumentation zu jedem Schritt des Workflows:
 
 Technische Dokumentation:
 
-6. [Datenhaltung und Architektur](./6-datenhaltung.md)
 7. [Test-Integration](./tests-integration.md) 

@@ -35,7 +35,7 @@ Stand: 2025-12-31
 - Wir erstellen eine **neue Anwender-Doku als Single-Source** in `docs/anwenderhandbuch/` (Markdown).
   - Vorteil: kurze Kapitel, gut pflegbar, gut verlinkbar.
   - Die technische Doku unter `docs/0-uebersicht.md` etc. bleibt bestehen (für Entwickler*innen).
-- Dazu kommt eine **Screenshot-Checkliste** (damit Bilder systematisch und konsistent entstehen).
+- Screenshots werden im Handbuch direkt an den passenden Stellen eingebunden.
 - Danach ein **wiederholbarer PDF-Build** aus derselben Quelle (mindestens als Prototyp),
   plus kurze Anleitung für Windows.
 

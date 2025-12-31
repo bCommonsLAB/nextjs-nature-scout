@@ -1,0 +1,44 @@
+site_name: NatureScout Dokumentation
+site_description: Anwenderhandbuch für NatureScout
+site_url: ""
+
+docs_dir: docs/anwenderhandbuch
+use_directory_urls: false
+
+# README ist für das Repo hilfreich, soll aber nicht als separate Seite veröffentlicht werden.
+exclude_docs: |
+  README.md
+
+theme:
+  name: material
+  language: de
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.top
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+
+nav:
+  - Überblick: index.md
+  - Start hier: 00-start-hier.md
+  - Über NatureScout: 01-ueber-naturescout.md
+  - Unsere Habitate (öffentlich): 04-unsere-habitate.md
+  - Anmelden & Profil: 02-anmelden-und-profil.md
+  - Ablauf in Phasen: 03-habitat-erfassen-uebersicht.md
+  - Standort (Phase): 05-standort-bestimmen.md
+  - Bilder (Phase): 06-bilder-erfassen.md
+  - Analyse (Phase): 07-habitat-analysieren.md
+  - Verifizierung (Phase): 08-verifizieren-experten.md
+  - Meine Habitate: 09-meine-habitate.md
+  - Habitatverwaltung (Expert*innen): 10-habitatverwaltung-experten.md
+  - Admin: 11-admin.md
+  - Häufige Probleme: 12-haeufige-probleme.md
+  - Glossar: 13-glossar.md
+  - Integration Geo-Browser (Export): 14-integration-geo-browser.md
+
+

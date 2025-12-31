@@ -1,0 +1,920 @@
+
+<!doctype html>
+<html lang="de" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Anwenderhandbuch für NatureScout">
+      
+      
+      
+      
+        <link rel="prev" href="03-habitat-erfassen-uebersicht.html">
+      
+      
+        <link rel="next" href="06-bilder-erfassen.html">
+      
+      
+      <link rel="icon" href="assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.16">
+    
+    
+      
+        <title>Standort (Phase) - NatureScout Dokumentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.7e37652d.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#standort-phase-schritte-standort-finden-umriss-zeichnen-standortdaten-ermitteln" class="md-skip">
+          Zum Inhalt
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Kopfzeile">
+    <a href="index.html" title="NatureScout Dokumentation" class="md-header__button md-logo" aria-label="NatureScout Dokumentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NatureScout Dokumentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Standort (Phase)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Suche" placeholder="Suche" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Suche">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Zurücksetzen" aria-label="Zurücksetzen" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Suche wird initialisiert
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="index.html" title="NatureScout Dokumentation" class="md-nav__button md-logo" aria-label="NatureScout Dokumentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NatureScout Dokumentation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Überblick
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="00-start-hier.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Start hier
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="01-ueber-naturescout.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Über NatureScout
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="04-unsere-habitate.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Unsere Habitate (öffentlich)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="02-anmelden-und-profil.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Anmelden & Profil
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="03-habitat-erfassen-uebersicht.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Ablauf in Phasen
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Standort (Phase)
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="05-standort-bestimmen.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Standort (Phase)
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Inhaltsverzeichnis">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Inhaltsverzeichnis
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#so-gehen-sie-vor-schritt-fur-schritt" class="md-nav__link">
+    <span class="md-ellipsis">
+      So gehen Sie vor (Schritt für Schritt)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="So gehen Sie vor (Schritt für Schritt)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-standort-finden" class="md-nav__link">
+    <span class="md-ellipsis">
+      1) Standort finden
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-umriss-zeichnen" class="md-nav__link">
+    <span class="md-ellipsis">
+      2) Umriss zeichnen
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-standortdaten-ermitteln-kurz-prufen" class="md-nav__link">
+    <span class="md-ellipsis">
+      3) Standortdaten ermitteln (kurz prüfen)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#achtung-haufige-stolpersteine" class="md-nav__link">
+    <span class="md-ellipsis">
+      Achtung (häufige Stolpersteine)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tipp" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tipp
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tipp">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#standortfreigabe-am-smartphone-wenn-die-karte-ungenau-ist" class="md-nav__link">
+    <span class="md-ellipsis">
+      Standortfreigabe am Smartphone (wenn die Karte ungenau ist)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genauigkeit-verbessern-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      Genauigkeit verbessern (optional)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="06-bilder-erfassen.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Bilder (Phase)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="07-habitat-analysieren.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Analyse (Phase)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="08-verifizieren-experten.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Verifizierung (Phase)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="09-meine-habitate.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Meine Habitate
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="10-habitatverwaltung-experten.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Habitatverwaltung (Expert*innen)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="11-admin.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Admin
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="12-haeufige-probleme.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Häufige Probleme
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="13-glossar.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Glossar
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="14-integration-geo-browser.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Integration Geo-Browser (Export)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Inhaltsverzeichnis">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Inhaltsverzeichnis
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#so-gehen-sie-vor-schritt-fur-schritt" class="md-nav__link">
+    <span class="md-ellipsis">
+      So gehen Sie vor (Schritt für Schritt)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="So gehen Sie vor (Schritt für Schritt)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-standort-finden" class="md-nav__link">
+    <span class="md-ellipsis">
+      1) Standort finden
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-umriss-zeichnen" class="md-nav__link">
+    <span class="md-ellipsis">
+      2) Umriss zeichnen
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-standortdaten-ermitteln-kurz-prufen" class="md-nav__link">
+    <span class="md-ellipsis">
+      3) Standortdaten ermitteln (kurz prüfen)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#achtung-haufige-stolpersteine" class="md-nav__link">
+    <span class="md-ellipsis">
+      Achtung (häufige Stolpersteine)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tipp" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tipp
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tipp">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#standortfreigabe-am-smartphone-wenn-die-karte-ungenau-ist" class="md-nav__link">
+    <span class="md-ellipsis">
+      Standortfreigabe am Smartphone (wenn die Karte ungenau ist)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#genauigkeit-verbessern-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      Genauigkeit verbessern (optional)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="standort-phase-schritte-standort-finden-umriss-zeichnen-standortdaten-ermitteln">Standort (Phase) – Schritte „Standort finden“, „Umriss zeichnen“, „Standortdaten ermitteln“<a class="headerlink" href="#standort-phase-schritte-standort-finden-umriss-zeichnen-standortdaten-ermitteln" title="Permanent link">&para;</a></h1>
+<p>Hier legen Sie die Fläche fest, auf die sich Ihre Erfassung bezieht.
+Sie zeichnen dazu ein <strong>Polygon</strong> (eine umrandete Fläche) direkt auf der Karte.</p>
+<p><img alt="Standort bestimmen (Screenshot folgt)" src="images/05-standort.png" /></p>
+<p>Dieses Kapitel deckt im Assistenten diese Schritte ab:</p>
+<ul>
+<li><strong>Standort finden</strong></li>
+<li><strong>Umriss zeichnen</strong></li>
+<li><strong>Standortdaten ermitteln</strong></li>
+</ul>
+<h2 id="so-gehen-sie-vor-schritt-fur-schritt">So gehen Sie vor (Schritt für Schritt)<a class="headerlink" href="#so-gehen-sie-vor-schritt-fur-schritt" title="Permanent link">&para;</a></h2>
+<h3 id="1-standort-finden">1) Standort finden<a class="headerlink" href="#1-standort-finden" title="Permanent link">&para;</a></h3>
+<p>Ziel: Sie bringen die Karte auf die richtige Stelle.</p>
+<ol>
+<li>Zoomen Sie zur Fläche, die Sie erfassen möchten.</li>
+<li>Am Smartphone: mit zwei Fingern (Auseinanderziehen/Zusammenziehen).</li>
+<li>Am Desktop: mit <strong>Mausrad</strong> oder den <strong>+ / –</strong> Buttons.</li>
+<li>Verschieben Sie die Karte, bis der Standort gut sichtbar ist.</li>
+<li>Wenn der Ausschnitt passt: klicken Sie unten auf <strong>„Weiter“</strong>.</li>
+</ol>
+<h3 id="2-umriss-zeichnen">2) Umriss zeichnen<a class="headerlink" href="#2-umriss-zeichnen" title="Permanent link">&para;</a></h3>
+<p>Ziel: Sie zeichnen die genaue Fläche als Polygon.</p>
+<ol>
+<li>Setzen Sie Punkt für Punkt entlang der Fläche.</li>
+<li>Schließen Sie den Umriss, indem Sie den ersten Punkt erneut antippen/anklicken.</li>
+<li>Wenn der Umriss fertig ist: klicken Sie unten auf <strong>„Weiter“</strong>.</li>
+</ol>
+<h3 id="3-standortdaten-ermitteln-kurz-prufen">3) Standortdaten ermitteln (kurz prüfen)<a class="headerlink" href="#3-standortdaten-ermitteln-kurz-prufen" title="Permanent link">&para;</a></h3>
+<p>Jetzt werden Standortdaten automatisch berechnet (z.B. Gemeinde, Flurname, Höhe, Hang, Exposition, Kataster).</p>
+<ol>
+<li>Warten Sie kurz, bis die Werte angezeigt werden.</li>
+<li>Prüfen Sie, ob die Angaben plausibel sind.</li>
+<li>Wenn alles passt: klicken Sie unten auf <strong>„Weiter“</strong>.</li>
+</ol>
+<h2 id="achtung-haufige-stolpersteine">Achtung (häufige Stolpersteine)<a class="headerlink" href="#achtung-haufige-stolpersteine" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Bereits erfasste Flächen</strong>: Wenn Sie schon Polygone sehen, erfassen Sie die gleiche Fläche nicht noch einmal.</li>
+<li><strong>Falsches Polygon</strong>: Wenn der Umriss falsch ist, beginnen Sie neu (z.B. „Neu beginnen“ / Umriss neu zeichnen).</li>
+<li><strong>Standortfreigabe</strong>: Am Smartphone ist die Karte oft genauer, wenn der Browser Zugriff auf den Standort hat.</li>
+</ul>
+<h2 id="tipp">Tipp<a class="headerlink" href="#tipp" title="Permanent link">&para;</a></h2>
+<h3 id="standortfreigabe-am-smartphone-wenn-die-karte-ungenau-ist">Standortfreigabe am Smartphone (wenn die Karte ungenau ist)<a class="headerlink" href="#standortfreigabe-am-smartphone-wenn-die-karte-ungenau-ist" title="Permanent link">&para;</a></h3>
+<p>Wenn NatureScout nach dem Standort fragt, wählen Sie <strong>„Zulassen“</strong>.
+Je nach Handy/Browser sieht das etwas unterschiedlich aus.</p>
+<p>Wenn Sie aus Versehen <strong>„Blockieren“</strong> gewählt haben:</p>
+<ul>
+<li>Öffnen Sie im Browser das Menü (meist „⋮“ oder „aA“).</li>
+<li>Gehen Sie zu <strong>Website‑Einstellungen</strong> / <strong>Berechtigungen</strong>.</li>
+<li>Setzen Sie <strong>Standort</strong> auf <strong>Zulassen</strong>.</li>
+<li>Laden Sie die Seite neu.</li>
+</ul>
+<h3 id="genauigkeit-verbessern-optional">Genauigkeit verbessern (optional)<a class="headerlink" href="#genauigkeit-verbessern-optional" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Wenn möglich: <strong>„Genauer Standort“ / „Präziser Standort“</strong> erlauben.</li>
+<li>Draußen ist GPS oft genauer als in Gebäuden.</li>
+<li>Wenn es weiterhin ungenau ist: Karte manuell verschieben und stark hineinzoomen.</li>
+</ul>
+<p>Wenn Werte (z.B. Höhenlage) offensichtlich falsch sind:</p>
+<ol>
+<li>Karte nochmal prüfen (richtige Fläche? richtig gezoomt?).</li>
+<li>Umriss neu zeichnen (z.B. „Neu beginnen“).</li>
+<li>Danach wieder mit <strong>„Weiter“</strong> fortfahren.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Zurück zum Seitenanfang
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": ".", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "content.code.copy"], "search": "assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "In Zwischenablage kopiert", "clipboard.copy": "In Zwischenablage kopieren", "search.result.more.one": "1 weiteres Suchergebnis auf dieser Seite", "search.result.more.other": "# weitere Suchergebnisse auf dieser Seite", "search.result.none": "Keine Suchergebnisse", "search.result.one": "1 Suchergebnis", "search.result.other": "# Suchergebnisse", "search.result.placeholder": "Suchbegriff eingeben", "search.result.term.missing": "Es fehlt", "select.version": "Version ausw\u00e4hlen"}, "version": null}</script>
+    
+    
+      <script src="assets/javascripts/bundle.50899def.min.js"></script>
+      
+    
+  </body>
+</html>

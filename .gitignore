@@ -40,3 +40,6 @@ uploads/*
 *.tsbuildinfo
 next-env.d.ts
 
+# mkdocs build output (nur site/, public/handbuch/ wird committet)
+/site/
+

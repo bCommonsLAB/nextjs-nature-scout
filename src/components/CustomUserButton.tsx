@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 
-import { User, LogOut, Settings, UserPlus } from 'lucide-react';
+import { BookOpen, User, LogOut, Settings, UserPlus } from 'lucide-react';
 
 export function CustomUserButton() {
   const { data: session, status } = useSession();
@@ -34,6 +34,10 @@ export function CustomUserButton() {
 
   const handleSignOut = () => {
     signOut({ callbackUrl: '/' });
+  };
+
+  const openDocumentation = () => {
+    window.open('/handbuch/', '_blank', 'noopener,noreferrer');
   };
 
   // Initialen aus dem Namen extrahieren
@@ -73,6 +77,11 @@ export function CustomUserButton() {
         <DropdownMenuItem onClick={() => window.location.href = '/auth/invite'}>
           <UserPlus className="mr-2 h-4 w-4" />
           <span>Benutzer einladen</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={openDocumentation}>
+          <BookOpen className="mr-2 h-4 w-4" />
+          <span>Dokumentation</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut}>
