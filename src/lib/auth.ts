@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { UserService } from "@/lib/services/user-service"
 import { LoginCodeService } from "@/lib/services/login-code-service"
 import bcrypt from "bcryptjs"
+import { logInviteError, logInviteInfo, safeEmail } from "@/lib/invitation-logger"
 
 export const authOptions = {
   // Konfiguration für Session-Management
@@ -118,6 +119,15 @@ export const authOptions = {
               return null // Benutzer mit Passwort müssen normal anmelden
             }
 
+            // Einladung als angenommen markieren, sobald der Invite-Login erfolgreich ist
+            const markedAsUsed = await UserService.markInvitationAsUsed(credentials.token)
+            logInviteInfo('invite.login.accepted', {
+              invitationId: invitation._id?.toString() || null,
+              inviteeEmail: safeEmail(invitation.email),
+              tokenTail: credentials.token.slice(-8),
+              markedAsUsed
+            })
+
             // Last Access aktualisieren
             await UserService.updateLastAccess(invitation.email)
 
@@ -133,7 +143,9 @@ export const authOptions = {
               canInvite: user.canInvite || false,
             }
           } catch (error) {
-            console.error('Invite-Login-Fehler:', error)
+            logInviteError('invite.login.failed', {
+              error: error instanceof Error ? error.message : String(error)
+            })
             return null
           }
         } else {
