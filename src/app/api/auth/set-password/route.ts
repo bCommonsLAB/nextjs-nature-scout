@@ -2,10 +2,14 @@ import { NextResponse } from 'next/server'
 import { UserService } from '@/lib/services/user-service'
 import { MailjetService } from '@/lib/services/mailjet-service'
 import bcrypt from 'bcryptjs'
+import { logInviteError, logInviteInfo, safeEmail } from '@/lib/invitation-logger'
 
 export async function POST(request: Request) {
   try {
     const { email, password } = await request.json()
+    logInviteInfo('setPassword.request.received', {
+      email: safeEmail(email)
+    })
 
     // Validierung
     if (!email || !password) {
@@ -60,6 +64,11 @@ export async function POST(request: Request) {
     const pendingInvitation = await UserService.findLatestPendingInvitationByEmail(email.toLowerCase().trim())
     if (pendingInvitation?.token) {
       await UserService.markInvitationAsUsed(pendingInvitation.token)
+      logInviteInfo('setPassword.invitation.accepted', {
+        invitationId: pendingInvitation._id?.toString() || null,
+        inviteeEmail: safeEmail(pendingInvitation.email),
+        tokenTail: pendingInvitation.token.slice(-8)
+      })
       if (pendingInvitation.invitedBy) {
         try {
           const inviter = await UserService.findById(pendingInvitation.invitedBy)
@@ -72,7 +81,11 @@ export async function POST(request: Request) {
             })
           }
         } catch (acceptedMailError) {
-          console.error('Fehler beim Senden der Annahme-Benachrichtigung:', acceptedMailError)
+          logInviteError('setPassword.acceptedNotification.failed', {
+            invitationId: pendingInvitation._id?.toString() || null,
+            inviteeEmail: safeEmail(pendingInvitation.email),
+            error: acceptedMailError instanceof Error ? acceptedMailError.message : String(acceptedMailError)
+          })
         }
       }
     }
@@ -82,7 +95,9 @@ export async function POST(request: Request) {
       { status: 200 }
     )
   } catch (error) {
-    console.error('Passwort-Set-Fehler:', error)
+    logInviteError('setPassword.request.failed', {
+      error: error instanceof Error ? error.message : String(error)
+    })
     return NextResponse.json(
       { message: 'Ein interner Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.' },
       { status: 500 }

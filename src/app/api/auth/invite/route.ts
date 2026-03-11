@@ -4,6 +4,7 @@ import { MailjetService } from '@/lib/services/mailjet-service'
 import { OrganizationService } from '@/lib/services/organization-service'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { logInviteError, logInviteInfo, safeEmail } from '@/lib/invitation-logger'
 
 export async function POST(request: Request) {
   try {
@@ -36,6 +37,12 @@ export async function POST(request: Request) {
     }
 
     const { name, email, message, organizationId, canInvite: inviteeCanInvite } = await request.json()
+    logInviteInfo('invite.request.received', {
+      inviterId: session.user.id,
+      inviterEmail: safeEmail(session.user.email || undefined),
+      inviteeEmail: safeEmail(email),
+      organizationId: organizationId || session.user.organizationId || null
+    })
 
     // Validierung
     if (!name || !email) {
@@ -79,6 +86,11 @@ export async function POST(request: Request) {
 
     let invitation = null
     if (existingPendingInvitation?._id) {
+      logInviteInfo('invite.pending.reuse', {
+        invitationId: existingPendingInvitation._id.toString(),
+        inviteeEmail: safeEmail(normalizedEmail),
+        organizationId: effectiveOrganizationId || null
+      })
       invitation = await UserService.refreshPendingInvitation(
         existingPendingInvitation._id.toString(),
         {
@@ -93,6 +105,10 @@ export async function POST(request: Request) {
         }
       )
     } else {
+      logInviteInfo('invite.pending.create', {
+        inviteeEmail: safeEmail(normalizedEmail),
+        organizationId: effectiveOrganizationId || null
+      })
       invitation = await UserService.createInvitation({
         email: normalizedEmail,
         name: name.trim(),
@@ -143,8 +159,17 @@ export async function POST(request: Request) {
         if (!emailSent) throw new Error('Einladungs-E-Mail konnte nicht versendet werden.')
       }
       await UserService.markInvitationEmailSent(invitationToken)
+      logInviteInfo('invite.mail.sent', {
+        invitationId: invitation._id?.toString() || null,
+        inviteeEmail: safeEmail(invitation.email),
+        invitationTokenTail: invitationToken.slice(-8)
+      })
     } catch (emailError) {
-      console.error('Fehler beim Senden der Einladungs-E-Mail:', emailError)
+      logInviteError('invite.mail.failed', {
+        invitationId: invitation._id?.toString() || null,
+        inviteeEmail: safeEmail(invitation.email),
+        error: emailError instanceof Error ? emailError.message : String(emailError)
+      })
       return NextResponse.json(
         { message: 'Einladung wurde erstellt, aber E-Mail konnte nicht gesendet werden.' },
         { status: 500 }
@@ -168,7 +193,9 @@ export async function POST(request: Request) {
       { status: 201 }
     )
   } catch (error) {
-    console.error('Einladungsfehler:', error)
+    logInviteError('invite.request.failed', {
+      error: error instanceof Error ? error.message : String(error)
+    })
     return NextResponse.json(
       { message: 'Ein interner Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.' },
       { status: 500 }

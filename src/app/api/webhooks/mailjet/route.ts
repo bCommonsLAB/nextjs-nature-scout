@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { UserService } from '@/lib/services/user-service'
+import { logInviteError, logInviteInfo } from '@/lib/invitation-logger'
 
 interface MailjetEventPayload {
   event?: string
@@ -55,6 +56,9 @@ export async function POST(request: Request) {
 
     const payload = await request.json()
     const events = extractEvents(payload)
+    logInviteInfo('mailjet.webhook.received', {
+      receivedEvents: events.length
+    })
     let processed = 0
 
     for (const event of events) {
@@ -67,6 +71,10 @@ export async function POST(request: Request) {
       const updated = await UserService.applyInvitationMailEvent(token, event.event, eventTime, errorMessage)
       if (updated) processed += 1
     }
+    logInviteInfo('mailjet.webhook.processed', {
+      receivedEvents: events.length,
+      processedEvents: processed
+    })
 
     return NextResponse.json({
       success: true,
@@ -74,7 +82,9 @@ export async function POST(request: Request) {
       received: events.length
     })
   } catch (error) {
-    console.error('Mailjet-Webhook Fehler:', error)
+    logInviteError('mailjet.webhook.failed', {
+      error: error instanceof Error ? error.message : String(error)
+    })
     return NextResponse.json(
       { message: 'Fehler beim Verarbeiten des Webhooks.' },
       { status: 500 }

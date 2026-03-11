@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server'
 import { UserService } from '@/lib/services/user-service'
+import { logInviteError, logInviteInfo, safeEmail } from '@/lib/invitation-logger'
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const token = searchParams.get('token')
+    logInviteInfo('invite.validate.request', {
+      tokenTail: token ? token.slice(-8) : null
+    })
 
     if (!token) {
       return NextResponse.json(
@@ -17,6 +21,9 @@ export async function GET(request: Request) {
     const invitation = await UserService.findInvitationByToken(token)
 
     if (!invitation) {
+      logInviteInfo('invite.validate.notFound', {
+        tokenTail: token.slice(-8)
+      })
       return NextResponse.json(
         { message: 'Ungültiger Einladungslink.' },
         { status: 404 }
@@ -27,6 +34,10 @@ export async function GET(request: Request) {
 
     // Prüfen ob Einladung abgelaufen ist
     if (new Date() > invitation.expiresAt) {
+      logInviteInfo('invite.validate.expired', {
+        inviteeEmail: safeEmail(invitation.email),
+        tokenTail: token.slice(-8)
+      })
       return NextResponse.json(
         { message: 'Diese Einladung ist abgelaufen.' },
         { status: 400 }
@@ -70,7 +81,9 @@ export async function GET(request: Request) {
       }
     })
   } catch (error) {
-    console.error('Einladungs-Validierungsfehler:', error)
+    logInviteError('invite.validate.failed', {
+      error: error instanceof Error ? error.message : String(error)
+    })
     return NextResponse.json(
       { message: 'Ein interner Fehler ist aufgetreten.' },
       { status: 500 }

@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server'
 import { UserService } from '@/lib/services/user-service'
 import { MailjetService } from '@/lib/services/mailjet-service'
+import { logInviteError, logInviteInfo, safeEmail } from '@/lib/invitation-logger'
 
 export async function POST(request: Request) {
   try {
     const { name, email, password, inviteToken } = await request.json()
+    logInviteInfo('register.request.received', {
+      email: safeEmail(email),
+      hasInviteToken: !!inviteToken,
+      inviteTokenTail: inviteToken ? String(inviteToken).slice(-8) : null
+    })
 
     // Validierung
     if (!name || !email || !password) {
@@ -73,6 +79,11 @@ export async function POST(request: Request) {
     // Wenn Einladung vorhanden, als verwendet markieren
     if (invitation && inviteToken) {
       await UserService.markInvitationAsUsed(inviteToken)
+      logInviteInfo('register.invitation.accepted', {
+        invitationId: invitation._id?.toString() || null,
+        inviteeEmail: safeEmail(invitation.email),
+        inviteTokenTail: inviteToken.slice(-8)
+      })
     }
 
     // Willkommens-E-Mail senden
@@ -101,7 +112,11 @@ export async function POST(request: Request) {
           })
         }
       } catch (acceptedMailError) {
-        console.error('Fehler beim Senden der Annahme-Benachrichtigung:', acceptedMailError)
+        logInviteError('register.acceptedNotification.failed', {
+          invitationId: invitation._id?.toString() || null,
+          inviteeEmail: safeEmail(invitation.email),
+          error: acceptedMailError instanceof Error ? acceptedMailError.message : String(acceptedMailError)
+        })
       }
     }
 
@@ -119,7 +134,9 @@ export async function POST(request: Request) {
       { status: 201 }
     )
   } catch (error) {
-    console.error('Registrierungsfehler:', error)
+    logInviteError('register.request.failed', {
+      error: error instanceof Error ? error.message : String(error)
+    })
     return NextResponse.json(
       { message: 'Ein interner Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.' },
       { status: 500 }

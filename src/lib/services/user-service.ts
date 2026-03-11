@@ -425,6 +425,7 @@ export class UserService {
       token,
       used: false,
       revokedAt: { $exists: false },
+      archivedAt: { $exists: false },
       expiresAt: { $gt: new Date() } 
     });
   }
@@ -503,6 +504,7 @@ export class UserService {
     return collection.find({
       used: false,
       revokedAt: { $exists: false },
+      archivedAt: { $exists: false },
       expiresAt: { $gt: new Date() },
       createdAt: { $lte: dueBefore },
       [reminderField]: { $exists: false }
@@ -521,6 +523,7 @@ export class UserService {
         email: email.toLowerCase().trim(),
         used: false,
         revokedAt: { $exists: false },
+        archivedAt: { $exists: false },
         expiresAt: { $gt: new Date() }
       },
       { sort: { createdAt: -1 } }
@@ -538,6 +541,7 @@ export class UserService {
       email: email.toLowerCase().trim(),
       used: false,
       revokedAt: { $exists: false },
+      archivedAt: { $exists: false },
       expiresAt: { $gt: new Date() }
     };
 
@@ -563,7 +567,7 @@ export class UserService {
     const collection = db.collection<IInvitation>('invitations');
 
     const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(id), used: false, revokedAt: { $exists: false } },
+      { _id: new ObjectId(id), used: false, revokedAt: { $exists: false }, archivedAt: { $exists: false } },
       {
         $set: {
           name: data.name,

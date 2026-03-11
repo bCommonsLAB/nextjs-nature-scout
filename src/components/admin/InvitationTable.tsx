@@ -8,11 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlertCircle, RefreshCw, Search } from 'lucide-react';
+import { AlertCircle, RefreshCw, Search, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Invitation {
   _id?: string;
+  token?: string;
   email: string;
   name: string;
   invitedByName: string;
@@ -106,6 +107,40 @@ export function InvitationTable() {
       await fetchInvitations();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Aktion fehlgeschlagen');
+    }
+  }
+
+  function getInviteUrl(invitation: Invitation): string | null {
+    if (!invitation.token) return null;
+    if (typeof window === 'undefined') return `/invite/${invitation.token}`;
+    return `${window.location.origin}/invite/${invitation.token}`;
+  }
+
+  async function shareInvitation(invitation: Invitation) {
+    const inviteUrl = getInviteUrl(invitation);
+    if (!inviteUrl) {
+      toast.error('Einladungslink ist nicht verfügbar.');
+      return;
+    }
+
+    const shareTitle = 'Einladung zu NatureScout';
+    const shareText = `Hallo ${invitation.name}, hier ist Ihr Einladungslink zu NatureScout.`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: inviteUrl
+        });
+        return;
+      }
+
+      await navigator.clipboard.writeText(inviteUrl);
+      toast.success('Einladungslink wurde in die Zwischenablage kopiert.');
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      toast.error(error instanceof Error ? error.message : 'Teilen fehlgeschlagen.');
     }
   }
 
@@ -322,6 +357,15 @@ export function InvitationTable() {
                             </Button>
                             <Button size="sm" variant="destructive" disabled={!isActiveOpen} onClick={() => runAction(id, 'revoke')}>
                               Widerrufen
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              disabled={!isActiveOpen}
+                              onClick={() => shareInvitation(invitation)}
+                              title="Einladung teilen"
+                            >
+                              <Share2 className="h-4 w-4" />
                             </Button>
                             <Button size="sm" variant="secondary" onClick={() => runAction(id, 'archive')}>
                               Archivieren

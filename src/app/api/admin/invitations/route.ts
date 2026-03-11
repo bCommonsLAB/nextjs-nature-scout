@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { checkAdminAccess } from '@/lib/server-auth'
 import { UserService } from '@/lib/services/user-service'
 import { MailjetService } from '@/lib/services/mailjet-service'
+import { logInviteError, logInviteInfo, safeEmail } from '@/lib/invitation-logger'
 
 export async function GET() {
   try {
@@ -14,13 +15,18 @@ export async function GET() {
     }
 
     const invitations = await UserService.getAllInvitations()
+    logInviteInfo('adminInvitations.list.loaded', {
+      count: invitations.length
+    })
     const normalized = invitations.map((invitation) => ({
       ...invitation,
       _id: invitation._id?.toString() || ''
     }))
     return NextResponse.json(normalized)
   } catch (error) {
-    console.error('Fehler beim Laden der Einladungen:', error)
+    logInviteError('adminInvitations.list.failed', {
+      error: error instanceof Error ? error.message : String(error)
+    })
     return NextResponse.json(
       { message: 'Ein interner Fehler ist aufgetreten.' },
       { status: 500 }
@@ -39,6 +45,10 @@ export async function POST(request: Request) {
     }
 
     const { action, invitationId } = await request.json()
+    logInviteInfo('adminInvitations.action.requested', {
+      action,
+      invitationId
+    })
     if (!action || !invitationId) {
       return NextResponse.json(
         { message: 'action und invitationId sind erforderlich.' },
@@ -62,6 +72,10 @@ export async function POST(request: Request) {
           { status: 400 }
         )
       }
+      logInviteInfo('adminInvitations.action.revoked', {
+        invitationId,
+        inviteeEmail: safeEmail(invitation.email)
+      })
       return NextResponse.json({ success: true, message: 'Einladung widerrufen.' })
     }
 
@@ -76,6 +90,11 @@ export async function POST(request: Request) {
           { status: 400 }
         )
       }
+      logInviteInfo('adminInvitations.action.archived', {
+        invitationId,
+        inviteeEmail: safeEmail(invitation.email),
+        archivedCount
+      })
       return NextResponse.json({
         success: true,
         message: `Einladung archiviert (${archivedCount} Datensatz/Datensaetze).`
@@ -134,6 +153,11 @@ export async function POST(request: Request) {
       }
 
       await UserService.markInvitationEmailSent(invitation.token)
+      logInviteInfo('adminInvitations.action.reminderSent', {
+        invitationId,
+        inviteeEmail: safeEmail(invitation.email),
+        tokenTail: invitation.token.slice(-8)
+      })
       return NextResponse.json({ success: true, message: 'Erinnerung versendet.' })
     }
 
@@ -142,7 +166,9 @@ export async function POST(request: Request) {
       { status: 400 }
     )
   } catch (error) {
-    console.error('Fehler bei Einladung-Aktion:', error)
+    logInviteError('adminInvitations.action.failed', {
+      error: error instanceof Error ? error.message : String(error)
+    })
     return NextResponse.json(
       { message: 'Ein interner Fehler ist aufgetreten.' },
       { status: 500 }
