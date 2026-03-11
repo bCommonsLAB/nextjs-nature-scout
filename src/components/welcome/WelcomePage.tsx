@@ -19,6 +19,7 @@ export default function WelcomePage() {
   } | null>(null)
   const [isLoadingInvitation, setIsLoadingInvitation] = useState(false)
   const [hasToken, setHasToken] = useState(false)
+  const [autoLoginStarted, setAutoLoginStarted] = useState(false)
 
   console.log('🔍 WelcomePage - Status:', status, 'Session:', !!session?.user, 'InvitationData:', !!invitationData)
 
@@ -65,6 +66,19 @@ export default function WelcomePage() {
     // KEINE automatische Weiterleitung mehr - Willkommensseite ist für nicht angemeldete Benutzer
     // Die Benutzer können selbst entscheiden, ob sie sich anmelden möchten
   }, [status, invitationData, router])
+
+  // Automatische Anmeldung starten, sobald Token + Einladungsdaten verfügbar sind
+  useEffect(() => {
+    if (autoLoginStarted) return
+    if (!hasToken) return
+    if (isLoadingInvitation) return
+    if (!invitationData) return
+    if (status === 'loading') return
+    if (session?.user) return
+
+    setAutoLoginStarted(true)
+    void handleStartNow()
+  }, [autoLoginStarted, hasToken, isLoadingInvitation, invitationData, status, session])
 
   // KEINE Fallback-Navigation mehr - wenn Token vorhanden ist, warten wir auf die Daten
   // Nur zur Login-Seite weiterleiten, wenn weder Token noch Einladungsdaten vorhanden sind
