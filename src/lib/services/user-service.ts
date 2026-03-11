@@ -40,6 +40,17 @@ export interface IInvitation {
   expiresAt: Date;
   used: boolean;
   usedAt?: Date;
+  acceptedAt?: Date;
+  reminder24hSentAt?: Date;
+  reminder3dSentAt?: Date;
+  lastSentAt?: Date;
+  sendAttempts?: number;
+  mailDeliveryStatus?: 'queued' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'deferred' | 'blocked' | 'bounced' | 'spam' | 'unsub' | 'error';
+  lastMailEvent?: string;
+  lastMailEventAt?: Date;
+  lastMailError?: string;
+  revokedAt?: Date;
+  archivedAt?: Date;
   createdAt: Date;
 }
 
@@ -74,6 +85,17 @@ export interface UpdateUserData {
 
 export interface CreateInvitationData {
   email: string;
+  name: string;
+  invitedBy: string;
+  invitedByName: string;
+  organizationId?: string;
+  organizationName?: string;
+  canInvite?: boolean;
+  token: string;
+  expiresAt: Date;
+}
+
+interface PendingInvitationUpdateData {
   name: string;
   invitedBy: string;
   invitedByName: string;
@@ -122,6 +144,15 @@ export class UserService {
   static async findByEmail(email: string): Promise<IUser | null> {
     const collection = await this.getUsersCollection();
     return collection.findOne({ email: email.toLowerCase().trim() });
+  }
+
+  /**
+   * Findet einen Benutzer anhand seiner ID
+   */
+  static async findById(id: string): Promise<IUser | null> {
+    if (!ObjectId.isValid(id)) return null;
+    const collection = await this.getUsersCollection();
+    return collection.findOne({ _id: new ObjectId(id) });
   }
   
 
@@ -371,6 +402,7 @@ export class UserService {
     const invitation: IInvitation = {
       ...invitationData,
       used: false,
+      sendAttempts: 0,
       createdAt: new Date()
     };
     
@@ -380,15 +412,19 @@ export class UserService {
 
   /**
    * Findet eine Einladung anhand des Tokens
-   * WICHTIG: "used" Status wird ignoriert - Link bleibt immer gültig
+   * Nur aktive Einladungen sind gültig:
+   * - nicht verwendet
+   * - nicht widerrufen
+   * - noch nicht abgelaufen
    */
   static async findInvitationByToken(token: string): Promise<IInvitation | null> {
     const db = await connectToDatabase();
     const collection = db.collection<IInvitation>('invitations');
     
-    // WICHTIG: "used: false" entfernt - nur Token und Ablauf prüfen
     return collection.findOne({ 
-      token, 
+      token,
+      used: false,
+      revokedAt: { $exists: false },
       expiresAt: { $gt: new Date() } 
     });
   }
@@ -401,15 +437,277 @@ export class UserService {
     const collection = db.collection<IInvitation>('invitations');
     
     const result = await collection.updateOne(
-      { token },
+      { token, used: false },
       { 
         $set: { 
           used: true, 
-          usedAt: new Date() 
+          usedAt: new Date(),
+          acceptedAt: new Date()
         } 
       }
     );
     
+    return result.modifiedCount > 0;
+  }
+
+  /**
+   * Markiert den erfolgreichen Versand einer Einladung/Erinnerung
+   */
+  static async markInvitationEmailSent(token: string): Promise<boolean> {
+    const db = await connectToDatabase();
+    const collection = db.collection<IInvitation>('invitations');
+
+    const result = await collection.updateOne(
+      { token },
+      {
+        $set: {
+          lastSentAt: new Date(),
+          mailDeliveryStatus: 'sent',
+          lastMailEvent: 'sent',
+          lastMailEventAt: new Date()
+        },
+        $inc: { sendAttempts: 1 }
+      }
+    );
+
+    return result.modifiedCount > 0;
+  }
+
+  /**
+   * Markiert, dass eine Einladungserinnerung versendet wurde
+   */
+  static async markInvitationReminderSent(token: string, reminderType: '24h' | '3d'): Promise<boolean> {
+    const db = await connectToDatabase();
+    const collection = db.collection<IInvitation>('invitations');
+
+    const reminderField = reminderType === '24h' ? 'reminder24hSentAt' : 'reminder3dSentAt';
+    const result = await collection.updateOne(
+      { token },
+      { $set: { [reminderField]: new Date() } }
+    );
+
+    return result.modifiedCount > 0;
+  }
+
+  /**
+   * Gibt offene Einladungen zurück, die eine Erinnerung benötigen.
+   */
+  static async getInvitationsDueForReminder(reminderType: '24h' | '3d'): Promise<IInvitation[]> {
+    const db = await connectToDatabase();
+    const collection = db.collection<IInvitation>('invitations');
+
+    const hours = reminderType === '24h' ? 24 : 72;
+    const dueBefore = new Date(Date.now() - hours * 60 * 60 * 1000);
+    const reminderField = reminderType === '24h' ? 'reminder24hSentAt' : 'reminder3dSentAt';
+
+    return collection.find({
+      used: false,
+      revokedAt: { $exists: false },
+      expiresAt: { $gt: new Date() },
+      createdAt: { $lte: dueBefore },
+      [reminderField]: { $exists: false }
+    }).toArray();
+  }
+
+  /**
+   * Findet die letzte offene Einladung einer E-Mail
+   */
+  static async findLatestPendingInvitationByEmail(email: string): Promise<IInvitation | null> {
+    const db = await connectToDatabase();
+    const collection = db.collection<IInvitation>('invitations');
+
+    return collection.findOne(
+      {
+        email: email.toLowerCase().trim(),
+        used: false,
+        revokedAt: { $exists: false },
+        expiresAt: { $gt: new Date() }
+      },
+      { sort: { createdAt: -1 } }
+    );
+  }
+
+  /**
+   * Findet eine offene Einladung je operativer Einheit (E-Mail + Organisation)
+   */
+  static async findPendingInvitationByScope(email: string, organizationId?: string): Promise<IInvitation | null> {
+    const db = await connectToDatabase();
+    const collection = db.collection<IInvitation>('invitations');
+
+    const baseQuery: Record<string, unknown> = {
+      email: email.toLowerCase().trim(),
+      used: false,
+      revokedAt: { $exists: false },
+      expiresAt: { $gt: new Date() }
+    };
+
+    if (organizationId) {
+      baseQuery.organizationId = organizationId;
+    } else {
+      baseQuery.$or = [
+        { organizationId: { $exists: false } },
+        { organizationId: null },
+        { organizationId: '' }
+      ];
+    }
+
+    return collection.findOne(baseQuery, { sort: { createdAt: -1 } });
+  }
+
+  /**
+   * Aktualisiert eine offene Einladung statt einen neuen Datensatz zu erzeugen
+   */
+  static async refreshPendingInvitation(id: string, data: PendingInvitationUpdateData): Promise<IInvitation | null> {
+    if (!ObjectId.isValid(id)) return null;
+    const db = await connectToDatabase();
+    const collection = db.collection<IInvitation>('invitations');
+
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(id), used: false, revokedAt: { $exists: false } },
+      {
+        $set: {
+          name: data.name,
+          invitedBy: data.invitedBy,
+          invitedByName: data.invitedByName,
+          organizationId: data.organizationId,
+          organizationName: data.organizationName,
+          canInvite: data.canInvite || false,
+          token: data.token,
+          expiresAt: data.expiresAt
+        },
+        $unset: {
+          reminder24hSentAt: '',
+          reminder3dSentAt: '',
+          acceptedAt: '',
+          usedAt: ''
+        }
+      },
+      { returnDocument: 'after' }
+    );
+
+    return result;
+  }
+
+  /**
+   * Holt alle Einladungen (neueste zuerst)
+   */
+  static async getAllInvitations(): Promise<IInvitation[]> {
+    const db = await connectToDatabase();
+    const collection = db.collection<IInvitation>('invitations');
+    return collection.find({ archivedAt: { $exists: false } }).sort({ createdAt: -1 }).toArray();
+  }
+
+  /**
+   * Findet eine Einladung anhand der ID
+   */
+  static async findInvitationById(id: string): Promise<IInvitation | null> {
+    if (!ObjectId.isValid(id)) return null;
+    const db = await connectToDatabase();
+    const collection = db.collection<IInvitation>('invitations');
+    return collection.findOne({ _id: new ObjectId(id) });
+  }
+
+  /**
+   * Widerruft eine Einladung
+   */
+  static async revokeInvitation(id: string): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const db = await connectToDatabase();
+    const collection = db.collection<IInvitation>('invitations');
+
+    const result = await collection.updateOne(
+      { _id: new ObjectId(id), used: false, revokedAt: { $exists: false } },
+      { $set: { revokedAt: new Date() } }
+    );
+
+    return result.modifiedCount > 0;
+  }
+
+  /**
+   * Archiviert eine Einladung (bleibt in der DB erhalten, wird aber nicht mehr gelistet)
+   */
+  static async archiveInvitation(id: string): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const db = await connectToDatabase();
+    const collection = db.collection<IInvitation>('invitations');
+
+    const result = await collection.updateOne(
+      { _id: new ObjectId(id), archivedAt: { $exists: false } },
+      { $set: { archivedAt: new Date() } }
+    );
+
+    return result.modifiedCount > 0;
+  }
+
+  /**
+   * Archiviert alle Einladungen einer operativen Einheit (E-Mail + Organisation)
+   */
+  static async archiveInvitationScope(email: string, organizationId?: string): Promise<number> {
+    const db = await connectToDatabase();
+    const collection = db.collection<IInvitation>('invitations');
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const query: Record<string, unknown> = {
+      email: normalizedEmail,
+      archivedAt: { $exists: false }
+    };
+
+    if (organizationId) {
+      query.organizationId = organizationId;
+    } else {
+      query.$or = [
+        { organizationId: { $exists: false } },
+        { organizationId: null },
+        { organizationId: '' }
+      ];
+    }
+
+    const result = await collection.updateMany(
+      query,
+      { $set: { archivedAt: new Date() } }
+    );
+
+    return result.modifiedCount;
+  }
+
+  /**
+   * Verarbeitet Mailjet-Zustellereignisse für eine Einladung
+   */
+  static async applyInvitationMailEvent(
+    token: string,
+    event: string,
+    eventTime: Date,
+    errorMessage?: string
+  ): Promise<boolean> {
+    const db = await connectToDatabase();
+    const collection = db.collection<IInvitation>('invitations');
+
+    const eventToStatusMap: Record<string, IInvitation['mailDeliveryStatus']> = {
+      sent: 'sent',
+      delivered: 'delivered',
+      open: 'opened',
+      click: 'clicked',
+      bounce: 'bounced',
+      blocked: 'blocked',
+      spam: 'spam',
+      unsub: 'unsub',
+      deferred: 'deferred'
+    };
+    const mappedStatus = eventToStatusMap[event] || 'error';
+    const normalizedEvent = event === 'open' ? 'opened' : event === 'click' ? 'clicked' : event;
+
+    const result = await collection.updateOne(
+      { token },
+      {
+        $set: {
+          mailDeliveryStatus: mappedStatus,
+          lastMailEvent: normalizedEvent,
+          lastMailEventAt: eventTime,
+          ...(errorMessage ? { lastMailError: errorMessage } : {})
+        }
+      }
+    );
+
     return result.modifiedCount > 0;
   }
 } 

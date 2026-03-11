@@ -1,17 +1,27 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { UserTable } from '@/components/admin/UserTable';
+import { InvitationTable } from '@/components/admin/InvitationTable';
 import { useAdmin } from '@/hooks/use-admin';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Shield, ShieldAlert, RefreshCw } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useRouter } from 'next/navigation';
 
 export default function AdminUsersPage() {
+  const router = useRouter();
   const { isAdmin, isLoading, makeAdmin } = useAdmin();
+  const [activeTab, setActiveTab] = useState<'users' | 'invitations'>('users');
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    setActiveTab(tab === 'invitations' ? 'invitations' : 'users');
+  }, []);
 
   const handleMakeAdmin = async () => {
     setActionLoading(true);
@@ -77,7 +87,26 @@ export default function AdminUsersPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <UserTable />
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          const nextTab = value === 'invitations' ? 'invitations' : 'users';
+          setActiveTab(nextTab);
+          router.push(`/admin/users?tab=${nextTab}`);
+        }}
+        className="w-full"
+      >
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="users">Benutzer</TabsTrigger>
+          <TabsTrigger value="invitations">Einladungen</TabsTrigger>
+        </TabsList>
+        <TabsContent value="users">
+          <UserTable />
+        </TabsContent>
+        <TabsContent value="invitations">
+          <InvitationTable />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 } 

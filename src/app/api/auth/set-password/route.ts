@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { UserService } from '@/lib/services/user-service'
+import { MailjetService } from '@/lib/services/mailjet-service'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: Request) {
@@ -53,6 +54,27 @@ export async function POST(request: Request) {
         { message: 'Fehler beim Speichern des Passworts.' },
         { status: 500 }
       )
+    }
+
+    // Letzte offene Einladung als angenommen markieren und Einladenden informieren
+    const pendingInvitation = await UserService.findLatestPendingInvitationByEmail(email.toLowerCase().trim())
+    if (pendingInvitation?.token) {
+      await UserService.markInvitationAsUsed(pendingInvitation.token)
+      if (pendingInvitation.invitedBy) {
+        try {
+          const inviter = await UserService.findById(pendingInvitation.invitedBy)
+          if (inviter?.email) {
+            await MailjetService.sendInvitationAcceptedNotification({
+              to: inviter.email,
+              name: inviter.name || pendingInvitation.invitedByName || 'Einladende Person',
+              subject: 'Einladung erfolgreich angenommen',
+              inviteeName: pendingInvitation.name
+            })
+          }
+        } catch (acceptedMailError) {
+          console.error('Fehler beim Senden der Annahme-Benachrichtigung:', acceptedMailError)
+        }
+      }
     }
 
     return NextResponse.json(

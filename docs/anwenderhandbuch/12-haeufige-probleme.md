@@ -43,3 +43,4 @@ NatureScout funktioniert erfahrungsgemäß am besten mit:
 - Safari (aktuell)
 
 
+

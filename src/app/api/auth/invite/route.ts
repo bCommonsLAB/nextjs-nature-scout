@@ -16,7 +16,26 @@ export async function POST(request: Request) {
       )
     }
 
-    const { name, email, message, organizationId, canInvite } = await request.json()
+    // Serverseitige Berechtigungsprüfung (nicht nur UI-seitig)
+    if (!session.user.email) {
+      return NextResponse.json(
+        { message: 'E-Mail in Sitzung fehlt.' },
+        { status: 403 }
+      )
+    }
+    const inviter = await UserService.findByEmail(session.user.email)
+    const inviterCanInvite =
+      inviter?.role === 'admin' ||
+      inviter?.role === 'superadmin' ||
+      inviter?.canInvite === true
+    if (!inviterCanInvite) {
+      return NextResponse.json(
+        { message: 'Keine Berechtigung zum Einladen von Benutzern.' },
+        { status: 403 }
+      )
+    }
+
+    const { name, email, message, organizationId, canInvite: inviteeCanInvite } = await request.json()
 
     // Validierung
     if (!name || !email) {
@@ -35,8 +54,11 @@ export async function POST(request: Request) {
       )
     }
 
+    const normalizedEmail = email.toLowerCase().trim()
+    const effectiveOrganizationId = organizationId || session.user.organizationId
+
     // Prüfen ob E-Mail bereits existiert
-    const existingUser = await UserService.findByEmail(email)
+    const existingUser = await UserService.findByEmail(normalizedEmail)
     const isExistingUser = !!existingUser
 
     // Organisation laden, falls angegeben
@@ -48,24 +70,54 @@ export async function POST(request: Request) {
     // Einladungs-Token generieren
     const invitationToken = UserService.generateInvitationToken()
 
-    // Einladung in der Datenbank speichern
-    const invitation = await UserService.createInvitation({
-      email: email.toLowerCase().trim(),
-      name: name.trim(),
-      invitedBy: session.user.id,
-      invitedByName: session.user.name || 'Ein Benutzer',
-      organizationId: organizationId || session.user.organizationId,
-      organizationName: targetOrganization?.name || session.user.organizationName,
-      canInvite: canInvite || false,
-      token: invitationToken,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 Tage gültig
-    })
+    // Offene Einladung pro operativer Einheit wiederverwenden (E-Mail + Organisation)
+    const existingPendingInvitation = await UserService.findPendingInvitationByScope(
+      normalizedEmail,
+      effectiveOrganizationId
+    )
+    const invitationExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+
+    let invitation = null
+    if (existingPendingInvitation?._id) {
+      invitation = await UserService.refreshPendingInvitation(
+        existingPendingInvitation._id.toString(),
+        {
+          name: name.trim(),
+          invitedBy: session.user.id,
+          invitedByName: session.user.name || 'Ein Benutzer',
+          organizationId: effectiveOrganizationId,
+          organizationName: targetOrganization?.name || session.user.organizationName,
+          canInvite: inviteeCanInvite || false,
+          token: invitationToken,
+          expiresAt: invitationExpiresAt
+        }
+      )
+    } else {
+      invitation = await UserService.createInvitation({
+        email: normalizedEmail,
+        name: name.trim(),
+        invitedBy: session.user.id,
+        invitedByName: session.user.name || 'Ein Benutzer',
+        organizationId: effectiveOrganizationId,
+        organizationName: targetOrganization?.name || session.user.organizationName,
+        canInvite: inviteeCanInvite || false,
+        token: invitationToken,
+        expiresAt: invitationExpiresAt // 30 Tage gültig
+      })
+    }
+
+    if (!invitation) {
+      return NextResponse.json(
+        { message: 'Einladung konnte nicht erstellt werden.' },
+        { status: 500 }
+      )
+    }
 
     // Einladungs-E-Mail senden
     try {
       if (isExistingUser) {
         // Erinnerungs-E-Mail für bereits registrierte Benutzer
-        await MailjetService.sendInvitationEmail({
+        const emailSent = await MailjetService.sendInvitationEmail({
           to: email,
           name: name.trim(),
           subject: 'Erinnerung: Willkommen zurück bei NatureScout',
@@ -75,9 +127,10 @@ export async function POST(request: Request) {
           loginUrl: `${process.env.NEXTAUTH_URL}/invite/${invitationToken}`,
           personalMessage: message?.trim() || 'Wir freuen uns, Sie wieder bei NatureScout zu sehen!'
         })
+        if (!emailSent) throw new Error('Einladungs-E-Mail konnte nicht versendet werden.')
       } else {
         // Neue Einladungs-E-Mail für neue Benutzer
-        await MailjetService.sendInvitationEmail({
+        const emailSent = await MailjetService.sendInvitationEmail({
           to: email,
           name: name.trim(),
           subject: 'Einladung zu NatureScout',
@@ -87,7 +140,9 @@ export async function POST(request: Request) {
           loginUrl: `${process.env.NEXTAUTH_URL}/invite/${invitationToken}`,
           personalMessage: message?.trim() || ''
         })
+        if (!emailSent) throw new Error('Einladungs-E-Mail konnte nicht versendet werden.')
       }
+      await UserService.markInvitationEmailSent(invitationToken)
     } catch (emailError) {
       console.error('Fehler beim Senden der Einladungs-E-Mail:', emailError)
       return NextResponse.json(
@@ -106,7 +161,8 @@ export async function POST(request: Request) {
           email: invitation.email,
           name: invitation.name,
           expiresAt: invitation.expiresAt,
-          isExistingUser
+          isExistingUser,
+          reusedExistingPendingInvitation: !!existingPendingInvitation
         }
       },
       { status: 201 }

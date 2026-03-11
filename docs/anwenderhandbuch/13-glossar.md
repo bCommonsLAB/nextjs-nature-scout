@@ -8,3 +8,4 @@
 - **Schutzstatus**: Einordnung, ob etwas geschützt oder schützenswert ist (je nach Regelwerk).
 
 
+

@@ -23,8 +23,7 @@ export async function GET(request: Request) {
       )
     }
 
-    // WICHTIG: "used" Status wird ignoriert - Link bleibt immer gültig
-    // Der "used" Status dient nur für Tracking-Zwecke, nicht für Zugriffskontrolle
+    // findInvitationByToken prüft bereits: nicht verwendet, nicht widerrufen, nicht abgelaufen
 
     // Prüfen ob Einladung abgelaufen ist
     if (new Date() > invitation.expiresAt) {
@@ -52,10 +51,8 @@ export async function GET(request: Request) {
       })
     }
 
-    // Einladung als verwendet markieren (nur beim ersten Mal)
-    if (!invitation.used) {
-      await UserService.markInvitationAsUsed(token)
-    }
+    // Einladung bewusst NICHT hier als "accepted" markieren.
+    // "accepted" wird erst nach erfolgreichem Abschluss (Passwort gesetzt/Registrierung) gesetzt.
 
     return NextResponse.json({
       success: true,

@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     })
 
     // Wenn Einladung vorhanden, als verwendet markieren
-    if (invitation) {
+    if (invitation && inviteToken) {
       await UserService.markInvitationAsUsed(inviteToken)
     }
 
@@ -86,6 +86,23 @@ export async function POST(request: Request) {
     } catch (emailError) {
       console.error('Fehler beim Senden der Willkommens-E-Mail:', emailError)
       // Registrierung trotzdem erfolgreich, auch wenn E-Mail fehlschlägt
+    }
+
+    // Einladende Person über erfolgreiche Annahme informieren
+    if (invitation?.invitedBy) {
+      try {
+        const inviter = await UserService.findById(invitation.invitedBy)
+        if (inviter?.email) {
+          await MailjetService.sendInvitationAcceptedNotification({
+            to: inviter.email,
+            name: inviter.name || invitation.invitedByName || 'Einladende Person',
+            subject: 'Einladung erfolgreich angenommen',
+            inviteeName: invitation.name
+          })
+        }
+      } catch (acceptedMailError) {
+        console.error('Fehler beim Senden der Annahme-Benachrichtigung:', acceptedMailError)
+      }
     }
 
     return NextResponse.json(

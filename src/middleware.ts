@@ -18,6 +18,7 @@ export default withAuth(
           '/api/habitat/public',
           '/api/public-filter-options',
           '/api/organizations',
+          '/api/webhooks/mailjet',
                     '/auth/login',
         '/auth/register',
         '/auth/forgot-password',

@@ -32,6 +32,17 @@ export interface LoginCodeEmailData extends EmailData {
   code: string
 }
 
+export interface InvitationReminderEmailData extends EmailData {
+  inviterName: string
+  inviteeName: string
+  loginUrl: string
+  invitationToken?: string
+}
+
+export interface InvitationAcceptedNotificationData extends EmailData {
+  inviteeName: string
+}
+
 export class MailjetService {
   
   /**
@@ -190,6 +201,9 @@ export class MailjetService {
             Email: data.to,
             Name: data.name
           }],
+          // Mailjet erlaubt max. 64 Zeichen. Der Token ist 64 Zeichen lang,
+          // daher darf kein Präfix ergänzt werden.
+          CustomID: data.invitationToken || undefined,
           Subject: `Einladung zu NatureScout${data.organizationName ? ` - ${data.organizationName}` : ''}`,
           HTMLPart: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -261,6 +275,86 @@ export class MailjetService {
       return true
     } catch (error) {
       console.error('Fehler beim Senden der Einladungs-E-Mail:', error)
+      return false
+    }
+  }
+
+  /**
+   * Sendet eine Erinnerung zu einer offenen Einladung
+   */
+  static async sendInvitationReminderEmail(data: InvitationReminderEmailData): Promise<boolean> {
+    try {
+      await mailjet.post('send', { version: 'v3.1' }).request({
+        Messages: [{
+          From: {
+            Email: process.env.MAILJET_FROM_EMAIL,
+            Name: process.env.MAILJET_FROM_NAME
+          },
+          To: [{
+            Email: data.to,
+            Name: data.name
+          }],
+          // Mailjet erlaubt max. 64 Zeichen. Der Token ist 64 Zeichen lang,
+          // daher darf kein Präfix ergänzt werden.
+          CustomID: data.invitationToken || undefined,
+          Subject: data.subject,
+          HTMLPart: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #2d5016;">Erinnerung: Einladung zu NatureScout ist noch offen</h2>
+              <p>Hallo ${data.name},</p>
+              <p>Die Einladung für <strong>${data.inviteeName}</strong> wurde noch nicht angenommen.</p>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${data.loginUrl}"
+                   style="background-color: #2d5016; color: white; padding: 12px 30px;
+                          text-decoration: none; border-radius: 5px; display: inline-block;">
+                  Einladung öffnen
+                </a>
+              </div>
+              <p>Viele Grüße<br/>NatureScout</p>
+            </div>
+          `,
+          TextPart: `Erinnerung: Die Einladung für ${data.inviteeName} ist noch offen. Einladung öffnen: ${data.loginUrl}`
+        }]
+      })
+
+      return true
+    } catch (error) {
+      console.error('Fehler beim Senden der Einladungs-Erinnerung:', error)
+      return false
+    }
+  }
+
+  /**
+   * Benachrichtigt den Einladenden über eine erfolgreiche Annahme
+   */
+  static async sendInvitationAcceptedNotification(data: InvitationAcceptedNotificationData): Promise<boolean> {
+    try {
+      await mailjet.post('send', { version: 'v3.1' }).request({
+        Messages: [{
+          From: {
+            Email: process.env.MAILJET_FROM_EMAIL,
+            Name: process.env.MAILJET_FROM_NAME
+          },
+          To: [{
+            Email: data.to,
+            Name: data.name
+          }],
+          Subject: data.subject,
+          HTMLPart: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #2d5016;">Einladung erfolgreich angenommen</h2>
+              <p>Hallo ${data.name},</p>
+              <p><strong>${data.inviteeName}</strong> hat die Einladung zu NatureScout erfolgreich angenommen.</p>
+              <p>Viele Grüße<br/>NatureScout</p>
+            </div>
+          `,
+          TextPart: `${data.inviteeName} hat die Einladung zu NatureScout erfolgreich angenommen.`
+        }]
+      })
+
+      return true
+    } catch (error) {
+      console.error('Fehler beim Senden der Annahme-Benachrichtigung:', error)
       return false
     }
   }

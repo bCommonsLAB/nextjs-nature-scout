@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -57,9 +57,20 @@ const userFormSchema = z.object({
 
 type UserFormValues = z.infer<typeof userFormSchema>;
 
+interface InvitationStatusItem {
+  email: string;
+  organizationId?: string;
+  used?: boolean;
+  acceptedAt?: string | Date;
+  revokedAt?: string | Date;
+  expiresAt: string | Date;
+  createdAt: string | Date;
+}
+
 export function UserTable() {
   const [allUsers, setAllUsers] = useState<IUser[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<IUser[]>([]);
+  const [invitationStatusItems, setInvitationStatusItems] = useState<InvitationStatusItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastAdminError, setLastAdminError] = useState<string | null>(null);
@@ -121,6 +132,42 @@ export function UserTable() {
     } finally {
       setLoadingOrganizations(false);
     }
+  };
+
+  // Einladungen laden (für Status in Benutzerverwaltung)
+  const fetchInvitations = async () => {
+    try {
+      const response = await fetch('/api/admin/invitations');
+      if (!response.ok) return;
+      const data = await response.json();
+      setInvitationStatusItems(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const invitationStatusByOperationalKey = useMemo(() => {
+    const map = new Map<string, InvitationStatusItem>();
+    for (const invitation of invitationStatusItems) {
+      const email = invitation.email?.toLowerCase().trim();
+      if (!email) continue;
+      const key = `${email}::${invitation.organizationId || 'none'}`;
+      const current = map.get(key);
+      if (!current || new Date(invitation.createdAt) > new Date(current.createdAt)) {
+        map.set(key, invitation);
+      }
+    }
+    return map;
+  }, [invitationStatusItems]);
+
+  const getInvitationStatusForUser = (user: IUser): { label: string; variant: 'default' | 'secondary' | 'destructive' } => {
+    const key = `${user.email.toLowerCase().trim()}::${user.organizationId || 'none'}`;
+    const invitation = invitationStatusByOperationalKey.get(key);
+    if (!invitation) return { label: 'Keine Einladung', variant: 'secondary' };
+    if (invitation.revokedAt) return { label: 'Widerrufen', variant: 'destructive' };
+    if (invitation.acceptedAt || invitation.used) return { label: 'Angenommen', variant: 'default' };
+    if (new Date(invitation.expiresAt) < new Date()) return { label: 'Abgelaufen', variant: 'destructive' };
+    return { label: 'Offen', variant: 'secondary' };
   };
 
   // Benutzer filtern basierend auf den aktuellen Filtern
@@ -464,6 +511,7 @@ export function UserTable() {
   useEffect(() => {
     fetchUsers();
     fetchOrganizations();
+    fetchInvitations();
   }, []);
 
   // Hilfstext zu den verschiedenen Rollen anzeigen
@@ -611,11 +659,11 @@ export function UserTable() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>E-Mail</TableHead>
+              <TableHead>Benutzer</TableHead>
               <TableHead>Rolle</TableHead>
               <TableHead>Organisation</TableHead>
               <TableHead>Einladen</TableHead>
+              <TableHead>Einladungsstatus</TableHead>
               <TableHead>Registriert</TableHead>
               <TableHead>Aktionen</TableHead>
             </TableRow>
@@ -623,7 +671,7 @@ export function UserTable() {
           <TableBody>
             {filteredUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center">
+                <TableCell colSpan={8} className="text-center">
                   {activeFilters.length > 0 
                     ? 'Keine Benutzer mit diesen Filterkriterien gefunden' 
                     : 'Keine Benutzer gefunden'}
@@ -632,8 +680,12 @@ export function UserTable() {
             ) : (
               filteredUsers.map((user) => (
                 <TableRow key={user.email}>
-                  <TableCell>{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{user.name}</span>
+                      <span className="text-xs text-gray-500">{user.email}</span>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       <Select 
@@ -705,6 +757,12 @@ export function UserTable() {
                         {user.canInvite ? 'Kann einladen' : 'Kein Zugriff'}
                       </span>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const status = getInvitationStatusForUser(user);
+                      return <Badge variant={status.variant}>{status.label}</Badge>;
+                    })()}
                   </TableCell>
                   <TableCell>
                     {user.createdAt ? formatDistanceToNow(new Date(user.createdAt), { 

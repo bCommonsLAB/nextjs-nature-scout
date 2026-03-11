@@ -78,6 +78,15 @@ export function CustomUserButton() {
           <UserPlus className="mr-2 h-4 w-4" />
           <span>Benutzer einladen</span>
         </DropdownMenuItem>
+        {(session.user.role === 'admin' || session.user.role === 'superadmin') && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => window.location.href = '/admin/users?tab=invitations'}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              <span>Einladungen verwalten</span>
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={openDocumentation}>
           <BookOpen className="mr-2 h-4 w-4" />
