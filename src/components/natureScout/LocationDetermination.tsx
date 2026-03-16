@@ -996,8 +996,13 @@ export function LocationDetermination({
       },
       (error) => {
         const normalizedError = normalizeGeolocationError(error);
-        // Einzelner console.error für den Hauptfehler, Details mit console.log
-        console.error(`GPS-Verfolgung Fehler [${normalizedError.kind}]: ${normalizedError.userMessage}`);
+        // TIMEOUT/POSITION_UNAVAILABLE sind im Feldbetrieb oft temporär und erwartbar.
+        // Nur echte Blocker als console.error ausgeben, damit die Konsole weniger "rote" Fehlalarme zeigt.
+        if (normalizedError.kind === 'permission-denied' || normalizedError.kind === 'unknown') {
+          console.error(`GPS-Verfolgung Fehler [${normalizedError.kind}]: ${normalizedError.userMessage}`);
+        } else {
+          console.warn(`GPS-Verfolgung Hinweis [${normalizedError.kind}]: ${normalizedError.userMessage}`);
+        }
         // Details als console.log, damit sie nicht als separate Fehler gezählt werden
         console.log("GPS-Fehler Details:", {
           kind: normalizedError.kind,

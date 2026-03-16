@@ -368,11 +368,11 @@ let habitatTypesCache: {
 // Cache-Lebensdauer in Millisekunden (5 Minuten)
 const CACHE_TTL = 5 * 60 * 1000;
 
-export async function getAllHabitatTypes(): Promise<HabitatType[]> {
+export async function getAllHabitatTypes(forceRefresh: boolean = false): Promise<HabitatType[]> {
   try {
     // Cache-Check: Wenn Daten im Cache und nicht älter als CACHE_TTL
     const now = Date.now();
-    if (habitatTypesCache.data && (now - habitatTypesCache.timestamp) < CACHE_TTL) {
+    if (!forceRefresh && habitatTypesCache.data && (now - habitatTypesCache.timestamp) < CACHE_TTL) {
       return habitatTypesCache.data;
     }
     

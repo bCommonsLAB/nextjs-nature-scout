@@ -7,11 +7,19 @@ interface RequestBody {
 export async function POST(request: Request) {
   try {
     const { imageUrls }: RequestBody = await request.json();
+    const plantNetApiKey = process.env.PLANTNET_API_KEY?.trim();
 
     if (!imageUrls?.length) {
       return NextResponse.json(
         { error: "Keine Bilder übermittelt" },
         { status: 400 }
+      );
+    }
+
+    if (!plantNetApiKey) {
+      return NextResponse.json(
+        { error: "PlantNet API-Key fehlt auf dem Server" },
+        { status: 500 }
       );
     }
 
@@ -21,7 +29,7 @@ export async function POST(request: Request) {
     const urlParams = new URLSearchParams();
     
     // Pflichtparameter
-    urlParams.append("api-key", process.env.PLANTNET_API_KEY || "");
+    urlParams.append("api-key", plantNetApiKey);
     
     // Füge die Bilder hinzu (max. 5)
     imageUrls.slice(0, 5).forEach((url) => {
@@ -44,12 +52,21 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error("PlantNet API Error:", errorData);
+      let errorData: { message?: string; error?: string } | null = null;
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = null;
+      }
+      console.error("PlantNet API Error:", {
+        status: response.status,
+        statusText: response.statusText,
+        errorData
+      });
       return NextResponse.json(
         { 
           error: "Fehler bei der Pflanzenidentifikation",
-          details: errorData.message,
+          details: errorData?.message || errorData?.error || "Unbekannter Upstream-Fehler",
           statusText: response.statusText 
         },
         { status: response.status }

@@ -120,19 +120,45 @@ function getZodDescription(zodType: z.ZodType): string | undefined {
   return undefined;
 }
 
+function formatHabitatTypesForPrompt(habitatTypes: HabitatType[]): string {
+  return habitatTypes
+    .map((ht) => {
+      const description = ht.description?.trim();
+      const species = (ht.typicalSpecies ?? [])
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      return [
+        `'${ht.name}'`,
+        `Beschreibung: ${description || 'keine Beschreibung hinterlegt'}`,
+        species.length > 0
+          ? `Typische Arten: ${species.join(', ')}`
+          : 'Typische Arten: keine typischen Arten hinterlegt'
+      ].join('\n');
+    })
+    .join('\n\n');
+}
+
 async function createHabitatAnalyseSchema(
   analysisSchema: { schema: Record<string, string | unknown> }, 
   habitatTypes: HabitatType[]
 ): Promise<z.ZodObject<z.ZodRawShape>> {
   // Erstelle eine formatierte Beschreibung der Habitat-Typen
-  const habitatTypeDesc = habitatTypes
-    .map(ht => `\n'${ht.name}'${ht.typicalSpecies.length > 0 ? ` bei typischen Arten wie ${ht.typicalSpecies.join(', ')}` : ''}`)
-    .join('\n');
+  const habitatTypeDesc = formatHabitatTypesForPrompt(habitatTypes);
 
   console.log('Verwende Habitat-Typen für Schema:', {
     count: habitatTypes.length,
     description: habitatTypeDesc.substring(0, 100) + '...'
   });
+
+  // Nutze bevorzugt den konfigurierten Text aus dem Schema, injiziere aber
+  // immer die aktuelle Habitattypen-Liste aus der Datenbank.
+  const habitattypTemplate = String(analysisSchema.schema.habitattyp ?? '').trim();
+  const habitattypDescription = habitattypTemplate
+    ? habitattypTemplate.includes('{habitattypen}')
+      ? habitattypTemplate.replace('{habitattypen}', habitatTypeDesc)
+      : `${habitattypTemplate}\n\nVerfügbare Habitattypen (aus Datenbank):\n${habitatTypeDesc}`
+    : `Wähle eines dieser Habitattypen: ${habitatTypeDesc} oder 'anderes', wenn keines dieser Typen passt`;
   
   return z.object({
     analyses: z.array(
@@ -182,7 +208,7 @@ async function createHabitatAnalyseSchema(
             .describe(String(analysisSchema.schema.bewertung_konfidenz)),
         }).describe(String(analysisSchema.schema.bewertung)),
         habitattyp: z.string()
-          .describe(String(analysisSchema.schema.habitattyp).replace('{habitattypen}', habitatTypeDesc)),
+          .describe(habitattypDescription),
         evidenz: z.object({
           dafür_spricht: z.string()
             .describe(String(analysisSchema.schema.evidenz_dafür_spricht)),
@@ -198,7 +224,9 @@ async function createHabitatAnalyseSchema(
 
 export async function analyzeImageStructured(metadata: NatureScoutData): Promise<openAiResult> {
   try {
-    const habitatTypes = await getAllHabitatTypes();
+    // Für neue Analysen immer frische Habitattypen aus der DB laden,
+    // damit direkt gepflegte Änderungen ohne Cache-Verzögerung wirken.
+    const habitatTypes = await getAllHabitatTypes(true);
 
     // Schritt 1: Habitat-Analyse
     const habitatAnalyse = await performHabitatAnalysis(metadata, habitatTypes);
@@ -411,9 +439,17 @@ async function performHabitatAnalysis(metadata: NatureScoutData, habitatTypes: H
       .replace('{standortparameter}', standortParameter)
       //.replace('{kommentar}', metadata.kommentar ? `Beachte bitte folgende zusätzliche Hinweise: ${metadata.kommentar}` : '');
 
+    const habitatTypeContext = formatHabitatTypesForPrompt(habitatTypes);
+    const effectiveSystemInstruction = `${prompt.systemInstruction.trim()}
+
+Verfügbare Habitattypen aus der Datenbank (mit Beschreibung und typischen Arten):
+${habitatTypeContext}
+
+Nutze diese Informationen für die Habitatklassifikation. Falls typische Arten fehlen, berücksichtige die Beschreibung und erkennbare Nutzungsspuren.`;
+
     const messages: ChatCompletionMessageParam[] = [{ 
       role: "system", 
-      content: prompt.systemInstruction
+      content: effectiveSystemInstruction
     },
     {
       role: "user",
@@ -475,7 +511,7 @@ async function performHabitatAnalysis(metadata: NatureScoutData, habitatTypes: H
       llmInfo: {
         modelPflanzenErkennung: "PLANTNET",
         modelHabitatErkennung: serverConfig.OPENAI_VISION_MODEL,
-        systemInstruction: prompt.systemInstruction,
+        systemInstruction: effectiveSystemInstruction,
         hapitatQuestion: llmQuestion,
         habitatStructuredOutput: simplifiedSchema,
         fullSchemaStructure: readableSchema

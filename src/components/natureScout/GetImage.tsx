@@ -370,7 +370,7 @@ export function GetImage({
           };
         }
       } catch (error) {
-        console.error("Fehler bei der Pflanzenanalyse:", error);
+        console.warn("Pflanzenanalyse nicht verfügbar:", error);
         analysis = { bestMatch: "Analyse fehlgeschlagen", results: [] };
       }
     }
@@ -393,7 +393,18 @@ export function GetImage({
     });
 
     if (!response.ok) {
-      throw new Error('Analyse fehlgeschlagen');
+      let errorMessage = `Pflanzenanalyse fehlgeschlagen (HTTP ${response.status})`;
+      try {
+        const errorData = await response.json() as { error?: string; details?: string; statusText?: string };
+        errorMessage = [
+          errorData.error,
+          errorData.details,
+          errorData.statusText
+        ].filter(Boolean).join(" | ") || errorMessage;
+      } catch {
+        // Fallback auf HTTP-Status, wenn kein JSON zurückkommt
+      }
+      throw new Error(errorMessage);
     }
 
     return await response.json() as PlantNetResponse;

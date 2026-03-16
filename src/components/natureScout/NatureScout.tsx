@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Welcome } from "./Welcome";
 import { Summary } from "./Summary";
 import { UploadedImageList } from "./UploadedImageList";
@@ -79,7 +80,7 @@ const schrittErklaerungen = [
   },
   {
     title: "Pflanzenbild 1",
-    description: "Fotografieren Sie eine typische Pflanze des Habitats. Fokussieren Sie scharf auf die Pflanze und achten Sie auf gute Beleuchtung für die automatische Pflanzenbestimmung."
+    description: "Optional: Fotografieren Sie eine typische Pflanze des Habitats. Die Erkennung wird in der Regel genauer, wenn mindestens ein Pflanzenbild hochgeladen wird."
   },
   {
     title: "Pflanzenbild 2", 
@@ -261,8 +262,8 @@ function isNextButtonDisabled(args: {
     }
 
     case 6: { // Pflanzenbild 1
-      const hasPlant1 = metadata.bilder.some(b => b.imageKey === "Detailbild_1");
-      return !hasPlant1;
+      // Optional: Weiter ist auch ohne erstes Pflanzenbild erlaubt.
+      return false;
     }
 
     case 7: // Pflanzenbild 2
@@ -299,6 +300,7 @@ export default function NatureScout() {
   const [shouldScrollToNext, setShouldScrollToNext] = useState(false);
   const [isAnyUploadActive, setIsAnyUploadActive] = useState(false);
   const [showHelpBubble, setShowHelpBubble] = useState(true); // State für die Sprechblase
+  const [showPlantImageOptionalDialog, setShowPlantImageOptionalDialog] = useState(false);
 
   // UX-State für den Umriss-Schritt (nur für Navigation/Tooltips, NICHT persistiert)
   const [draftPolygonPoints, setDraftPolygonPoints] = useState<Array<[number, number]>>([]);
@@ -353,7 +355,7 @@ export default function NatureScout() {
       case 5:
         return "Weiter: Pflanzenbild 1 erfassen";
       case 6:
-        return "Weiter: Pflanzenbild 2 erfassen";
+        return "Weiter: Pflanzenbild 2 erfassen (ohne Pflanzenbild 1 möglich)";
       case 7:
         return "Weiter: zur Analyse";
       case 8:
@@ -843,7 +845,7 @@ export default function NatureScout() {
           setMetadata={setMetadata} 
           imageKey="Detailbild_1"
           title="Pflanzenbild 1"
-          instruction="Erste typische Pflanzenart"
+          instruction="Erste typische Pflanzenart (optional)"
           doAnalyzePlant={true}
           schematicBg="/images/schema-plant1.svg"
           onUploadActiveChange={handleUploadActiveChange}
@@ -1108,6 +1110,14 @@ export default function NatureScout() {
                     return;
                   }
 
+                  if (aktiverSchritt === 6) {
+                    const hasPlant1 = metadata.bilder.some(b => b.imageKey === "Detailbild_1");
+                    if (!hasPlant1) {
+                      setShowPlantImageOptionalDialog(true);
+                      return;
+                    }
+                  }
+
                   setAktiverSchritt(prev => prev + 1);
                 }} 
                 disabled={isNextButtonDisabled({
@@ -1140,6 +1150,33 @@ export default function NatureScout() {
           viewportHeight={viewportHeight}
         />
       )}
+
+      <Dialog open={showPlantImageOptionalDialog} onOpenChange={setShowPlantImageOptionalDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Pflanzenbild 1 überspringen?</DialogTitle>
+            <DialogDescription>
+              Ohne Pflanzenbild kann die Habitat-Erkennung ungenauer sein. Möchtest du trotzdem fortfahren?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowPlantImageOptionalDialog(false)}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              onClick={() => {
+                setShowPlantImageOptionalDialog(false);
+                setAktiverSchritt(prev => prev + 1);
+              }}
+            >
+              Weiter
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 } 
