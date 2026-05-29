@@ -30,7 +30,7 @@ Die Anwendung folgt einem 5-stufigen Prozess:
 Die Anwendung basiert auf folgenden Technologien:
 
 - **Frontend**:
-  - Next.js 14 (App Router)
+  - Next.js 15 (App Router)
   - React mit TypeScript
   - Tailwind CSS für das Styling
   - Shadcn/UI für UI-Komponenten
@@ -158,7 +158,7 @@ UPLOAD_DIR=naturescout
 
 # Datenbank
 MONGODB_URI=mongodb+srv://...
-MONGODB_DB_NAME=naturescout
+MONGODB_DATABASE_NAME=naturescout
 MONGODB_COLLECTION_NAME=analyseJobs
 ```
 
