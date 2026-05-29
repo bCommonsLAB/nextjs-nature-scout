@@ -172,6 +172,9 @@ Definiert in `createAnalyseJobsIndexes()` (`habitat-service.ts`). Auswahl:
 |---|---|---|
 | `POST /api/analyze/start` | Analyse starten / Job anlegen | angemeldet |
 | `GET /api/analyze/status` | Analysestatus abfragen | angemeldet |
+| `POST /api/habitat/draft` | Entwurf anlegen (`status: 'draft'`), liefert `jobId` | angemeldet (Eigentümer = anlegende Person) |
+| `PATCH /api/habitat/[auftragsId]/draft` | Teil-Metadaten in Entwurf mergen (idempotent, je Schritt) | nur eigener Entwurf |
+| `GET /api/habitat/mine?status=draft` | Eigene Habitate (z. B. Entwürfe) – Resume/„Meine Habitate" | angemeldet (nur eigene) |
 | `GET /api/habitat` | Liste (eigene bzw. alle bei erw. Rechten) | angemeldet |
 | `GET /api/habitat/[auftragsId]` | Detail | öffentlich (falls public) sonst Eigentümer/Experte/Admin |
 | `POST /api/habitat/[auftragsId]` | Reanalyse | Eigentümer/Experte/Admin |
@@ -189,15 +192,15 @@ Definiert in `createAnalyseJobsIndexes()` (`habitat-service.ts`). Auswahl:
   Habitat-Dokument angleichen".)
 - ⚠️ **Doppelte Ergebnisablage:** `metadata.analyseErgebnis` vs. Wurzel-`result`. Konsens:
   `result` ist maßgeblich; `metadata.analyseErgebnis` möglichst nicht mehr verwenden.
-- ✅ **Status `'draft'` (Typen + Listen-Filter, erledigt – Session 1.1):** `AnalysisJob.status`
-  umfasst nun `'draft'` (`src/types/nature-scout.ts`); alle öffentlichen/Listen-Queries schließen
-  `draft` aus (s. Invariante „Entwürfe"); Index `{ 'metadata.email': 1, status: 1 }` angelegt.
-  **Noch offen:** Anlegen/Aktualisieren von Entwürfen über API (`POST /api/habitat/draft`,
-  `PATCH /api/habitat/[jobId]/draft`, `GET /api/habitat/mine?status=draft`) – Session 1.2.
-  Plan: `specs/regeln/offline-erfassung-umsetzungsplan.md`.
-- ⚠️ **Wartungs-Route `habitat/cleanup` (DELETE) vs. Entwürfe:** Diese Admin-Route löscht **hart**
-  alle Einträge ohne `result` (`result` fehlt/`null`/`{}`). Entwürfe haben (noch) kein `result`
-  und würden dadurch gelöscht. Solange noch keine Entwürfe erzeugt werden (vor Session 1.2),
-  ist das unkritisch; **vor/bei Session 1.2 absichern** (Entwürfe ausnehmen). Quelle:
+- ✅ **Status `'draft'` + Entwurf-API (erledigt – Sessions 1.1/1.2):** `AnalysisJob.status`
+  umfasst `'draft'`; alle öffentlichen/Listen-Queries schließen `draft` aus (s. Invariante
+  „Entwürfe"); Index `{ 'metadata.email': 1, status: 1 }` angelegt (1.1). Entwurf-API umgesetzt
+  (1.2): `POST /api/habitat/draft`, `PATCH /api/habitat/[auftragsId]/draft` (Param = `jobId`),
+  `GET /api/habitat/mine?status=draft`; Service `createDraftJob`/`updateDraftMetadata`
+  (`analysis-service.ts`). **Noch offen:** Bilder serverseitig an Entwurf verknüpfen (1.3),
+  Auto-Save im Orchestrator (1.4). Plan: `specs/regeln/offline-erfassung-umsetzungsplan.md`.
+- ✅ **Wartungs-Route `habitat/cleanup` (DELETE) abgesichert (Session 1.2):** Die Admin-Route
+  löscht hart Einträge ohne `result`; sie nimmt nun Entwürfe aus (`status: { $ne: 'draft' }`),
+  damit (resultlose) Entwürfe nicht versehentlich gelöscht werden. Quelle:
   `src/app/api/habitat/cleanup/route.ts`.
 </content>

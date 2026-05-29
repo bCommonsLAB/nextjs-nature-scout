@@ -26,7 +26,9 @@ export async function DELETE() {
     const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
     
     // Suche nach Einträgen ohne result-Objekt oder mit leerem result-Objekt
+    // WICHTIG: Entwürfe (status: 'draft') haben (noch) kein result und dürfen NICHT gelöscht werden
     const result = await collection.deleteMany({
+      status: { $ne: 'draft' },
       $or: [
         { result: { $exists: false } },
         { result: null },
