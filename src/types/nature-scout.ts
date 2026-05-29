@@ -88,10 +88,64 @@ export interface PlantNetResult {
 }
 
 
+/**
+ * Rolle einer handelnden Person (vgl. IUser.role in user-service.ts).
+ */
+export type BenutzerRolle = 'user' | 'experte' | 'admin' | 'superadmin';
+
+/**
+ * Audit-Information über eine handelnde Person (Verifizierung, Löschung, History).
+ */
+export interface AuditUser {
+  userId: string;
+  userName: string;
+  email?: string;
+  role: BenutzerRolle;
+}
+
+/**
+ * Vom Experten/Admin verifiziertes (effektives) Ergebnis. Hat fachlich Vorrang vor `result`.
+ * Siehe specs/regeln/verifizierungs-workflow.md.
+ */
+export interface VerifiedResult {
+  habitattyp?: string;
+  habitatfamilie?: string;
+  schutzstatus?: string;
+  kommentar?: string;
+}
+
+/**
+ * Eintrag der Versionshistorie (Reanalyse & Verifizierung).
+ */
+export interface HabitatHistoryEntry {
+  date: Date;
+  user: AuditUser;
+  module: string;
+  previousResult?: {
+    habitattyp?: string;
+    habitatfamilie?: string;
+    schutzstatus?: string;
+    kommentar?: string;
+  } | null;
+  changes?: {
+    bildCount?: number;
+    habitattyp?: string;
+    habitatfamilie?: string;
+    schutzstatus?: string;
+    kommentar?: string;
+  };
+}
+
+/**
+ * Habitat-Datensatz (Collection `analyseJobs`).
+ *
+ * Spec: specs/entitaeten/habitat.md – diese Definition spiegelt das tatsächlich
+ * persistierte Dokument inkl. Verifizierungs-, Soft-Delete- und History-Feldern wider.
+ */
 export interface AnalysisJob {
   _id: ObjectId;
-  jobId: string; // Neue Zeile für die ursprüngliche ID
-  status: 'pending' | 'completed' | 'failed';
+  jobId: string; // Fachlicher/öffentlicher Identifikator (= "auftragsId" in URLs)
+  status: 'pending' | 'analyzing' | 'completed' | 'failed';
   metadata: NatureScoutData;
   result?: AnalyseErgebnis | null;
   llmInfo?: llmInfo
@@ -99,6 +153,20 @@ export interface AnalysisJob {
   startTime: Date;
   updatedAt: Date;
   protectionStatus?: 'red' | 'yellow' | 'green';
+
+  // Verifizierung (gesetzt durch effective-habitat/route.ts, entfernt durch unverify/route.ts)
+  verified?: boolean;
+  verifiedAt?: Date;
+  verifiedBy?: AuditUser;
+  verifiedResult?: VerifiedResult;
+
+  // Soft-Delete (gesetzt durch DELETE /api/habitat/[auftragsId])
+  deleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: AuditUser;
+
+  // Versionshistorie (Reanalyse & Verifizierung)
+  history?: HabitatHistoryEntry[];
 }
 
 
