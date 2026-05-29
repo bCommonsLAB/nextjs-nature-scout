@@ -200,9 +200,11 @@ Definiert in `createAnalyseJobsIndexes()` (`habitat-service.ts`). Auswahl:
   `GET /api/habitat/mine?status=draft`; Service `createDraftJob`/`updateDraftMetadata`
   (`analysis-service.ts`). Bilder serverseitig an Entwurf verknüpfen (1.3): `/api/upload` akzeptiert
   optional `jobId`/`imageKey`/`clientImageId`, Service `addImageToDraft`. Online-Auto-Save im
-  Orchestrator (1.4): früher Entwurf + `PATCH …/draft` je Schritt (`NatureScout.tsx`). **Noch offen:**
-  ehrliche Bestätigung + Online-Indikator (1.5), Resume-UI (1.6).
-  Plan: `specs/regeln/offline-erfassung-umsetzungsplan.md`.
+  Orchestrator (1.4): früher Entwurf + `PATCH …/draft` je Schritt (`NatureScout.tsx`). Ehrliche Bestätigung + Retry +
+  Online-/Offline-Indikator (1.5): `Summary.tsx`, `OnlineStatusIndicator`, `/api/health`. Resume
+  über Server-Entwürfe (1.6): „Erfassung fortsetzen" in `app/habitat/page.tsx`. **Phase 1
+  (Datenrettung, online-first) damit abgeschlossen.** Offen: Phase 2 (Offline/IndexedDB + Sync),
+  Phase 3 (PWA). Plan: `specs/regeln/offline-erfassung-umsetzungsplan.md`.
 - ✅ **Wartungs-Route `habitat/cleanup` (DELETE) abgesichert (Session 1.2):** Die Admin-Route
   löscht hart Einträge ohne `result`; sie nimmt nun Entwürfe aus (`status: { $ne: 'draft' }`),
   damit (resultlose) Entwürfe nicht versehentlich gelöscht werden. Quelle:

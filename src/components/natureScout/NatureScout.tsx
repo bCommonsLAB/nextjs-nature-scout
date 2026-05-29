@@ -11,6 +11,7 @@ import { Summary } from "./Summary";
 import { UploadedImageList } from "./UploadedImageList";
 import { HabitatAnalysis } from "./HabitatAnalysis";
 import { SingleImageUpload } from "./SingleImageUpload";
+import { OnlineStatusIndicator } from "./OnlineStatusIndicator";
 import { Bild, NatureScoutData, AnalyseErgebnis, llmInfo, PlantNetResult } from "@/types/nature-scout";
 import { LocationDetermination, isPolygonClosed } from './LocationDetermination';
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
@@ -656,37 +657,39 @@ export default function NatureScout() {
     return () => { cancelled = true; };
   }, [aktiverSchritt, editJobId, ctxJobId, setCtxJobId]);
 
+  // Entwurf sofort speichern – genutzt vom Auto-Save-Debounce und vom manuellen Retry (Session 1.4/1.5).
+  const saveDraftNow = useCallback(async () => {
+    if (!activeDraftId) return;
+    setSaveState('saving');
+    try {
+      const res = await fetch(`/api/habitat/${activeDraftId}/draft`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ metadata })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Speichern fehlgeschlagen (${res.status})`);
+      }
+      setSaveState('saved');
+      setSaveError(null);
+      setLastSavedAt(new Date());
+    } catch (error) {
+      setSaveState('error');
+      setSaveError(error instanceof Error ? error.message : 'Unbekannter Fehler beim Speichern');
+    }
+  }, [activeDraftId, metadata]);
+
   // Auto-Save: Teil-Metadaten je Änderung in den Entwurf schreiben (debounced, nur online, nur vor der Analyse).
   useEffect(() => {
     if (!activeDraftId) return;
     if (aktiverSchritt < 1 || aktiverSchritt >= 8) return; // ab Analyse (Schritt 8) wird der Entwurf zu 'pending'
-
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    autoSaveTimerRef.current = setTimeout(async () => {
-      setSaveState('saving');
-      try {
-        const res = await fetch(`/api/habitat/${activeDraftId}/draft`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ metadata })
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || `Speichern fehlgeschlagen (${res.status})`);
-        }
-        setSaveState('saved');
-        setSaveError(null);
-        setLastSavedAt(new Date());
-      } catch (error) {
-        setSaveState('error');
-        setSaveError(error instanceof Error ? error.message : 'Unbekannter Fehler beim Speichern');
-      }
-    }, 1200);
-
+    autoSaveTimerRef.current = setTimeout(() => { void saveDraftNow(); }, 1200);
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [metadata, activeDraftId, aktiverSchritt]);
+  }, [metadata, activeDraftId, aktiverSchritt, saveDraftNow]);
 
   // Handler für den Upload-Status aus der UploadImages-Komponente
   const handleUploadActiveChange = (isActive: boolean) => {
@@ -1012,17 +1015,31 @@ export default function NatureScout() {
           </div>
         </div>
 
-        {/* Auto-Save-Status (Online) – Session 1.4 */}
-        {activeDraftId && saveState !== 'idle' && (
-          <div className="mb-2 flex items-center justify-end gap-2 text-xs" aria-live="polite">
-            {saveState === 'saving' && <span className="text-gray-500">Wird gespeichert…</span>}
-            {saveState === 'saved' && (
-              <span className="text-green-600">
-                Automatisch gespeichert{lastSavedAt ? ` · ${lastSavedAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` : ''}
-              </span>
-            )}
-            {saveState === 'error' && (
-              <span className="text-red-600">Nicht gespeichert{saveError ? `: ${saveError}` : ''}</span>
+        {/* Online-Indikator + Auto-Save-Status – Session 1.4/1.5 */}
+        {aktiverSchritt >= 1 && (
+          <div className="mb-2 flex items-center justify-between gap-2 text-xs">
+            <OnlineStatusIndicator />
+            {activeDraftId && (
+              <div aria-live="polite">
+                {saveState === 'saving' && <span className="text-gray-500">Wird gespeichert…</span>}
+                {saveState === 'saved' && (
+                  <span className="text-green-600">
+                    Automatisch gespeichert{lastSavedAt ? ` · ${lastSavedAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                  </span>
+                )}
+                {saveState === 'error' && (
+                  <span className="text-red-600 inline-flex items-center gap-2">
+                    Nicht gespeichert{saveError ? `: ${saveError}` : ''}
+                    <button
+                      type="button"
+                      onClick={() => void saveDraftNow()}
+                      className="underline hover:no-underline"
+                    >
+                      Erneut versuchen
+                    </button>
+                  </span>
+                )}
+              </div>
             )}
           </div>
         )}

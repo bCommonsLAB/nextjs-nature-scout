@@ -71,6 +71,20 @@ interface HabitateData {
   };
 }
 
+// Leichter Typ für eigene Entwürfe (GET /api/habitat/mine?status=draft) – Session 1.6
+interface DraftEntry {
+  jobId: string;
+  status: string;
+  startTime?: string;
+  updatedAt: string;
+  metadata?: {
+    gemeinde?: string;
+    flurname?: string;
+    standort?: string;
+    bilder?: Array<{ url: string }>;
+  };
+}
+
 function HabitatPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -86,6 +100,8 @@ function HabitatPageContent() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationResult, setMigrationResult] = useState<{ success: boolean; message: string } | null>(null);
+  // Eigene Entwürfe für „Erfassung fortsetzen" – Session 1.6
+  const [drafts, setDrafts] = useState<DraftEntry[]>([]);
   
   const page = Number(searchParams.get('page') || '1');
   const search = searchParams.get('search') || '';
@@ -122,7 +138,27 @@ function HabitatPageContent() {
 
     checkPermissions();
   }, []);
-  
+
+  // Eigene Entwürfe laden (für „Erfassung fortsetzen") – Session 1.6
+  useEffect(() => {
+    if (!session?.user) {
+      setDrafts([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/habitat/mine?status=draft');
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled) setDrafts(Array.isArray(json.entries) ? json.entries : []);
+      } catch {
+        // Entwürfe sind optional – Fehler hier sind nicht kritisch
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [session?.user]);
+
   const debugLog = (section: string, data: Record<string, unknown>) => {
     console.log(`[DEBUG:${section}]`, data);
   };
@@ -342,6 +378,23 @@ function HabitatPageContent() {
     }
   };
   
+  // Entwurf verwerfen (Soft-Delete des eigenen Entwurfs) – Session 1.6
+  const handleDeleteDraft = async (jobId: string) => {
+    if (!confirm('Diesen Entwurf wirklich verwerfen? Die unfertige Erfassung wird entfernt.')) {
+      return;
+    }
+    try {
+      const response = await fetch(`/api/habitat/${jobId}`, { method: 'DELETE' });
+      if (!response.ok) {
+        throw new Error(`Fehler ${response.status}`);
+      }
+      setDrafts(prev => prev.filter(d => d.jobId !== jobId));
+    } catch (error) {
+      console.error('Fehler beim Verwerfen des Entwurfs:', error);
+      alert('Entwurf konnte nicht verworfen werden.');
+    }
+  };
+
   // Funktion zum Herunterladen aller Habitat-Daten (für Admins)
   const handleDownloadHabitatData = () => {
     window.location.href = '/api/habitat/download';
@@ -602,6 +655,41 @@ function HabitatPageContent() {
             <pre className="whitespace-pre-wrap font-mono text-sm">{migrationResult.message}</pre>
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* Erfassung fortsetzen: offene Entwürfe (Session 1.6) */}
+      {drafts.length > 0 && (
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <h2 className="text-lg font-semibold text-amber-800 mb-1">
+            Erfassung fortsetzen ({drafts.length})
+          </h2>
+          <p className="text-sm text-amber-700 mb-3">
+            Sie haben unfertige Erfassungen (Entwürfe). Setzen Sie eine Erfassung fort oder verwerfen Sie sie.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {drafts.map((d) => (
+              <div key={d.jobId} className="bg-white rounded-md border border-amber-200 p-3 flex flex-col gap-2">
+                <div className="text-sm font-medium text-gray-900">
+                  {d.metadata?.gemeinde || 'Unbekannter Standort'}
+                  {d.metadata?.flurname ? ` · ${d.metadata.flurname}` : ''}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {(d.metadata?.bilder?.length || 0)} Bild(er)
+                  {d.updatedAt ? ` · zuletzt ${new Date(d.updatedAt).toLocaleString('de-DE')}` : ''}
+                </div>
+                <div className="flex gap-2 mt-1">
+                  <Button size="sm" onClick={() => router.push(`/naturescout?editJobId=${d.jobId}`)}>
+                    Fortsetzen
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => handleDeleteDraft(d.jobId)}>
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Verwerfen
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {!hasAdvancedPermissions && (

@@ -1,8 +1,9 @@
 "use client";
 
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { NatureScoutData } from "@/types/nature-scout";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { EffektiverHabitatEditor } from "@/components/habitat/EffektiverHabitatEditor";
 import { useNatureScoutState } from "@/context/nature-scout-context";
 import Image from 'next/image';
@@ -19,6 +20,7 @@ export function Summary({ metadata }: SummaryProps) {
   const [isAnalysisDetailsOpen, setIsAnalysisDetailsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [hasSaved, setHasSaved] = useState(false);
   
   // Verwende entweder editJobId (wenn ein bestehendes Habitat bearbeitet wird)
   // oder jobId (wenn ein neues Habitat erstellt wurde)
@@ -41,45 +43,45 @@ export function Summary({ metadata }: SummaryProps) {
     checkPermissions();
   }, []);
 
-  // Speichere die Daten (insbesondere den Kommentar) beim Öffnen der Summary
-  useEffect(() => {
-    async function updateHabitatWithComments() {
-      // Nur speichern, wenn eine jobId vorhanden ist und die Metadaten vollständig sind
-      if (currentJobId && metadata.analyseErgebnis) {
-        setIsSaving(true);
-        setSaveError(null);
-        
-        try {
-          // Aktualisiere den Habitat-Eintrag mit der aktuellen Metadaten (inkl. Kommentar)
-          const response = await fetch(`/api/habitat/${currentJobId}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              newAnalysisModule: 'Metadata-Update',
-              kommentar: metadata.kommentar || ''
-            }),
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Fehler beim Speichern der Daten');
-          }
-          
-          console.log('Habitat-Daten wurden erfolgreich aktualisiert (inkl. Kommentar)');
-        } catch (error) {
-          console.error('Fehler beim Speichern des Habitats:', error);
-          setSaveError(error instanceof Error ? error.message : 'Unbekannter Fehler beim Speichern');
-          // Kein Alert hier, da wir den Benutzer nicht stören wollen, falls etwas schief geht
-        } finally {
-          setIsSaving(false);
-        }
+  // Speichert die Daten (insbesondere den Kommentar). Auch für den Retry-Button nutzbar.
+  const saveSummary = useCallback(async () => {
+    // Nur speichern, wenn eine jobId vorhanden ist und die Metadaten vollständig sind
+    if (!currentJobId || !metadata.analyseErgebnis) return;
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      // Aktualisiere den Habitat-Eintrag mit der aktuellen Metadaten (inkl. Kommentar)
+      const response = await fetch(`/api/habitat/${currentJobId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          newAnalysisModule: 'Metadata-Update',
+          kommentar: metadata.kommentar || ''
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Fehler beim Speichern der Daten');
       }
+
+      setHasSaved(true);
+    } catch (error) {
+      console.error('Fehler beim Speichern des Habitats:', error);
+      setSaveError(error instanceof Error ? error.message : 'Unbekannter Fehler beim Speichern');
+    } finally {
+      setIsSaving(false);
     }
-    
-    updateHabitatWithComments();
   }, [currentJobId, metadata]);
+
+  // Speichern beim Öffnen der Summary (und bei relevanten Änderungen)
+  useEffect(() => {
+    void saveSummary();
+  }, [saveSummary]);
 
   // Debug-Logging für die Werte
   useEffect(() => {
@@ -291,12 +293,33 @@ export function Summary({ metadata }: SummaryProps) {
   return (
     <div className="space-y-4">
       
-      <Alert>
-        <AlertTitle>Vielen Dank für Ihre Hilfe!</AlertTitle>
-        <AlertDescription className="whitespace-pre-line">
-          Ihre erfasstes Habitat wurde gespeichert und wird nun von einem Experten analysiert. Wir geben Ihnen eine kurze Rückmeldung, sobald das Ergebnis verfügbar ist.
-        </AlertDescription>
-      </Alert>
+      {saveError ? (
+        <Alert className="bg-red-50 border-red-200">
+          <AlertTitle className="text-red-800">Speichern fehlgeschlagen</AlertTitle>
+          <AlertDescription className="text-red-700">
+            <p>Ihre Erfassung konnte nicht gespeichert werden: {saveError}</p>
+            <div className="mt-2">
+              <Button size="sm" variant="outline" onClick={() => void saveSummary()} disabled={isSaving}>
+                {isSaving ? 'Wird gespeichert…' : 'Erneut versuchen'}
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      ) : (isSaving || !hasSaved) ? (
+        <Alert className="bg-blue-50 border-blue-200">
+          <AlertTitle>Wird gespeichert…</AlertTitle>
+          <AlertDescription>
+            Ihre Erfassung wird übertragen. Bitte einen Moment Geduld.
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <Alert>
+          <AlertTitle>Vielen Dank für Ihre Hilfe!</AlertTitle>
+          <AlertDescription className="whitespace-pre-line">
+            Ihr erfasstes Habitat wurde gespeichert und wird nun von einem Experten analysiert. Wir geben Ihnen eine kurze Rückmeldung, sobald das Ergebnis verfügbar ist.
+          </AlertDescription>
+        </Alert>
+      )}
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Linke Spalte: Standort und Bilder */}
