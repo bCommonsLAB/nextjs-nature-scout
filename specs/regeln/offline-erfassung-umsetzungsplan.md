@@ -37,7 +37,7 @@
 - [x] **1.0 – Baseline & Setup.** `tsc --noEmit`-Fehleranzahl als Baseline notieren (Logbuch).
   Lint/Build-Ausgangszustand festhalten. Keine Code-Änderung außer ggf. diesem Dokument.
 
-- [ ] **1.1 – Status `draft` einführen (Typen + Listen-Filter).**
+- [x] **1.1 – Status `draft` einführen (Typen + Listen-Filter).**
   - `AnalysisJob.status` um `'draft'` erweitern (`src/types/nature-scout.ts`).
   - `specs/entitaeten/habitat.md` nachziehen (Status-Wert + Invariante: `draft` nie öffentlich,
     nie in normalen Listen).
@@ -150,3 +150,4 @@
 | Session | Datum | Commit | Notizen / Abweichungen |
 |---|---|---|---|
 | 1.0 | 2026-05-29 | _(dieser Commit)_ | **Baseline (projekteigenes TS 5.6.3):** `tsc --noEmit` = **98 Fehler** (70 in `src/__tests__/` – Jest ohne Runner; 28 im Produktionscode). `npm run lint` = Exit 1 wegen **1 vorbestehendem Error** in `src/app/not-found.tsx` (`@next/next/no-html-link-for-pages`), sonst nur Warnungen. `npm run build` = Exit 0; `next.config` setzt `eslint.ignoreDuringBuilds` **und** `typescript.ignoreBuildErrors` = `true`, daher ist `build` die maßgebliche Grün-Prüfung. Hinweis: „Collecting page data" wirft ohne Secrets (Env-Validierung beim Modul-Load); in der Sandbox mit Platzhalter-Env grün gebaut. `node_modules` war ungetrackt → via `npm ci` installiert. |
+| 1.1 | 2026-05-29 | _(dieser Commit)_ | **Status `'draft'` eingeführt.** `AnalysisJob.status` um `'draft'` erweitert (`src/types/nature-scout.ts`). `draft` aus allen öffentlichen/Listen-Queries ausgeschlossen (`status: { $ne: 'draft' }`): `habitat/route.ts` (Liste + 2 Personen-Aggregationen), `habitat/public/route.ts` (Karte/Liste + Filter-Options), `habitat/export/route.ts`, `filter-options/route.ts`, `public-filter-options/route.ts`, `habitat-service.ts` (`getFilterOptions` + Personen-Agg). DB-Index `{ 'metadata.email': 1, status: 1 }` ergänzt. Spec `habitat.md` nachgezogen (Status-Wert, Invariante „Entwürfe", Lebenszyklus, Index, Offene Punkte). **Bewusst NICHT ausgeschlossen** (Entwürfe müssen enthalten bleiben): `admin/storage-cleanup` (Bild-Referenzprüfung – sonst gälten Entwurfs-Bilder als verwaist) und `habitat/download` (vollständiger Admin-Backup-Dump). **Abweichung/Risiko:** `habitat/cleanup` (DELETE) löscht hart Einträge ohne `result` → würde künftige Entwürfe treffen; vor Session 1.2 absichern (in `habitat.md` „Offene Punkte" vermerkt). **Verifikation:** `tsc --noEmit` = 98 (= Baseline, keine neuen Fehler); `lint` unverändert (nur der vorbestehende `not-found.tsx`-Error); `build` Exit 0. |

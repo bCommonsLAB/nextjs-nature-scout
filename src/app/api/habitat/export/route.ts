@@ -7,6 +7,7 @@ import { requireAuth } from '@/lib/server-auth';
 // Definiere die Typen
 interface MongoFilter {
   deleted?: { $ne: boolean };
+  status?: { $ne: string };
   'metadata.email'?: string;
   'metadata.erfassungsperson'?: string;
   'metadata.gemeinde'?: string;
@@ -119,6 +120,8 @@ export async function GET(request: Request) {
     const filter: MongoFilter = {
       // Zeige nur Einträge an, die nicht als gelöscht markiert sind
       deleted: { $ne: true },
+      // Entwürfe (status: 'draft') nie exportieren
+      status: { $ne: 'draft' },
       // Nur verifizierte Einträge exportieren
       verified: true
     };

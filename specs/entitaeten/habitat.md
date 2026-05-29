@@ -30,7 +30,7 @@ Expert:in **verifiziert** werden. Der Identifikator nach außen ist `jobId` (auc
 |---|---|---|---|---|---|
 | `_id` | `ObjectId` | ✓ | gespeichert | MongoDB-ID | automatisch |
 | `jobId` | `string` | ✓ | gespeichert | Fachlicher/öffentlicher Identifikator (= „auftragsId" in URLs) | Default: `new ObjectId().toString()` |
-| `status` | `'pending' \| 'completed' \| 'failed' \| 'analyzing'` | ✓ | gespeichert | Bearbeitungsstatus der Analyse | ⚠️ `analyzing` wird zur Laufzeit gesetzt, fehlt im TS-Typ |
+| `status` | `'draft' \| 'pending' \| 'analyzing' \| 'completed' \| 'failed'` | ✓ | gespeichert | Bearbeitungsstatus | `draft` = Erfassung läuft, noch nicht analysiert (offline-fähige Erfassung); nie öffentlich/in normalen Listen (s. Invarianten). `analyzing` wird zur Laufzeit gesetzt. |
 | `metadata` | `NatureScoutData` | ✓ | gespeichert | Erfassungsdaten (s. u.) | |
 | `result` | `AnalyseErgebnis \| null` | – | gespeichert | KI-Analyseergebnis | gesetzt bei `status='completed'` |
 | `llmInfo` | `llmInfo` | – | gespeichert | Modell-/Prompt-Metadaten zur Nachvollziehbarkeit | |
@@ -123,6 +123,15 @@ Die Bedeutung jedes Feldes (erlaubte Werte) ist im Analyse-Schema definiert – 
 - **Öffentlichkeit:** Ein Habitat ist genau dann öffentlich sichtbar, wenn
   `verified === true && protectionStatus ∈ {red, yellow}`. `green` ist **nicht** öffentlich.
   (Quelle: `[auftragsId]/route.ts`, `public/route.ts`.)
+- **Entwürfe (`status: 'draft'`):** Ein Entwurf ist **nie öffentlich** und taucht **nicht** in
+  normalen Listen auf (nur unter „Meine Habitate → Entwürfe"). Alle öffentlichen/Listen-Queries
+  schließen `draft` aus (`status: { $ne: 'draft' }`, zusätzlich zur `verified`/`deleted`-Logik).
+  Fundstellen: `habitat/route.ts`, `habitat/public/route.ts`, `habitat/export/route.ts`,
+  `filter-options/route.ts`, `public-filter-options/route.ts`, `habitat-service.ts`
+  (`getFilterOptions`). **Ausnahmen (Entwürfe bleiben enthalten):** vollständiger Admin-Backup-Dump
+  (`habitat/download/route.ts`) und Bild-Referenzprüfung der Speicherbereinigung
+  (`admin/storage-cleanup/route.ts`, sonst gälten Entwurfs-Bilder als verwaist).
+  Siehe `regeln/offline-erfassung-und-sync.md`.
 - **Effektives Ergebnis:** Nach Verifizierung gilt `verifiedResult` fachlich vor `result`
   (z. B. bei Schutzstatus-Anzeige/Export).
 - **Soft-Delete:** Löschen markiert nur `deleted: true` (kein physisches Löschen). Gelöschte
@@ -132,6 +141,9 @@ Die Bedeutung jedes Feldes (erlaubte Werte) ist im Analyse-Schema definiert – 
 
 ## Lebenszyklus
 
+0. **(Optional) Entwurf** (`status: 'draft'`) – Erfassung läuft, noch nicht analysiert; früh
+   angelegt zur Datensicherung (offline-fähige Erfassung). Geht beim Start der Analyse in
+   `pending` über. Details: `regeln/offline-erfassung-und-sync.md`.
 1. **Anlegen** (`analyze/start`, `status: 'pending'`) durch erfassende Person.
 2. **Analyse** läuft → `status: 'analyzing'` → `completed` (mit `result`) oder `failed` (mit `error`).
 3. **Reanalyse** (`POST /api/habitat/[auftragsId]`) durch Eigentümer:in/Expert:in/Admin – schreibt `history`.
@@ -146,6 +158,7 @@ Definiert in `createAnalyseJobsIndexes()` (`habitat-service.ts`). Auswahl:
 - Einzel: `metadata.gemeinde`, `metadata.erfassungsperson`, `metadata.email`,
   `metadata.organizationName`, `result.habitattyp`, `result.habitatfamilie`,
   `result.schutzstatus`, `verifiedResult.habitatfamilie`, `verified`, `deleted`, `updatedAt`.
+- Verbund („Meine Entwürfe"): `{metadata.email, status}` (eigene Habitate nach Status, z. B. `draft`).
 - Verbund (öffentliche Sicht): `{deleted, verified}`, `{deleted, verified, organizationName}`,
   `{deleted, verified, gemeinde}`, `{deleted, verified, result.habitattyp}`,
   `{deleted, verified, result.habitatfamilie}`, `{deleted, verified, result.schutzstatus}`.
@@ -176,8 +189,15 @@ Definiert in `createAnalyseJobsIndexes()` (`habitat-service.ts`). Auswahl:
   Habitat-Dokument angleichen".)
 - ⚠️ **Doppelte Ergebnisablage:** `metadata.analyseErgebnis` vs. Wurzel-`result`. Konsens:
   `result` ist maßgeblich; `metadata.analyseErgebnis` möglichst nicht mehr verwenden.
-- 📝 **Geplant – Status `'draft'`:** Für die ausfallsichere/offline-fähige Erfassung soll der
-  Status um `'draft'` (Erfassung läuft, noch nicht analysiert) erweitert werden; solche
-  Datensätze sind nie öffentlich und aus normalen Listen ausgeschlossen. Details & Plan:
-  `specs/regeln/offline-erfassung-und-sync.md`.
+- ✅ **Status `'draft'` (Typen + Listen-Filter, erledigt – Session 1.1):** `AnalysisJob.status`
+  umfasst nun `'draft'` (`src/types/nature-scout.ts`); alle öffentlichen/Listen-Queries schließen
+  `draft` aus (s. Invariante „Entwürfe"); Index `{ 'metadata.email': 1, status: 1 }` angelegt.
+  **Noch offen:** Anlegen/Aktualisieren von Entwürfen über API (`POST /api/habitat/draft`,
+  `PATCH /api/habitat/[jobId]/draft`, `GET /api/habitat/mine?status=draft`) – Session 1.2.
+  Plan: `specs/regeln/offline-erfassung-umsetzungsplan.md`.
+- ⚠️ **Wartungs-Route `habitat/cleanup` (DELETE) vs. Entwürfe:** Diese Admin-Route löscht **hart**
+  alle Einträge ohne `result` (`result` fehlt/`null`/`{}`). Entwürfe haben (noch) kein `result`
+  und würden dadurch gelöscht. Solange noch keine Entwürfe erzeugt werden (vor Session 1.2),
+  ist das unkritisch; **vor/bei Session 1.2 absichern** (Entwürfe ausnehmen). Quelle:
+  `src/app/api/habitat/cleanup/route.ts`.
 </content>

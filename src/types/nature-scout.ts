@@ -145,7 +145,11 @@ export interface HabitatHistoryEntry {
 export interface AnalysisJob {
   _id: ObjectId;
   jobId: string; // Fachlicher/öffentlicher Identifikator (= "auftragsId" in URLs)
-  status: 'pending' | 'analyzing' | 'completed' | 'failed';
+  // 'draft' = Erfassung läuft, noch nicht analysiert (ausfallsichere/offline-fähige Erfassung).
+  // Ablauf: draft → (Analyse starten) → pending → analyzing → completed/failed.
+  // Invariante: 'draft'-Datensätze sind nie öffentlich und tauchen nicht in normalen Listen auf
+  // (nur unter "Meine Habitate → Entwürfe"). Siehe specs/regeln/offline-erfassung-und-sync.md.
+  status: 'draft' | 'pending' | 'analyzing' | 'completed' | 'failed';
   metadata: NatureScoutData;
   result?: AnalyseErgebnis | null;
   llmInfo?: llmInfo

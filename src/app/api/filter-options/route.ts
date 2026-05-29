@@ -29,11 +29,12 @@ export async function GET(request: Request) {
       const db = await connectToDatabase();
       const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
       
-      // Basisfilter: nicht gelöschte Dokumente
-      const baseMatch: { 
+      // Basisfilter: nicht gelöschte Dokumente, keine Entwürfe (status: 'draft')
+      const baseMatch: {
         deleted?: { $ne: boolean },
-        'metadata.email'?: string 
-      } = { deleted: { $ne: true } };
+        status?: { $ne: string },
+        'metadata.email'?: string
+      } = { deleted: { $ne: true }, status: { $ne: 'draft' } };
       
       // Für normale Benutzer: Nur eigene Einträge
       if (!hasAdvancedPermissions) {

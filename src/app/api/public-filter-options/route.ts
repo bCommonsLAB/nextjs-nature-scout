@@ -53,8 +53,10 @@ export async function GET(request: Request) {
     // Basisfilter - bei öffentlicher Route immer nur verifizierte Habitate
     // WICHTIG: Zeige nur Habitate mit protectionStatus "red" oder "yellow"
     // Habitate mit "green" oder ohne protectionStatus werden nicht angezeigt
-    const baseFilter: any = { 
+    const baseFilter: any = {
       deleted: { $ne: true },
+      // Entwürfe (status: 'draft') sind nie öffentlich
+      status: { $ne: 'draft' },
       verified: true,
       protectionStatus: { $in: ['red', 'yellow'] }
     };
