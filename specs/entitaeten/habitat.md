@@ -39,10 +39,11 @@ Expert:in **verifiziert** werden. Der Identifikator nach außen ist `jobId` (auc
 | `updatedAt` | `Date` | ✓ | gespeichert | Letzte Änderung | bei jeder Mutation aktualisiert |
 | `protectionStatus` | `'red' \| 'yellow' \| 'green'` | – | abgeleitet | Ampel-Schutzstatus | aus `schutzstatus` abgeleitet, s. `regeln/schutzstatus.md` |
 
-### ⚠️ Zusätzliche, gespeicherte Felder (NICHT im TS-Interface `AnalysisJob`)
+### Zusätzliche, gespeicherte Felder (Verifizierung, Soft-Delete, History)
 
-Diese Felder existieren im DB-Dokument und werden von API/Indizes genutzt, fehlen aber im
-TypeScript-Typ. Sie sollten in `src/types/nature-scout.ts` ergänzt werden (siehe „Offene Punkte").
+Diese Felder existieren im DB-Dokument und werden von API/Indizes genutzt. Sie sind seit der
+Spec→Code-Angleichung auch im TypeScript-Interface `AnalysisJob` (`src/types/nature-scout.ts`)
+abgebildet (vgl. Hilfstypen `AuditUser`, `VerifiedResult`, `HabitatHistoryEntry`).
 
 | Feld | Typ | Status | Beschreibung | Gesetzt in |
 |---|---|---|---|---|
@@ -169,10 +170,10 @@ Definiert in `createAnalyseJobsIndexes()` (`habitat-service.ts`). Auswahl:
 
 ## Offene Punkte / Abweichungen
 
-- ⚠️ **TS-Typ unvollständig:** `AnalysisJob` in `src/types/nature-scout.ts` enthält
+- ✅ **TS-Typ vollständig (erledigt):** `AnalysisJob` in `src/types/nature-scout.ts` bildet nun
   `verified`, `verifiedAt`, `verifiedBy`, `verifiedResult`, `deleted`, `deletedAt`, `deletedBy`,
-  `history` **nicht**, und `status` kennt `analyzing` nicht. Empfehlung: Interface erweitern,
-  damit Typ und Persistenz übereinstimmen.
+  `history` ab; `status` umfasst `analyzing`. (Commit „types: AnalysisJob an persistiertes
+  Habitat-Dokument angleichen".)
 - ⚠️ **Doppelte Ergebnisablage:** `metadata.analyseErgebnis` vs. Wurzel-`result`. Konsens:
   `result` ist maßgeblich; `metadata.analyseErgebnis` möglichst nicht mehr verwenden.
 </content>

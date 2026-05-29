@@ -53,10 +53,10 @@ specs/
 
 Diese sind in den jeweiligen Specs detailliert; hier als Überblick:
 
-- ⚠️ **`AnalysisJob`-Interface unvollständig:** Das gespeicherte Habitat-Dokument enthält mehr
-  Felder (`verified`, `verifiedResult`, `verifiedBy`, `verifiedAt`, `protectionStatus`,
-  `deleted`, `deletedAt`, `deletedBy`, `history`, Status `analyzing`) als der TypeScript-Typ in
-  `src/types/nature-scout.ts`. Siehe `entitaeten/habitat.md`.
+- ✅ **`AnalysisJob`-Interface vollständig (erledigt):** Der TypeScript-Typ in
+  `src/types/nature-scout.ts` bildet inzwischen alle persistierten Felder ab (`verified`,
+  `verifiedResult`, `verifiedBy`, `verifiedAt`, `protectionStatus`, `deleted`, `deletedAt`,
+  `deletedBy`, `history`, Status `analyzing`). Siehe `entitaeten/habitat.md`.
 - ⚠️ **Env-Variablen-Namen:** Der Code (`src/lib/services/db.ts`) nutzt `MONGODB_DATABASE_NAME`
   und `MONGODB_COLLECTION_NAME`; ältere Doku (`docs/0-uebersicht.md`) nennt `MONGODB_DB_NAME`.
 - ⚠️ **Auth-System:** Aktiv ist **NextAuth** (`next-auth`), nicht Clerk – ältere Doku
