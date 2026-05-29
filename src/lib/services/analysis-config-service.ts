@@ -23,10 +23,29 @@ export interface Prompt {
   updatedAt: Date;
 }
 
+/**
+ * Erstellt Indizes für die Analyse-Konfigurations-Collections.
+ * Der Unique-Index auf `{name, version}` sichert die Versionseindeutigkeit je Konfiguration.
+ * Siehe specs/entitaeten/analyse-konfiguration.md.
+ */
+export async function createAnalysisConfigIndexes(): Promise<void> {
+  const db = await connectToDatabase();
+
+  await db.collection<AnalysisSchema>('habitatAnalysisSchemas')
+    .createIndex({ name: 1, version: 1 }, { unique: true });
+  await db.collection<Prompt>('prompts')
+    .createIndex({ name: 1, version: 1 }, { unique: true });
+
+  console.log('Analyse-Konfigurations-Indizes wurden erstellt oder aktualisiert');
+}
+
 export async function initializeAnalysisConfigs(): Promise<void> {
   const db = await connectToDatabase();
   const habitatSchemaCollection = db.collection<AnalysisSchema>('habitatAnalysisSchemas');
   const promptCollection = db.collection<Prompt>('prompts');
+
+  // Indizes erstellen
+  await createAnalysisConfigIndexes();
 
   // Prüfe ob bereits Konfigurationen existieren
   const habitatSchemaCount = await habitatSchemaCollection.countDocuments();

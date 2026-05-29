@@ -9,9 +9,29 @@ export interface HabitatGroup {
   pos: number;
 }
 
+/**
+ * Erstellt Indizes für die habitatGroups-Collection.
+ * Der Unique-Index auf `name` sichert die bislang nur app-seitige Eindeutigkeitsprüfung ab.
+ * Siehe specs/entitaeten/habitatgruppe.md.
+ */
+export async function createHabitatGroupIndexes(): Promise<void> {
+  const db = await connectToDatabase();
+  const collection = db.collection('habitatGroups');
+
+  // Name eindeutig (verhindert Race Conditions bei paralleler Anlage)
+  await collection.createIndex({ name: 1 }, { unique: true });
+  // Sortierung nach Position
+  await collection.createIndex({ pos: 1 });
+
+  console.log('HabitatGroup-Indizes wurden erstellt oder aktualisiert');
+}
+
 export async function initializeHabitatGroups(): Promise<void> {
   const db = await connectToDatabase();
   const collection = db.collection('habitatGroups');
+
+  // Indizes erstellen
+  await createHabitatGroupIndexes();
 
   // Prüfe ob bereits Gruppen existieren
   const count = await collection.countDocuments();

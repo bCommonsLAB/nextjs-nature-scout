@@ -32,9 +32,13 @@ Sonderbiotope). Die Verknüpfung zu Habitattypen erfolgt namentlich über
 
 ## Invarianten & Geschäftsregeln
 
-- **Name eindeutig** – Anlage/Update mit Duplikat wirft Fehler („Habitat-Familie … existiert bereits").
+- **Name eindeutig** – app-seitig geprüft **und** durch DB-Unique-Index abgesichert.
 - Sortierung erfolgt über `pos` (aufsteigend).
-- 4 Initialgruppen via `initializeHabitatGroups()`.
+- 4 Initialgruppen via `initializeHabitatGroups()` (legt auch die Indizes an).
+
+## Indizes (MongoDB)
+
+`createHabitatGroupIndexes()`: `name` (unique), `pos`.
 
 ## API-Endpunkte
 
@@ -45,5 +49,6 @@ Sonderbiotope). Die Verknüpfung zu Habitattypen erfolgt namentlich über
 
 ## Offene Punkte / Abweichungen
 
-- Kein DB-Unique-Index auf `name` (nur App-Prüfung) – Index ergänzen, um Race Conditions zu vermeiden.
+- ✅ **DB-Unique-Index auf `name` (erledigt):** ergänzt via `createHabitatGroupIndexes()`,
+  abgesichert gegen Race Conditions.
 </content>

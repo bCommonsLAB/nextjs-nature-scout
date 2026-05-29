@@ -57,6 +57,11 @@ Felder/Werte des `AnalyseErgebnis` (z. B. zulässige Werte für `häufigkeit`, L
 `initializeAnalysisConfigs()` legt Initial-Schema an, wenn noch keine Konfiguration existiert.
 Admins bearbeiten Schema/Prompt; neue Versionen werden additiv geführt.
 
+## Indizes (MongoDB)
+
+`createAnalysisConfigIndexes()`: Unique-Index `{name, version}` auf `habitatAnalysisSchemas`
+und auf `prompts` (sichert die Versionseindeutigkeit je Konfiguration).
+
 ## API-Endpunkte
 
 | Methode & Pfad | Zweck | Berechtigung |
@@ -67,8 +72,8 @@ Admins bearbeiten Schema/Prompt; neue Versionen werden additiv geführt.
 
 ## Offene Punkte / Abweichungen
 
-- Keine DB-Unique-/Verbund-Indizes auf `{name, version}` dokumentiert – empfehlenswert zur
-  Sicherung der Versionseindeutigkeit.
+- ✅ **Unique-Index `{name, version}` (erledigt):** ergänzt via `createAnalysisConfigIndexes()`
+  für beide Collections.
 - Im Initialcode wird nur das Schema, aber (noch) kein `Prompt`-Dokument angelegt – Prüfen, ob
   Prompts ausschließlich über Admin-UI entstehen sollen.
 </content>
