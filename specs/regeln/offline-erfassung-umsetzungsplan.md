@@ -34,7 +34,7 @@
 > Ziel: Behebt den Hauptschmerz für alle mit zumindest zeitweisem Empfang.
 > Server-Entwurf früh anlegen, Bilder sofort verknüpfen, ehrliche Bestätigung, Resume.
 
-- [ ] **1.0 – Baseline & Setup.** `tsc --noEmit`-Fehleranzahl als Baseline notieren (Logbuch).
+- [x] **1.0 – Baseline & Setup.** `tsc --noEmit`-Fehleranzahl als Baseline notieren (Logbuch).
   Lint/Build-Ausgangszustand festhalten. Keine Code-Änderung außer ggf. diesem Dokument.
 
 - [ ] **1.1 – Status `draft` einführen (Typen + Listen-Filter).**
@@ -149,4 +149,4 @@
 
 | Session | Datum | Commit | Notizen / Abweichungen |
 |---|---|---|---|
-| – | – | – | (noch nicht begonnen) |
+| 1.0 | 2026-05-29 | _(dieser Commit)_ | **Baseline (projekteigenes TS 5.6.3):** `tsc --noEmit` = **98 Fehler** (70 in `src/__tests__/` – Jest ohne Runner; 28 im Produktionscode). `npm run lint` = Exit 1 wegen **1 vorbestehendem Error** in `src/app/not-found.tsx` (`@next/next/no-html-link-for-pages`), sonst nur Warnungen. `npm run build` = Exit 0; `next.config` setzt `eslint.ignoreDuringBuilds` **und** `typescript.ignoreBuildErrors` = `true`, daher ist `build` die maßgebliche Grün-Prüfung. Hinweis: „Collecting page data" wirft ohne Secrets (Env-Validierung beim Modul-Load); in der Sandbox mit Platzhalter-Env grün gebaut. `node_modules` war ungetrackt → via `npm ci` installiert. |
