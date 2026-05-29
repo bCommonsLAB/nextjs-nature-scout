@@ -97,6 +97,7 @@ gemeinde?, istatKodex? }`.
 | `lowResUrl` | `string` | – | Vorschau-URL |
 | `analyse` | `string \| null` | ✓ | Bildbezogene Analysenotiz |
 | `plantnetResult` | `PlantNetResult` | – | Pflanzenbestimmung (PlantNet) |
+| `clientImageId` | `string` | – | Stabile Client-ID für Idempotenz beim (Wieder-)Verknüpfen/Sync (Offline-Erfassung) |
 
 ### Eingebettet: `AnalyseErgebnis` (`result`)
 
@@ -197,8 +198,11 @@ Definiert in `createAnalyseJobsIndexes()` (`habitat-service.ts`). Auswahl:
   „Entwürfe"); Index `{ 'metadata.email': 1, status: 1 }` angelegt (1.1). Entwurf-API umgesetzt
   (1.2): `POST /api/habitat/draft`, `PATCH /api/habitat/[auftragsId]/draft` (Param = `jobId`),
   `GET /api/habitat/mine?status=draft`; Service `createDraftJob`/`updateDraftMetadata`
-  (`analysis-service.ts`). **Noch offen:** Bilder serverseitig an Entwurf verknüpfen (1.3),
-  Auto-Save im Orchestrator (1.4). Plan: `specs/regeln/offline-erfassung-umsetzungsplan.md`.
+  (`analysis-service.ts`). Bilder serverseitig an Entwurf verknüpfen (1.3): `/api/upload` akzeptiert
+  optional `jobId`/`imageKey`/`clientImageId`, Service `addImageToDraft`. Online-Auto-Save im
+  Orchestrator (1.4): früher Entwurf + `PATCH …/draft` je Schritt (`NatureScout.tsx`). **Noch offen:**
+  ehrliche Bestätigung + Online-Indikator (1.5), Resume-UI (1.6).
+  Plan: `specs/regeln/offline-erfassung-umsetzungsplan.md`.
 - ✅ **Wartungs-Route `habitat/cleanup` (DELETE) abgesichert (Session 1.2):** Die Admin-Route
   löscht hart Einträge ohne `result`; sie nimmt nun Entwürfe aus (`status: { $ne: 'draft' }`),
   damit (resultlose) Entwürfe nicht versehentlich gelöscht werden. Quelle:

@@ -302,6 +302,18 @@ export default function NatureScout() {
   const [showHelpBubble, setShowHelpBubble] = useState(true); // State für die Sprechblase
   const [showPlantImageOptionalDialog, setShowPlantImageOptionalDialog] = useState(false);
 
+  // Auto-Save (online) für Entwürfe – Session 1.4
+  const { setMetadata: setContextMetadata, setEditJobId: setContextEditJobId, jobId: ctxJobId, setJobId: setCtxJobId } = useNatureScoutState();
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [isResumedDraft, setIsResumedDraft] = useState(false);
+  const draftCreationStartedRef = useRef(false);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Aktiver Entwurf, in den auto-gespeichert wird: neuer Entwurf (jobId) oder fortgesetzter Entwurf (editJobId, falls draft).
+  const activeDraftId = editJobId ? (isResumedDraft ? editJobId : null) : ctxJobId;
+
   // UX-State für den Umriss-Schritt (nur für Navigation/Tooltips, NICHT persistiert)
   const [draftPolygonPoints, setDraftPolygonPoints] = useState<Array<[number, number]>>([]);
   const [isLocationDataLoading, setIsLocationDataLoading] = useState(false);
@@ -582,6 +594,12 @@ export default function NatureScout() {
               kataster: habitatData.metadata.kataster || undefined
             });
             
+            // Entwurf fortsetzen: aktiven Entwurf für Auto-Save übernehmen (Session 1.4/1.6)
+            if (habitatData.status === 'draft') {
+              setIsResumedDraft(true);
+              setCtxJobId(editJobId);
+            }
+
             // Direkt zum zweiten Schritt springen, wenn wir ein bestehendes Habitat bearbeiten
             setAktiverSchritt(1);
           }
@@ -595,10 +613,7 @@ export default function NatureScout() {
       
       fetchHabitatData();
     }
-  }, [editJobId]);
-
-  // Metadaten in den Context übertragen
-  const { setMetadata: setContextMetadata, setEditJobId: setContextEditJobId } = useNatureScoutState();
+  }, [editJobId, setCtxJobId]);
 
   // useEffect zum Aktualisieren des Contexts
   useEffect(() => {
@@ -607,6 +622,71 @@ export default function NatureScout() {
       setContextEditJobId(editJobId);
     }
   }, [metadata, editJobId, setContextMetadata, setContextEditJobId]);
+
+  // Entwurf früh anlegen (online), sobald die Erfassung beginnt (Schritt ≥ 1) und kein Entwurf/Edit aktiv ist.
+  // Online-first: Fehler sind hier nicht fatal (Offline-Fallback folgt in Phase 2).
+  useEffect(() => {
+    if (editJobId) return;            // Fortsetzen/Bearbeiten läuft über editJobId
+    if (ctxJobId) return;             // Entwurf existiert bereits
+    if (aktiverSchritt < 1) return;   // erst wenn der/die Nutzer:in tatsächlich startet
+    if (draftCreationStartedRef.current) return;
+    draftCreationStartedRef.current = true;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/habitat/draft', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        if (!res.ok) {
+          draftCreationStartedRef.current = false; // erneuter Versuch beim nächsten Schritt
+          return;
+        }
+        const data = await res.json();
+        if (!cancelled && data?.jobId) {
+          setCtxJobId(data.jobId);
+        }
+      } catch {
+        draftCreationStartedRef.current = false; // online-first: später erneut versuchen
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [aktiverSchritt, editJobId, ctxJobId, setCtxJobId]);
+
+  // Auto-Save: Teil-Metadaten je Änderung in den Entwurf schreiben (debounced, nur online, nur vor der Analyse).
+  useEffect(() => {
+    if (!activeDraftId) return;
+    if (aktiverSchritt < 1 || aktiverSchritt >= 8) return; // ab Analyse (Schritt 8) wird der Entwurf zu 'pending'
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(async () => {
+      setSaveState('saving');
+      try {
+        const res = await fetch(`/api/habitat/${activeDraftId}/draft`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ metadata })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `Speichern fehlgeschlagen (${res.status})`);
+        }
+        setSaveState('saved');
+        setSaveError(null);
+        setLastSavedAt(new Date());
+      } catch (error) {
+        setSaveState('error');
+        setSaveError(error instanceof Error ? error.message : 'Unbekannter Fehler beim Speichern');
+      }
+    }, 1200);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [metadata, activeDraftId, aktiverSchritt]);
 
   // Handler für den Upload-Status aus der UploadImages-Komponente
   const handleUploadActiveChange = (isActive: boolean) => {
@@ -651,9 +731,17 @@ export default function NatureScout() {
     
     // Zum ersten Schritt zurückkehren
     setAktiverSchritt(0);
-    
+
     // Upload-Status zurücksetzen
     setIsAnyUploadActive(false);
+
+    // Entwurfs-/Auto-Save-Status zurücksetzen, damit ein neuer Entwurf angelegt wird
+    setCtxJobId(null);
+    setIsResumedDraft(false);
+    draftCreationStartedRef.current = false;
+    setSaveState('idle');
+    setSaveError(null);
+    setLastSavedAt(null);
     
     // Hilfe-Sprechblase wieder anzeigen
     setShowHelpBubble(true);
@@ -923,7 +1011,22 @@ export default function NatureScout() {
             ))}
           </div>
         </div>
-        
+
+        {/* Auto-Save-Status (Online) – Session 1.4 */}
+        {activeDraftId && saveState !== 'idle' && (
+          <div className="mb-2 flex items-center justify-end gap-2 text-xs" aria-live="polite">
+            {saveState === 'saving' && <span className="text-gray-500">Wird gespeichert…</span>}
+            {saveState === 'saved' && (
+              <span className="text-green-600">
+                Automatisch gespeichert{lastSavedAt ? ` · ${lastSavedAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` : ''}
+              </span>
+            )}
+            {saveState === 'error' && (
+              <span className="text-red-600">Nicht gespeichert{saveError ? `: ${saveError}` : ''}</span>
+            )}
+          </div>
+        )}
+
         {/* Hauptinhalt - nimmt verfügbaren Platz ein, aber lässt Platz für Navigation */}
         <div className="flex-1 overflow-y-auto pb-32 sm:pb-24" style={{ paddingBottom: 'max(140px, 20vh)' }}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">

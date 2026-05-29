@@ -55,6 +55,8 @@ export interface Bild {
   lowResUrl?: string;
   analyse: string | null;
   plantnetResult?: PlantNetResult;
+  // Stabile Client-ID zur Idempotenz beim (Wieder-)Verknüpfen/Sync von Bildern (Offline-Erfassung).
+  clientImageId?: string;
 }
 
 export interface PlantNetResponse {

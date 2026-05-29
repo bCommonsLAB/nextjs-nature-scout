@@ -12,6 +12,7 @@ import { detectBrowserEnvironment } from "@/lib/utils";
 interface GetImageProps {
   imageTitle: string;
   imageKey: string;
+  jobId?: string | null;
   anweisung: string;
   onBildUpload: (
     imageKey: string,
@@ -31,11 +32,12 @@ interface GetImageProps {
   requiredOrientation?: 'landscape' | 'portrait';
 }
 
-export function GetImage({ 
-  imageTitle, 
+export function GetImage({
+  imageTitle,
   imageKey,
-  anweisung, 
-  onBildUpload, 
+  jobId,
+  anweisung,
+  onBildUpload,
   onDeleteImage,
   existingImage, 
   doAnalyzePlant = false,
@@ -276,6 +278,12 @@ export function GetImage({
 
     const formData = new FormData();
     formData.append("image", file);
+    // Session 1.3: Bild serverseitig direkt mit dem Entwurf verknüpfen (verwaiste Bilder vermeiden)
+    if (jobId) {
+      formData.append("jobId", jobId);
+      formData.append("imageKey", imageKey);
+      formData.append("clientImageId", imageKey);
+    }
 
     const uploadResponse = await fetch('/api/upload', {
       method: 'POST',

@@ -3,6 +3,7 @@
 import { NatureScoutData, Bild, PlantNetResult } from "@/types/nature-scout";
 import { GetImage } from "./GetImage";
 import { useState, useEffect } from "react";
+import { useNatureScoutState } from "@/context/nature-scout-context";
 
 interface SingleImageUploadProps {
   metadata: NatureScoutData;
@@ -28,7 +29,10 @@ export function SingleImageUpload({
   requiredOrientation
 }: SingleImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
-  
+  // jobId des aktiven Entwurfs (für serverseitiges Verknüpfen des Bildes, Session 1.3)
+  const { jobId, editJobId } = useNatureScoutState();
+  const draftJobId = jobId || editJobId || null;
+
   // Upload-Status an übergeordnete Komponente weiterleiten
   useEffect(() => {
     if (onUploadActiveChange) {
@@ -70,9 +74,10 @@ export function SingleImageUpload({
 
   return (
     <div className="h-full">
-      <GetImage 
-        imageTitle={title} 
+      <GetImage
+        imageTitle={title}
         imageKey={imageKey} // Neuer Parameter
+        jobId={draftJobId}
         anweisung={instruction}
         onBildUpload={handleBildUpload}
         onDeleteImage={handleDeleteImage}

@@ -1,5 +1,5 @@
 import { connectToDatabase } from './db';
-import { AnalysisJob, NatureScoutData } from '@/types/nature-scout';
+import { AnalysisJob, NatureScoutData, Bild } from '@/types/nature-scout';
 import { ObjectId } from 'mongodb';
 
 export async function createAnalysisJob(jobId: string, metadata: NatureScoutData, status: AnalysisJob['status']): Promise<AnalysisJob> {
@@ -124,4 +124,29 @@ export async function updateDraftMetadata(jobId: string, partialMetadata: Partia
     console.error('Fehler beim Aktualisieren des Entwurfs:', error);
     throw error;
   }
+}
+
+/**
+ * Verknüpft ein hochgeladenes Bild serverseitig direkt mit einem Entwurf (verhindert verwaiste Bilder).
+ *
+ * Nur für Entwürfe (`status: 'draft'`). Idempotent über `imageKey`: ein bereits vorhandenes Bild
+ * desselben Slots wird ersetzt (kein Duplikat). Gibt `false` zurück, wenn kein Entwurf vorliegt.
+ * Berechtigungs-/Eigentumsprüfung erfolgt im Aufrufer (Upload-Route). Siehe
+ * specs/regeln/offline-erfassung-und-sync.md (§6).
+ */
+export async function addImageToDraft(jobId: string, bild: Bild): Promise<boolean> {
+  const db = await connectToDatabase();
+  const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
+
+  const job = await collection.findOne({ jobId });
+  if (!job || job.status !== 'draft') return false;
+
+  const bilder: Bild[] = Array.isArray(job.metadata?.bilder) ? job.metadata.bilder : [];
+  const nextBilder = [...bilder.filter((b: Bild) => b.imageKey !== bild.imageKey), bild];
+
+  await collection.updateOne(
+    { jobId },
+    { $set: { 'metadata.bilder': nextBilder, updatedAt: new Date() } }
+  );
+  return true;
 }
