@@ -30,7 +30,8 @@ export function SingleImageUpload({
 }: SingleImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   // jobId des aktiven Entwurfs (für serverseitiges Verknüpfen des Bildes, Session 1.3)
-  const { jobId, editJobId } = useNatureScoutState();
+  // localSessionId: aktive Offline-Session (Bild lokal ablegen, Session 2.5)
+  const { jobId, editJobId, localSessionId } = useNatureScoutState();
   const draftJobId = jobId || editJobId || null;
 
   // Upload-Status an übergeordnete Komponente weiterleiten
@@ -54,7 +55,9 @@ export function SingleImageUpload({
       url,
       lowResUrl,
       analyse: analysis,
-      plantnetResult
+      plantnetResult,
+      // Stabile Client-ID je Slot (Idempotenz beim serverseitigen Verknüpfen/Sync)
+      clientImageId: imageKey
     };
       
     setMetadata(prev => ({
@@ -78,6 +81,7 @@ export function SingleImageUpload({
         imageTitle={title}
         imageKey={imageKey} // Neuer Parameter
         jobId={draftJobId}
+        localSessionId={localSessionId}
         anweisung={instruction}
         onBildUpload={handleBildUpload}
         onDeleteImage={handleDeleteImage}

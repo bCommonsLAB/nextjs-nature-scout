@@ -11,6 +11,9 @@ interface NatureScoutContextType {
   setEditJobId: React.Dispatch<React.SetStateAction<string | null>>;
   jobId: string | null;
   setJobId: React.Dispatch<React.SetStateAction<string | null>>;
+  // Aktive lokale (Offline-)Session-ID – gesetzt im Offline-Modus (Phase 2)
+  localSessionId: string | null;
+  setLocalSessionId: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
 // Erstelle den Context mit Defaultwerten
@@ -21,6 +24,8 @@ const NatureScoutContext = createContext<NatureScoutContextType>({
   setEditJobId: () => {},
   jobId: null,
   setJobId: () => {},
+  localSessionId: null,
+  setLocalSessionId: () => {},
 });
 
 // Hook zum Verwenden des Contexts
@@ -33,16 +38,19 @@ export function NatureScoutProvider({ children }: { children: ReactNode }) {
   const [metadata, setMetadata] = useState<NatureScoutData | null>(null);
   const [editJobId, setEditJobId] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
+  const [localSessionId, setLocalSessionId] = useState<string | null>(null);
 
   return (
-    <NatureScoutContext.Provider 
-      value={{ 
-        metadata, 
+    <NatureScoutContext.Provider
+      value={{
+        metadata,
         setMetadata,
         editJobId,
         setEditJobId,
         jobId,
-        setJobId
+        setJobId,
+        localSessionId,
+        setLocalSessionId
       }}
     >
       {children}

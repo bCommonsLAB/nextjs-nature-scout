@@ -13,6 +13,7 @@ interface GetImageProps {
   imageTitle: string;
   imageKey: string;
   jobId?: string | null;
+  localSessionId?: string | null;
   anweisung: string;
   onBildUpload: (
     imageKey: string,
@@ -36,6 +37,7 @@ export function GetImage({
   imageTitle,
   imageKey,
   jobId,
+  localSessionId,
   anweisung,
   onBildUpload,
   onDeleteImage,
@@ -352,7 +354,30 @@ export function GetImage({
 
   async function processImage(file: File, filename: string, doAnalyzePlant: boolean) {
     setProgressPhase('upload');
-    
+
+    // Offline-Modus (Session 2.5): Blob lokal in voller Qualität ablegen – kein Upload, kein PlantNet.
+    // Beides läuft erst beim späteren Sync (online).
+    if (localSessionId) {
+      setLocalUploadProgress(30);
+      const { storeImageLocally } = await import('@/lib/offline/images');
+      try {
+        const result = await storeImageLocally({ localSessionId, imageKey, blob: file, clientImageId: imageKey });
+        setLocalUploadProgress(100);
+        if (result.storageWarning) {
+          toast.warning('Lokaler Speicher wird knapp – bitte bald synchronisieren.');
+        }
+        return {
+          url: result.previewUrl,
+          lowResUrl: result.previewUrl,
+          filename: file.name,
+          analysis: { bestMatch: "", results: [] as PlantNetResult[] }
+        };
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Lokales Speichern fehlgeschlagen');
+        throw error;
+      }
+    }
+
     const compressedFile = await compressImageOnClient(file);
     
     setLocalUploadProgress(20);

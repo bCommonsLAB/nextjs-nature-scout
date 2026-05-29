@@ -17,6 +17,10 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { FilterSelect } from './components/FilterSelect';
+import { useSync } from '@/lib/offline/use-sync';
+import { deleteLocalSession } from '@/lib/offline/db';
+import { LocalSessionStatus } from '@/lib/offline/types';
+import { RefreshCw, WifiOff } from 'lucide-react';
 
 interface HabitateEntry {
   jobId: string;
@@ -71,6 +75,15 @@ interface HabitateData {
   };
 }
 
+// Lesbares Label für den lokalen Offline-Status (Session 2.5)
+const LOCAL_STATUS_LABEL: Record<LocalSessionStatus, string> = {
+  entwurf_lokal: 'Nur lokal gespeichert',
+  sync_ausstehend: 'Wird synchronisiert…',
+  synchronisiert: 'Synchronisiert (lokal noch vorhanden)',
+  abgeschlossen: 'Abgeschlossen',
+  sync_fehler: 'Synchronisierung fehlgeschlagen'
+};
+
 // Leichter Typ für eigene Entwürfe (GET /api/habitat/mine?status=draft) – Session 1.6
 interface DraftEntry {
   jobId: string;
@@ -102,6 +115,8 @@ function HabitatPageContent() {
   const [migrationResult, setMigrationResult] = useState<{ success: boolean; message: string } | null>(null);
   // Eigene Entwürfe für „Erfassung fortsetzen" – Session 1.6
   const [drafts, setDrafts] = useState<DraftEntry[]>([]);
+  // Offline-Sessions (IndexedDB) + Sync-Engine – Session 2.5
+  const { syncing, pendingCount, sessions: localSessions, syncNow, refresh: refreshSync } = useSync();
   
   const page = Number(searchParams.get('page') || '1');
   const search = searchParams.get('search') || '';
@@ -392,6 +407,20 @@ function HabitatPageContent() {
     } catch (error) {
       console.error('Fehler beim Verwerfen des Entwurfs:', error);
       alert('Entwurf konnte nicht verworfen werden.');
+    }
+  };
+
+  // Lokale (Offline-)Session verwerfen – Session 2.5
+  const handleDeleteLocalSession = async (localId: string) => {
+    if (!confirm('Diese lokale Offline-Erfassung wirklich löschen? Noch nicht synchronisierte Daten gehen verloren.')) {
+      return;
+    }
+    try {
+      await deleteLocalSession(localId);
+      await refreshSync();
+    } catch (error) {
+      console.error('Fehler beim Löschen der lokalen Session:', error);
+      alert('Lokale Session konnte nicht gelöscht werden.');
     }
   };
 
@@ -688,6 +717,59 @@ function HabitatPageContent() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Offline-Erfassungen (lokal, IndexedDB) + Sync (Session 2.5) */}
+      {localSessions.filter(s => s.status !== 'abgeschlossen').length > 0 && (
+        <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+            <h2 className="text-lg font-semibold text-blue-800 inline-flex items-center gap-2">
+              <WifiOff className="h-5 w-5" />
+              Offline-Erfassungen ({localSessions.filter(s => s.status !== 'abgeschlossen').length})
+            </h2>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void syncNow()}
+              disabled={syncing || pendingCount === 0}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Synchronisiere…' : `Jetzt synchronisieren${pendingCount ? ` (${pendingCount})` : ''}`}
+            </Button>
+          </div>
+          <p className="text-sm text-blue-700 mb-3">
+            Lokal auf diesem Gerät gespeicherte Erfassungen. Sie werden automatisch übertragen, sobald eine Internetverbindung besteht.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {localSessions.filter(s => s.status !== 'abgeschlossen').map((s) => {
+              const bildCount = Array.isArray(s.metadata?.bilder) ? s.metadata.bilder.length : 0;
+              const resumeHref = s.jobId
+                ? `/naturescout?editJobId=${s.jobId}`
+                : `/naturescout?localSessionId=${s.localId}`;
+              return (
+                <div key={s.localId} className="bg-white rounded-md border border-blue-200 p-3 flex flex-col gap-2">
+                  <div className="text-sm font-medium text-gray-900">
+                    {s.metadata?.gemeinde || 'Unbekannter Standort'}
+                    {s.metadata?.flurname ? ` · ${s.metadata.flurname}` : ''}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {bildCount} Bild(er) · {LOCAL_STATUS_LABEL[s.status]}
+                  </div>
+                  {s.lastError && <div className="text-xs text-red-600">{s.lastError}</div>}
+                  <div className="flex gap-2 mt-1">
+                    <Button size="sm" onClick={() => router.push(resumeHref)}>
+                      Fortsetzen
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleDeleteLocalSession(s.localId)}>
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Löschen
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
