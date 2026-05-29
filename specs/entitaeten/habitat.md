@@ -176,4 +176,8 @@ Definiert in `createAnalyseJobsIndexes()` (`habitat-service.ts`). Auswahl:
   Habitat-Dokument angleichen".)
 - ⚠️ **Doppelte Ergebnisablage:** `metadata.analyseErgebnis` vs. Wurzel-`result`. Konsens:
   `result` ist maßgeblich; `metadata.analyseErgebnis` möglichst nicht mehr verwenden.
+- 📝 **Geplant – Status `'draft'`:** Für die ausfallsichere/offline-fähige Erfassung soll der
+  Status um `'draft'` (Erfassung läuft, noch nicht analysiert) erweitert werden; solche
+  Datensätze sind nie öffentlich und aus normalen Listen ausgeschlossen. Details & Plan:
+  `specs/regeln/offline-erfassung-und-sync.md`.
 </content>

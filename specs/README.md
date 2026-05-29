@@ -28,7 +28,8 @@ specs/
     ├── verifizierungs-workflow.md
     ├── schutzstatus.md        # Schutzstatus ↔ protectionStatus (Ampel)
     ├── datenschutz-und-consent.md
-    └── analyse-pipeline.md    # Ablauf der KI-Analyse
+    ├── analyse-pipeline.md    # Ablauf der KI-Analyse
+    └── offline-erfassung-und-sync.md  # ENTWURF: ausfallsichere & offline-fähige Erfassung
 ```
 
 ## Arbeitsweise (Spec-Driven)
