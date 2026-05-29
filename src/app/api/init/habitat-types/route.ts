@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/services/db';
-import { UserService } from '@/lib/services/user-service';
-import { requireAuth } from '@/lib/server-auth';
+import { requireAdmin } from '@/lib/server-auth';
 
 // Aktualisierte Habitattypen mit typicalSpecies
 const updatedHabitatTypes = [
@@ -274,18 +273,9 @@ const updatedHabitatTypes = [
 
 export async function GET() {
   try {
-    // Echte Authentifizierung
-    const currentUser = await requireAuth();
-    const userId = currentUser.email;
-    const isAdmin = await UserService.isAdmin(currentUser.email);
-    
-    // if (!isAdmin) {
-    //   return NextResponse.json(
-    //     { error: 'Nur Administratoren können Habitattypen initialisieren' },
-    //     { status: 403 }
-    //   );
-    // }
-    
+    // Nur Administratoren (siehe specs/regeln/rollen-und-rechte.md)
+    await requireAdmin();
+
     const db = await connectToDatabase();
     const collection = db.collection('habitatTypes');
     

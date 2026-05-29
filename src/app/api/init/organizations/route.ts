@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { OrganizationService } from '@/lib/services/organization-service';
-import { UserService } from '@/lib/services/user-service';
-import { requireAuth } from '@/lib/server-auth';
+import { requireAdmin } from '@/lib/server-auth';
 import fs from 'fs';
 import path from 'path';
 
@@ -25,23 +24,11 @@ interface ImportStats {
  * GET /api/init/organizations - Importiert Organisationen aus der JSON-Datei
  * Nur für Admins zugänglich
  */
-export async function GET(req: Request) {
+export async function GET() {
   try {
-    // Echte Authentifizierung
-    const currentUser = await requireAuth();
-    const userId = currentUser.email;
-    const isAdmin = await UserService.isAdmin(currentUser.email);
-    
-    // const auth = getAuth(req);
-    // const userId = auth.userId;
-    // if (!userId) {
-    //   return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
-    // }
-    // const isAdmin = await UserService.isAdmin(userId);
-    // if (!isAdmin) {
-    //   return NextResponse.json({ error: 'Zugriff verweigert. Nur für Admins.' }, { status: 403 });
-    // }
-    
+    // Nur Administratoren (siehe specs/regeln/rollen-und-rechte.md)
+    await requireAdmin();
+
     // Lese die JSON-Datei
     const filePath = path.join(process.cwd(), 'data', 'organisations.json');
     

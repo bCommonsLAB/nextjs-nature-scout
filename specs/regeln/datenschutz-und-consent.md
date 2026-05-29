@@ -28,14 +28,22 @@ Regeln zu Einwilligungen, Sichtbarkeit personenbezogener Daten und Bildrechten.
 4. **Datenverarbeitung:** `consent_data_processing` dokumentiert die Einwilligung; fachlich ist
    zu klären, ob aktive Erfassung ohne diese Einwilligung blockiert sein soll (s. „Offene Punkte").
 
+## Ist-Zustand der Durchsetzung (verifiziert)
+
+- ✅ **Namens-Sichtbarkeit:** In der öffentlichen Liste/Karte (`habitat/public/route.ts`) wird
+  `erfassungsperson` anonymisiert: für anonyme Zugriffe **immer**; für eingeloggte Nutzer nur
+  angezeigt, wenn `habitat_name_visibility === 'public'` **oder** dieselbe Organisation. Die
+  `email` wird in der öffentlichen Ausgabe stets entfernt. Analog in `public-filter-options`.
+- ✅ **Datenverarbeitung:** `consent_data_processing` wird clientseitig als Zugangs-Gate
+  erzwungen (`hooks/use-user-consent.ts`, `components/layout/navigationbar.tsx`): ohne alle drei
+  Consents wird der/die Nutzer:in zur Vervollständigung im Profil geführt.
+
 ## Offene Punkte / Abweichungen
 
-- Die **Durchsetzung** der Consent-Felder ist im Code nur teilweise erkennbar. Zu spezifizieren
-  und zu verifizieren ist:
-  - Wird `habitat_name_visibility` in **allen** öffentlichen Ausgaben (Liste, Karte, Detail,
-    Export) konsequent angewandt?
-  - Wird `consent_image_ccby` vor Veröffentlichung/Export von Bildern geprüft?
-  - Soll `consent_data_processing` Pflicht für die Erfassung sein?
+- ⚠️ **`consent_image_ccby` wird (noch) nicht durchgesetzt:** In der öffentlichen Ausgabe/Export
+  findet keine Prüfung dieses Flags statt – Bilder werden unabhängig von der CC-BY-Freigabe
+  ausgespielt. **Fachliche Entscheidung nötig:** Sollen Bilder ohne CC-BY-Freigabe zurückgehalten
+  oder nur intern angezeigt werden? (Bewusst nicht eigenmächtig geändert, da verhaltensändernd.)
 - DSGVO-Aspekte (Auskunft, Löschung) sind nicht spezifiziert; Soft-Delete von Habitaten löscht
   Personendaten nicht physisch.
 </content>

@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
 import { LoginCodeService } from '@/lib/services/login-code-service'
+import { requireAdmin } from '@/lib/server-auth'
 
 export async function POST() {
   try {
+    // Nur Administratoren (siehe specs/regeln/rollen-und-rechte.md)
+    await requireAdmin()
+
     // Erstelle die benötigten Indizes für Login-Codes
     await LoginCodeService.createLoginCodeIndexes()
     

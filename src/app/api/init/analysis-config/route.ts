@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { initializeAnalysisConfigs } from '@/lib/services/analysis-config-service';
+import { requireAdmin } from '@/lib/server-auth';
 
 export async function GET() {
   try {
+    // Nur Administratoren (siehe specs/regeln/rollen-und-rechte.md)
+    await requireAdmin();
+
     await initializeAnalysisConfigs();
     return NextResponse.json({ 
       success: true, 

@@ -47,6 +47,9 @@ Rolle des Benutzers.
 
 ## Offene Punkte / Abweichungen
 
+- ✅ **`GET /api/init/db-indexes` gehärtet (erledigt):** Route erfordert nun `requireAdmin()`
+  (zuvor war die Admin-Prüfung auskommentiert, nur `requireAuth`). Andere `/api/init/*`-Routen
+  sollten gegengeprüft werden.
 - Unterschied `admin` vs. `superadmin` ist im Code aktuell **nicht** wirksam differenziert
   (beide gelten als Admin). Falls eine Sonderrolle gewünscht ist, hier spezifizieren.
 - Berechtigungen werden pro Route imperativ geprüft (keine zentrale Policy/Middleware) – ein
