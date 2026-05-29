@@ -60,7 +60,7 @@ adaptiv genutzt. Zur Laufzeit werden zwei Fähigkeiten erkannt:
 | ✅ | ✅ | **Server sofort** nach jedem Schritt speichern; lokal zusätzlich spiegeln (Fallback). |
 | ✅ | ❌ | **Nur Server** (sofort). Voll funktionsfähig, kein lokaler Bedarf. |
 | ❌ | ✅ | **Lokal** speichern (IndexedDB inkl. Bild-Blobs). Automatischer Sync, sobald online. |
-| ❌ | ❌ | **Keine Persistenz möglich** → eindringliche Warnung: „Ohne Internet **und** ohne lokalen Speicher kann nichts zwischengespeichert werden. Bitte mit Internetverbindung erfassen." Erfassung wird nicht still zugelassen. |
+| ❌ | ❌ | **Keine Persistenz möglich** → **hart blockieren (Entscheidung):** eindringliche Warnung „Ohne Internet **und** ohne lokalen Speicher kann nichts zwischengespeichert werden. Bitte mit Internetverbindung erfassen." und die Erfassung wird **nicht zugelassen** (kein stilles Weiterarbeiten, das garantiert zu Datenverlust führt). |
 
 ## 4. Lokaler Speicher: Technikwahl
 
@@ -69,8 +69,14 @@ adaptiv genutzt. Zur Laufzeit werden zwei Fähigkeiten erkannt:
 - **Erfassungs-Metadaten → IndexedDB** (eine „Session" je Erfassung), zusätzlich ein kleiner
   Zeiger (aktive Session-ID, Sync-Status) in `localStorage` für schnellen Start.
 - **Bild-Vorschau offline** über `URL.createObjectURL(blob)`.
-- **Kontingent-Fehler (`QuotaExceededError`)** abfangen → Hinweis + zum Synchronisieren auffordern;
-  optional clientseitiges Herunterskalieren großer Fotos vor lokaler Ablage.
+- **Bildqualität hat Vorrang (Entscheidung):** Fotos werden **in voller Qualität** lokal abgelegt –
+  **kein** clientseitiges Herunterskalieren, da die Bildqualität für die KI-Analyse wichtig ist.
+- **Freien Speicher proaktiv prüfen (Entscheidung):** Vor/bei lokaler Ablage `navigator.storage.estimate()`
+  auswerten. Liegt der verbleibende Speicher unter einem Schwellwert (bzw. reicht das geschätzte
+  Restkontingent nicht für die anstehenden Fotos), **frühzeitig warnen** und zum Synchronisieren auffordern –
+  nicht erst, wenn der Fehler eintritt.
+- **Kontingent-Fehler (`QuotaExceededError`)** zusätzlich als Sicherheitsnetz abfangen → Hinweis +
+  zum Synchronisieren auffordern.
 
 ## 5. Statusmodell
 
@@ -107,7 +113,12 @@ Neuer Wert **`'draft'`** (Erfassung läuft / noch nicht analysiert), zusätzlich
   ersetzen, Server-Entwurf anlegen/aktualisieren, lokal als `synchronisiert` markieren.
 - **Retry mit Backoff**; pro Session sichtbarer Sync-Status; Fehler werden angezeigt, nicht verschluckt.
 - **Konflikte:** Entwürfe sind nie verifiziert → Last-Write-Wins je `jobId` genügt.
-- Nach erfolgreichem Sync + Abschluss: lokale Kopie (inkl. Blobs) aufräumen (Datenschutz, Kontingent).
+- **Aufräumen (Entscheidung):** Lokale Kopie (inkl. Blobs) wird **erst nach bestätigtem Abschluss**
+  (Server-2xx auf den finalen Speicher/Analyse-Schritt) gelöscht – **nicht** schon direkt nach dem
+  reinen Bild-Sync, damit bei einem späteren Fehler nichts verloren geht.
+- **Manuelle Bereinigung (Entscheidung):** Im **Nutzerprofil** gibt es eine Option „Offline-Daten
+  bereinigen", mit der lokal verbliebene Sessions/Blobs angezeigt und gezielt gelöscht werden können
+  (z. B. nach erfolgtem Abschluss auf einem anderen Gerät, oder zum Freigeben von Speicher).
 
 ## 8. Fortsetzen (Resume)
 
@@ -150,9 +161,14 @@ für „stundenlang im Feld, mehrere Sessions" zu fragil. Hinweise: saubere Upda
 **Client:** Persistenz-Service (Strategie aus §3), IndexedDB-Layer (§4/§6), Sync-Engine (§7),
 Capability-Erkennung, Auto-Save-Hook im Orchestrator, Status-/Offline-UI.
 
+**Consent offline (Entscheidung):** Für die **Offline-Erfassung ist keine gesonderte Einwilligung
+erforderlich** – das Zwischenspeichern (lokal/Server-Entwurf) läuft ohne zusätzliches Consent-Gate.
+Die bestehenden Consent-Pflichten gelten unverändert beim **Abschluss/Einreichen** (online).
+
 **Spec-Folgeänderungen:** `habitat.md` (Status `draft`, Listen-Ausschluss-Invariante),
-`datenschutz-und-consent.md` (lokale Speicherung personenbezogener Daten, Aufräumen nach Sync),
-`analyse-pipeline.md` (Analyse/PlantNet erst online/bei Sync).
+`datenschutz-und-consent.md` (lokale Speicherung personenbezogener Daten; kein zusätzliches
+Consent fürs Offline-Zwischenspeichern; Aufräumen erst nach bestätigtem Abschluss + manuelle
+Bereinigung im Profil), `analyse-pipeline.md` (Analyse/PlantNet erst online/bei Sync).
 
 ## 12. Umsetzungsplan (Phasen)
 
@@ -168,16 +184,20 @@ Capability-Erkennung, Auto-Save-Hook im Orchestrator, Status-/Offline-UI.
 Jede Phase wird verifiziert: `npm run lint` + `npm run build` grün, `tsc`-Fehleranzahl ≤ Baseline,
 Offline-Test (DevTools „Offline"), Test auf echtem Smartphone (inkl. Tab-Eviction/Flugmodus).
 
-## 13. Offene Punkte / zu entscheiden
+## 13. Entscheidungen & offene Punkte
 
-- **Kontingent/Bildqualität:** clientseitiges Herunterskalieren vor lokaler Ablage? (Qualität für
-  KI-Analyse vs. Speicherplatz.)
-- **Aufbewahrung lokaler Daten:** Wann genau lokale Blobs löschen (sofort nach Sync vs.
-  nach bestätigtem Abschluss)? Datenschutz vs. Sicherheit.
-- **Consent offline:** Darf offline erfasst werden, bevor Consent serverseitig bestätigt ist?
-  (Heute werden Consents über ein UI-Gate erzwungen – Verhalten offline definieren.)
-- **iOS-Besonderheiten:** PWA-Storage-Eviction; Kamera/Datei-APIs in Safari.
-- **„Kein Internet & kein lokaler Speicher":** Erfassung hart blockieren oder nur warnen?
+### Entschieden
+- ✅ **Kontingent/Bildqualität:** **Kein** Herunterskalieren – Bildqualität hat Vorrang (KI-Analyse).
+  Stattdessen freien Speicher proaktiv prüfen und bei wenig Platz warnen (§4).
+- ✅ **Aufbewahrung lokaler Daten:** Löschen **erst nach bestätigtem Abschluss**; zusätzlich
+  manuelle „Offline-Daten bereinigen"-Option im Nutzerprofil (§7).
+- ✅ **Consent offline:** **Keine** gesonderte Einwilligung fürs Offline-Zwischenspeichern;
+  Consent-Pflichten gelten beim Abschluss/Einreichen (§11).
+- ✅ **„Kein Internet & kein lokaler Speicher":** Erfassung **hart blockieren** (warnen + nicht
+  zulassen) (§3).
+
+### Noch offen
+- **iOS-Besonderheiten:** PWA-Storage-Eviction; Kamera/Datei-APIs in Safari (in Phase 2/3 klären).
 - **Mehrgeräte-Resume:** Server-Entwürfe ermöglichen Fortsetzen auf anderem Gerät; lokale Sessions
-  sind gerätegebunden – gewünschtes Verhalten bestätigen.
+  sind gerätegebunden – gewünschtes Verhalten bei Umsetzung von Phase 2 bestätigen.
 </content>
