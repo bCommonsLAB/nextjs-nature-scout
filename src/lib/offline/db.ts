@@ -214,6 +214,19 @@ export function setActiveLocalSessionId(localId: string | null): void {
   }
 }
 
+/**
+ * Löscht die lokale Session, die zu einer Server-`jobId` gehört (Aufräumen nach bestätigtem
+ * Abschluss, Session 2.6). No-op, wenn keine passende Session existiert.
+ */
+export async function deleteLocalSessionByJobId(jobId: string): Promise<void> {
+  if (!jobId) return;
+  const sessions = await listLocalSessions();
+  const match = sessions.find(s => s.jobId === jobId);
+  if (match) {
+    await deleteLocalSession(match.localId);
+  }
+}
+
 /** Anzahl Sessions mit ausstehendem Sync (für die Offline-Status-UI, Session 2.5). */
 export async function countPendingSyncSessions(): Promise<number> {
   const sessions = await listLocalSessions();

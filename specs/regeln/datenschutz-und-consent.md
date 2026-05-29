@@ -27,6 +27,11 @@ Regeln zu Einwilligungen, Sichtbarkeit personenbezogener Daten und Bildrechten.
    `consent_image_ccby === true` voraus.
 4. **Datenverarbeitung:** `consent_data_processing` dokumentiert die Einwilligung; fachlich ist
    zu klären, ob aktive Erfassung ohne diese Einwilligung blockiert sein soll (s. „Offene Punkte").
+5. **Offline-Zwischenspeichern (lokal):** Das vorübergehende lokale Speichern personenbezogener
+   Erfassungsdaten (IndexedDB: Entwürfe + Bild-Blobs) zur Ausfallsicherheit/Offline-Erfassung
+   benötigt **kein gesondertes Consent** (Entscheidung, Spec §11). Die bestehenden Consent-Pflichten
+   gelten unverändert beim **Abschluss/Einreichen** (online). Lokale Kopien werden erst nach
+   bestätigtem Abschluss gelöscht; im Profil lassen sich verbliebene Offline-Daten gezielt bereinigen.
 
 ## Ist-Zustand der Durchsetzung (verifiziert)
 
@@ -37,6 +42,10 @@ Regeln zu Einwilligungen, Sichtbarkeit personenbezogener Daten und Bildrechten.
 - ✅ **Datenverarbeitung:** `consent_data_processing` wird clientseitig als Zugangs-Gate
   erzwungen (`hooks/use-user-consent.ts`, `components/layout/navigationbar.tsx`): ohne alle drei
   Consents wird der/die Nutzer:in zur Vervollständigung im Profil geführt.
+- ✅ **Offline-Zwischenspeichern (Phase 2):** Lokale Sessions/Bild-Blobs in IndexedDB
+  (`src/lib/offline/*`) – ohne zusätzliches Consent-Gate. Bereinigung im Profil („Offline-Daten",
+  `components/natureScout/OfflineDataManager.tsx`); automatische Löschung der lokalen Kopie nach
+  bestätigtem Abschluss (`Summary.tsx` → `deleteLocalSessionByJobId`).
 
 ## Offene Punkte / Abweichungen
 

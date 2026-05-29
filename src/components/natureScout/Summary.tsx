@@ -70,6 +70,17 @@ export function Summary({ metadata }: SummaryProps) {
       }
 
       setHasSaved(true);
+
+      // Aufräumen nach bestätigtem Abschluss (Session 2.6): lokale Offline-Kopie löschen,
+      // erst jetzt (Server-2xx), nicht schon nach reinem Bild-Sync. Best-Effort.
+      if (currentJobId) {
+        try {
+          const { deleteLocalSessionByJobId } = await import('@/lib/offline/db');
+          await deleteLocalSessionByJobId(currentJobId);
+        } catch {
+          // lokale Bereinigung ist nicht kritisch (auch im Profil möglich)
+        }
+      }
     } catch (error) {
       console.error('Fehler beim Speichern des Habitats:', error);
       setSaveError(error instanceof Error ? error.message : 'Unbekannter Fehler beim Speichern');
