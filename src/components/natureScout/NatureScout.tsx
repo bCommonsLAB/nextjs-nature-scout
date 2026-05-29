@@ -14,9 +14,10 @@ import { SingleImageUpload } from "./SingleImageUpload";
 import { OnlineStatusIndicator } from "./OnlineStatusIndicator";
 import { Bild, NatureScoutData, AnalyseErgebnis, llmInfo, PlantNetResult } from "@/types/nature-scout";
 import { LocationDetermination, isPolygonClosed } from './LocationDetermination';
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, AlertTriangle } from "lucide-react";
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNatureScoutState } from "@/context/nature-scout-context";
+import { useCapabilities } from "@/lib/offline/use-capabilities";
 import { toast } from "sonner";
 
 function calculatePolygonCenter(points: Array<[number, number]>): [number, number] {
@@ -314,6 +315,11 @@ export default function NatureScout() {
 
   // Aktiver Entwurf, in den auto-gespeichert wird: neuer Entwurf (jobId) oder fortgesetzter Entwurf (editJobId, falls draft).
   const activeDraftId = editJobId ? (isResumedDraft ? editJobId : null) : ctxJobId;
+
+  // Capability-Erkennung + Strategie-Matrix (Session 2.1)
+  const { strategy, refresh: refreshCapabilities } = useCapabilities();
+  // Hart blockieren, wenn weder Netz noch lokaler Speicher verfügbar ist (garantierter Datenverlust).
+  const isHardBlocked = strategy === 'blockieren' && aktiverSchritt >= 1;
 
   // UX-State für den Umriss-Schritt (nur für Navigation/Tooltips, NICHT persistiert)
   const [draftPolygonPoints, setDraftPolygonPoints] = useState<Array<[number, number]>>([]);
@@ -1297,6 +1303,29 @@ export default function NatureScout() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Hart blockieren: kein Netz UND kein lokaler Speicher → Erfassung nicht zulassen (Session 2.1) */}
+      {isHardBlocked && (
+        <div className="fixed inset-0 z-[10001] bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6 text-center shadow-xl">
+            <AlertTriangle className="h-10 w-10 text-red-600 mx-auto mb-3" />
+            <h2 className="text-lg font-bold mb-2">Zwischenspeichern nicht möglich</h2>
+            <p className="text-sm text-gray-700 mb-4">
+              Ohne Internetverbindung <strong>und</strong> ohne lokalen Speicher kann nichts
+              zwischengespeichert werden. Bitte erfassen Sie mit einer Internetverbindung –
+              andernfalls gehen Ihre Eingaben verloren.
+            </p>
+            <div className="flex gap-2 justify-center">
+              <Button variant="outline" onClick={() => router.push('/')}>
+                Zur Startseite
+              </Button>
+              <Button onClick={() => void refreshCapabilities()}>
+                Erneut prüfen
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 } 

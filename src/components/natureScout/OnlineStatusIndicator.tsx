@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Wifi, WifiOff } from "lucide-react";
+import { checkOnline } from "@/lib/offline/capabilities";
 
 /**
  * Persistenter Online-/Offline-Indikator (Session 1.5).
@@ -16,25 +17,13 @@ export function OnlineStatusIndicator() {
     let cancelled = false;
 
     const check = async () => {
-      // Schneller Negativ-Check ohne Netzwerk
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        if (!cancelled) setOnline(false);
-        return;
-      }
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
-        const res = await fetch('/api/health', { method: 'GET', cache: 'no-store', signal: controller.signal });
-        clearTimeout(timeout);
-        if (!cancelled) setOnline(res.ok);
-      } catch {
-        if (!cancelled) setOnline(false);
-      }
+      const isOnline = await checkOnline();
+      if (!cancelled) setOnline(isOnline);
     };
 
-    check();
-    const interval = setInterval(check, 15000);
-    const handleOnline = () => check();
+    void check();
+    const interval = setInterval(() => { void check(); }, 15000);
+    const handleOnline = () => { void check(); };
     const handleOffline = () => setOnline(false);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);

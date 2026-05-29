@@ -85,14 +85,14 @@
 > Ziel: Erfassung ohne Empfang im Feld, mehrere Sessions, späterer Sync.
 > Lokaler Speicher als Fallback gemäß Capability-Matrix (Spec §3).
 
-- [ ] **2.1 – Capability-Erkennung + Strategie-Matrix.**
+- [x] **2.1 – Capability-Erkennung + Strategie-Matrix.**
   - `online` = `navigator.onLine` **und** Erreichbarkeits-Check gegen leichten Endpoint.
   - `localPersistenceAvailable` = IndexedDB nutzbar?
   - Strategie-Auswahl nach Spec §3 (Server sofort / nur Server / lokal / **hart blockieren**).
   - **Hart blockieren**, wenn kein Netz **und** kein lokaler Speicher (Spec §3, eindringliche Warnung,
     Erfassung nicht zulassen).
 
-- [ ] **2.2 – IndexedDB-Layer (Sessions + Bild-Blobs).**
+- [x] **2.2 – IndexedDB-Layer (Sessions + Bild-Blobs).**
   - Eine „Session" je Erfassung (Metadaten) + Bild-Blobs in IndexedDB.
   - Kleiner Zeiger (aktive Session-ID, Sync-Status) in `localStorage`.
   - Lokales Statusmodell: `entwurf_lokal | sync_ausstehend | synchronisiert | abgeschlossen | sync_fehler`.
@@ -156,3 +156,5 @@
 | 1.4 | 2026-05-29 | _(dieser Commit)_ | **Auto-Save im Orchestrator (online).** `NatureScout.tsx`: legt früh (Schritt ≥ 1, sofern kein Edit/Entwurf aktiv) via `POST /api/habitat/draft` einen Entwurf an und hält die `jobId` im Context; debounced `PATCH …/draft` je Metadaten-Änderung (Schritte 1–7). Ab Analyse (Schritt 8) übernimmt der bestehende Pfad: `HabitatAnalysis` nutzt die Context-`jobId` als `existingJobId` → Entwurf wird zu `pending` (kein Doppeldokument). Sichtbarer Auto-Save-Status unter der Fortschrittsleiste. Fortsetzen eines Entwurfs (editJobId, `status==='draft'`) übernimmt den aktiven Entwurf fürs Auto-Save. Online-first: Fehler sind nicht fatal (Offline-Fallback = Phase 2). Verifikation: tsc 98, lint Baseline (1 bereinigte exhaustive-deps-Warnung), build Exit 0. |
 | 1.5 | 2026-05-29 | _(dieser Commit)_ | **Ehrliche Bestätigung + Retry + Online-Indikator.** Unbedingtes „… wurde gespeichert" in `Summary.tsx` ersetzt durch statusabhängige Meldung: „Wird gespeichert…" → Erfolg **nur** nach Server-2xx (`hasSaved`); bei Fehler sichtbare Meldung + **Retry-Button** (`saveSummary` als `useCallback`, kein verschluckter `catch`). Neuer Online-/Offline-Indikator (`OnlineStatusIndicator`) mit echtem Erreichbarkeits-Check gegen neuen Endpoint `/api/health` (nicht nur `navigator.onLine`); im Orchestrator persistent angezeigt inkl. Auto-Save-Status + Retry. Verifikation: tsc 98, lint Baseline (entfernt sogar Warnungen, da `isSaving`/`saveError` jetzt genutzt), build Exit 0. |
 | 1.6 | 2026-05-29 | _(dieser Commit)_ | **Resume über Server-Entwürfe.** „Meine Habitate" (`app/habitat/page.tsx`) lädt eigene Entwürfe (`GET /api/habitat/mine?status=draft`) und zeigt einen Bereich „Erfassung fortsetzen" (Standort, Bildanzahl, letzte Änderung) mit **Fortsetzen** (→ `/naturescout?editJobId=<jobId>`, bestehender Rehydrierungs-Pfad) und **Verwerfen** (Soft-Delete). Rehydrierung übernimmt den Entwurf fürs weitere Auto-Save (Schritt 1.4). Verifikation: tsc 98, lint Baseline (`Trash2` jetzt genutzt), build Exit 0. |
+| 2.1 | 2026-05-29 | _(dieser Commit)_ | **Capability-Erkennung + Strategie-Matrix.** Neues Modul `src/lib/offline/`: `capabilities.ts` (`checkOnline` via `/api/health`, `checkLocalPersistence` via IndexedDB-Testöffnung, `chooseStrategy` nach Matrix §3), `types.ts` (`LocalSessionStatus`, `PersistenceStrategy`, `Capabilities`), Hook `use-capabilities.ts`. `OnlineStatusIndicator` nutzt jetzt das gemeinsame `checkOnline` (DRY). Strategie `blockieren` (kein Netz **und** kein lokaler Speicher) → eindringliche, blockierende Warnung im Orchestrator (`NatureScout`), Erfassung nicht zugelassen (nur „Erneut prüfen"/„Zur Startseite"). Verifikation: tsc 98, lint Baseline, build Exit 0. |
+| 2.2 | 2026-05-29 | _(dieser Commit)_ | **IndexedDB-Layer (Sessions + Bild-Blobs).** `src/lib/offline/db.ts` (raw IndexedDB, promisifiziert, ohne externe Abhängigkeit): Stores `sessions` (Metadaten + lokaler Status) und `images` (Blobs, Index `localSessionId`); CRUD (`createLocalSession`/`get`/`list`/`update`/`delete`, `putImageBlob`/`getImagesForSession`/`deleteImage`), Statushelfer, `countPendingSyncSessions`. Kleiner Zeiger (aktive Session-ID) in `localStorage`. Lokales Statusmodell `entwurf_lokal|sync_ausstehend|synchronisiert|abgeschlossen|sync_fehler`; Typen `LocalSession`/`StoredImage` in `types.ts`. Verifikation: tsc 98, lint Baseline, build Exit 0. |
