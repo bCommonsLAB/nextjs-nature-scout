@@ -172,6 +172,10 @@ Bereinigung im Profil), `analyse-pipeline.md` (Analyse/PlantNet erst online/bei 
 
 ## 12. Umsetzungsplan (Phasen)
 
+> 🔧 **Feinkörnige Session-für-Session-Checkliste:** `specs/regeln/offline-erfassung-umsetzungsplan.md`
+> (Branch `feature/offline-erfassung`). Die folgenden Phasen sind dort in einzeln verifizierbare
+> Arbeits-Sessions heruntergebrochen.
+
 - **Phase 0 – Spec (dieses Dokument).** ✅ Abnahme einholen.
 - **Phase 1 – Datenrettung (online-first).** Server-Entwurf (`draft`) früh anlegen; Bilder sofort
   an den Entwurf verknüpfen; Auto-Save je Schritt (online); ehrliche Bestätigung + sichtbare
