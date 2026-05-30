@@ -19,6 +19,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useNatureScoutState } from "@/context/nature-scout-context";
 import { useCapabilities } from "@/lib/offline/use-capabilities";
 import { checkLocalPersistence } from "@/lib/offline/capabilities";
+import { requestPersistentStorage } from "@/lib/offline/storage";
 import { createLocalSession, getImagesForSession, getLocalSession, setActiveLocalSessionId, updateLocalSession } from "@/lib/offline/db";
 import { toast } from "sonner";
 
@@ -703,6 +704,8 @@ export default function NatureScout() {
       const localOk = await checkLocalPersistence();
       if (localOk) {
         try {
+          // iOS-Härtung (Session 3.3): lokalen Speicher möglichst persistent halten
+          void requestPersistentStorage();
           const session = await createLocalSession({ status: 'entwurf_lokal' });
           if (!cancelled) {
             setCtxLocalSessionId(session.localId);

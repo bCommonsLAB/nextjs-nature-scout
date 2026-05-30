@@ -177,13 +177,18 @@ Bereinigung im Profil), `analyse-pipeline.md` (Analyse/PlantNet erst online/bei 
 > Arbeits-Sessions heruntergebrochen.
 
 - **Phase 0 – Spec (dieses Dokument).** ✅ Abnahme einholen.
-- **Phase 1 – Datenrettung (online-first).** Server-Entwurf (`draft`) früh anlegen; Bilder sofort
+- ✅ **Phase 1 – Datenrettung (online-first).** Server-Entwurf (`draft`) früh anlegen; Bilder sofort
   an den Entwurf verknüpfen; Auto-Save je Schritt (online); ehrliche Bestätigung + sichtbare
   Fehler/Retry; Resume über Server-Entwürfe. → Behebt den Hauptschmerz für alle, die zumindest
-  zeitweise Empfang haben.
-- **Phase 2 – Offline-Fähigkeit.** IndexedDB-Sessions + Bild-Blob-Cache; Capability-Matrix (§3);
-  Sync-Engine (§7); Offline-Status-UI; mehrere Offline-Sessions.
-- **Phase 3 – PWA.** Service Worker + Manifest → echtes Cold-Offline, installierbar.
+  zeitweise Empfang haben. **(umgesetzt, Sessions 1.1–1.6)**
+- ✅ **Phase 2 – Offline-Fähigkeit.** IndexedDB-Sessions + Bild-Blob-Cache; Capability-Matrix (§3);
+  Sync-Engine (§7); Offline-Status-UI; mehrere Offline-Sessions. **(umgesetzt, Sessions 2.1–2.6;
+  Code in `src/lib/offline/*`. Offline-Verhalten am echten Gerät zu verifizieren.)**
+- ✅ **Phase 3 – PWA.** Service Worker + Manifest → echtes Cold-Offline, installierbar. **(umgesetzt,
+  Sessions 3.1–3.3: `src/app/manifest.ts`, `public/sw.js`, `ServiceWorkerRegister`; SW nur in
+  Produktion aktiv. Geräte-Tests durch Nutzer:in.)**
+
+> 🔧 **Detail-Logbuch je Session:** `specs/regeln/offline-erfassung-umsetzungsplan.md`.
 
 Jede Phase wird verifiziert: `npm run lint` + `npm run build` grün, `tsc`-Fehleranzahl ≤ Baseline,
 Offline-Test (DevTools „Offline"), Test auf echtem Smartphone (inkl. Tab-Eviction/Flugmodus).

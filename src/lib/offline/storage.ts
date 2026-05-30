@@ -50,6 +50,25 @@ export async function checkStorageWarning(neededBytes = 0): Promise<StorageWarni
   return { low: false, estimate };
 }
 
+/**
+ * Bittet den Browser, den lokalen Speicher als „persistent" zu markieren (Session 3.3).
+ * Reduziert die Storage-Eviction (z. B. iOS-Safari verwirft PWA-Storage nach Inaktivität).
+ * Best-Effort: nicht alle Browser unterstützen/gewähren dies.
+ */
+export async function requestPersistentStorage(): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !navigator.storage || typeof navigator.storage.persist !== 'function') {
+    return false;
+  }
+  try {
+    if (typeof navigator.storage.persisted === 'function' && (await navigator.storage.persisted())) {
+      return true;
+    }
+    return await navigator.storage.persist();
+  } catch {
+    return false;
+  }
+}
+
 /** Erkennt einen Kontingent-Fehler (Sicherheitsnetz). */
 export function isQuotaExceeded(error: unknown): boolean {
   return (
