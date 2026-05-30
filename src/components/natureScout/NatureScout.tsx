@@ -22,6 +22,7 @@ import { checkLocalPersistence } from "@/lib/offline/capabilities";
 import { requestPersistentStorage } from "@/lib/offline/storage";
 import { createLocalSession, getImagesForSession, getLocalSession, setActiveLocalSessionId, updateLocalSession } from "@/lib/offline/db";
 import { toast } from "sonner";
+import { inferResumeStep } from "@/lib/erfassung-resume";
 
 function calculatePolygonCenter(points: Array<[number, number]>): [number, number] {
   // Falls Polygon geschlossen ist (letzter Punkt = erster Punkt), den letzten Punkt nicht doppelt zählen.
@@ -309,7 +310,16 @@ export default function NatureScout() {
   const [showPlantImageOptionalDialog, setShowPlantImageOptionalDialog] = useState(false);
 
   // Auto-Save (online) für Entwürfe – Session 1.4; lokale Session-ID für Offline – Session 2.5
-  const { setMetadata: setContextMetadata, setEditJobId: setContextEditJobId, jobId: ctxJobId, setJobId: setCtxJobId, localSessionId: ctxLocalSessionId, setLocalSessionId: setCtxLocalSessionId } = useNatureScoutState();
+  const {
+    setMetadata: setContextMetadata,
+    setEditJobId: setContextEditJobId,
+    jobId: ctxJobId,
+    setJobId: setCtxJobId,
+    localSessionId: ctxLocalSessionId,
+    setLocalSessionId: setCtxLocalSessionId,
+    captureSessionKey,
+    resetCaptureSession
+  } = useNatureScoutState();
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
@@ -317,8 +327,9 @@ export default function NatureScout() {
   const draftCreationStartedRef = useRef(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Aktiver Entwurf, in den auto-gespeichert wird: neuer Entwurf (jobId) oder fortgesetzter Entwurf (editJobId, falls draft).
-  const activeDraftId = editJobId ? (isResumedDraft ? editJobId : null) : ctxJobId;
+  // Aktiver Entwurf: nur echte Entwürfe (Resume) oder frisch angelegte ctxJobId – nicht abgeschlossene Jobs.
+  const activeDraftId =
+    editJobId && isResumedDraft ? editJobId : ctxJobId;
 
   // Capability-Erkennung + Strategie-Matrix (Session 2.1)
   const { strategy, refresh: refreshCapabilities } = useCapabilities();
@@ -431,9 +442,59 @@ export default function NatureScout() {
   const progressBarRef = useRef<HTMLDivElement>(null);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
   const navigationRef = useRef<HTMLDivElement>(null);
+  const prevAktiverSchrittRef = useRef(aktiverSchritt);
   const [navigationHeight, setNavigationHeight] = useState(0);
   const [helpBubbleHeight, setHelpBubbleHeight] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
+
+  const resetLocalCaptureWizard = useCallback(() => {
+    setMetadata({
+      erfassungsperson: "",
+      organizationId: "",
+      organizationName: "",
+      organizationLogo: "",
+      email: "",
+      gemeinde: "",
+      flurname: "",
+      latitude: 0,
+      longitude: 0,
+      standort: "",
+      bilder: [],
+      analyseErgebnis: undefined
+    });
+    setAktiverSchritt(0);
+    setIsAnyUploadActive(false);
+    setIsResumedDraft(false);
+    setDraftPolygonPoints([]);
+    setIsLocationDataReady(false);
+    setIsLocationDataLoading(false);
+    draftCreationStartedRef.current = false;
+    setSaveState('idle');
+    setSaveError(null);
+    setLastSavedAt(null);
+    setShowHelpBubble(true);
+  }, []);
+
+  const lastAppliedCaptureKeyRef = useRef(-1);
+
+  // „Neue Erfassung“ aus Navigation: Context + Wizard zurücksetzen (ohne ?editJobId in der URL)
+  useEffect(() => {
+    if (editJobId || resumeLocalId) return;
+    if (captureSessionKey === lastAppliedCaptureKeyRef.current) return;
+    lastAppliedCaptureKeyRef.current = captureSessionKey;
+    if (captureSessionKey === 0) return;
+    resetLocalCaptureWizard();
+    if (searchParams.get('editJobId') || searchParams.get('localSessionId')) {
+      router.replace('/naturescout');
+    }
+  }, [captureSessionKey, editJobId, resumeLocalId, resetLocalCaptureWizard, router, searchParams]);
+
+  // Ab Analyse ist der Datensatz kein Entwurf mehr – nicht weiter über /draft patchen
+  useEffect(() => {
+    if (aktiverSchritt >= 8) {
+      setIsResumedDraft(false);
+    }
+  }, [aktiverSchritt]);
 
   // Sprechblase bei Schrittwechsel anzeigen
   useEffect(() => {
@@ -445,10 +506,13 @@ export default function NatureScout() {
     setShowHelpBubble(true);
   }, [aktiverSchritt]);
 
-  // Wenn der Nutzer zurück zu "Standort finden" geht (Standort ändern),
-  // müssen Standortinformationen verworfen werden, damit sie später neu berechnet werden.
+  // Wenn der Nutzer von „Umriss zeichnen" zurück zu „Standort finden" geht (Standort ändern),
+  // Standortinformationen verwerfen – nicht beim ersten Laden / Resume (sonst Entwurf leer).
   useEffect(() => {
-    if (aktiverSchritt !== 1) return;
+    const prev = prevAktiverSchrittRef.current;
+    prevAktiverSchrittRef.current = aktiverSchritt;
+
+    if (aktiverSchritt !== 1 || prev !== 2) return;
 
     const hasLocationInfo = Boolean(
       metadata.gemeinde ||
@@ -572,7 +636,7 @@ export default function NatureScout() {
                                   habitatData.metadata.points || 
                                   [];
             
-            setMetadata({
+            const loadedMetadata: NatureScoutData = {
               erfassungsperson: habitatData.metadata.erfassungsperson || "",
               organizationId: habitatData.metadata.organizationId || "",
               organizationName: habitatData.metadata.organizationName || "",
@@ -593,26 +657,28 @@ export default function NatureScout() {
               analyseErgebnis: habitatData.result || undefined,
               llmInfo: habitatData.llmInfo || undefined,
               kommentar: habitatData.metadata.kommentar || "",
-              
-              // Wichtig: Polygonpunkte setzen
-              polygonPoints: polygonPoints,
-              
-              // Weitere Felder, die möglicherweise in den Metadaten vorhanden sind
+              polygonPoints,
               exposition: habitatData.metadata.exposition || "",
               elevation: habitatData.metadata.elevation || "",
               slope: habitatData.metadata.slope || "",
               plotsize: habitatData.metadata.plotsize || 0,
               kataster: habitatData.metadata.kataster || undefined
-            });
-            
+            };
+            setMetadata(loadedMetadata);
+
             // Entwurf fortsetzen: aktiven Entwurf für Auto-Save übernehmen (Session 1.4/1.6)
             if (habitatData.status === 'draft') {
               setIsResumedDraft(true);
               setCtxJobId(editJobId);
+              const resumeStep = inferResumeStep(loadedMetadata);
+              setAktiverSchritt(resumeStep);
+              if (resumeStep > 3 && (loadedMetadata.gemeinde || loadedMetadata.flurname)) {
+                setIsLocationDataReady(true);
+              }
+            } else {
+              // Bearbeitung abgeschlossener Habitate: weiterhin bei Standort-Karte starten
+              setAktiverSchritt(1);
             }
-
-            // Direkt zum zweiten Schritt springen, wenn wir ein bestehendes Habitat bearbeiten
-            setAktiverSchritt(1);
           }
         } catch (error) {
           console.error("Fehler beim Laden der Habitat-Daten:", error);
@@ -649,10 +715,18 @@ export default function NatureScout() {
             })
           : [];
         if (cancelled) return;
-        setMetadata(prev => ({ ...prev, ...meta, bilder } as NatureScoutData));
+        const merged = { ...meta, bilder } as NatureScoutData;
+        setMetadata(prev => ({ ...prev, ...merged }));
         setCtxLocalSessionId(resumeLocalId);
         setActiveLocalSessionId(resumeLocalId);
-        setAktiverSchritt(session.aktiverSchritt && session.aktiverSchritt >= 1 ? session.aktiverSchritt : 1);
+        const step =
+          session.aktiverSchritt && session.aktiverSchritt >= 1
+            ? session.aktiverSchritt
+            : inferResumeStep(merged);
+        setAktiverSchritt(step);
+        if (step > 3 && (meta.gemeinde || meta.flurname)) {
+          setIsLocationDataReady(true);
+        }
       } catch (error) {
         console.error('Fehler beim Laden der lokalen Session:', error);
       } finally {
@@ -724,16 +798,48 @@ export default function NatureScout() {
     return () => { cancelled = true; };
   }, [aktiverSchritt, editJobId, resumeLocalId, ctxJobId, ctxLocalSessionId, setCtxJobId, setCtxLocalSessionId]);
 
+  const createNewServerDraft = useCallback(async (): Promise<string | null> => {
+    const res = await fetch('/api/habitat/draft', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data?.jobId === 'string' ? data.jobId : null;
+  }, []);
+
   // Entwurf sofort speichern – genutzt vom Auto-Save-Debounce und vom manuellen Retry (Session 1.4/1.5).
   const saveDraftNow = useCallback(async () => {
-    if (!activeDraftId) return;
+    let draftId = activeDraftId;
+    if (!draftId) return;
     setSaveState('saving');
     try {
-      const res = await fetch(`/api/habitat/${activeDraftId}/draft`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ metadata })
-      });
+      const patchDraft = async (jobId: string) =>
+        fetch(`/api/habitat/${jobId}/draft`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ metadata })
+        });
+
+      let res = await patchDraft(draftId);
+
+      // Abgeschlossene/alte jobId im Context → neuen Entwurf anlegen und erneut speichern
+      if (res.status === 409) {
+        setIsResumedDraft(false);
+        setContextEditJobId(null);
+        setCtxJobId(null);
+        draftCreationStartedRef.current = false;
+        const newId = await createNewServerDraft();
+        if (!newId) {
+          throw new Error('Neuer Entwurf konnte nicht angelegt werden');
+        }
+        setCtxJobId(newId);
+        draftCreationStartedRef.current = true;
+        draftId = newId;
+        res = await patchDraft(newId);
+      }
+
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `Speichern fehlgeschlagen (${res.status})`);
@@ -745,14 +851,56 @@ export default function NatureScout() {
       setSaveState('error');
       setSaveError(error instanceof Error ? error.message : 'Unbekannter Fehler beim Speichern');
     }
-  }, [activeDraftId, metadata]);
+  }, [activeDraftId, metadata, createNewServerDraft, setCtxJobId, setContextEditJobId]);
+
+  // Verhindert Mehrfach-Anlage lokaler Spiegel-Sessions: gleichzeitige Aufrufer (Strategie-Effekt,
+  // Auto-Save, Bild-Upload) teilen sich EIN in-flight Promise, bis `ctxLocalSessionId` gesetzt ist.
+  const localMirrorPromiseRef = useRef<Promise<string | null> | null>(null);
+  useEffect(() => {
+    if (!ctxLocalSessionId) localMirrorPromiseRef.current = null;
+  }, [ctxLocalSessionId]);
+
+  /** Spiegelt die laufende Erfassung in IndexedDB, wenn offline (auch nach online gestartetem Server-Entwurf). */
+  const ensureLocalMirrorSession = useCallback(async (): Promise<string | null> => {
+    if (ctxLocalSessionId) return ctxLocalSessionId;
+    if (localMirrorPromiseRef.current) return localMirrorPromiseRef.current;
+    const creation = (async (): Promise<string | null> => {
+      const localOk = await checkLocalPersistence();
+      if (!localOk) { localMirrorPromiseRef.current = null; return null; }
+      try {
+        void requestPersistentStorage();
+        const session = await createLocalSession({
+          jobId: activeDraftId || ctxJobId || undefined,
+          metadata,
+          aktiverSchritt,
+          status: 'entwurf_lokal'
+        });
+        setCtxLocalSessionId(session.localId);
+        setActiveLocalSessionId(session.localId);
+        return session.localId;
+      } catch {
+        localMirrorPromiseRef.current = null;
+        return null;
+      }
+    })();
+    localMirrorPromiseRef.current = creation;
+    return creation;
+  }, [ctxLocalSessionId, activeDraftId, ctxJobId, metadata, aktiverSchritt, setCtxLocalSessionId]);
+
+  useEffect(() => {
+    if (strategy !== 'nur-lokal') return;
+    if (aktiverSchritt < 1) return;
+    if (ctxLocalSessionId) return;
+    void ensureLocalMirrorSession();
+  }, [strategy, aktiverSchritt, ctxLocalSessionId, ensureLocalMirrorSession]);
 
   // Lokales Speichern der Session (Offline-Modus, IndexedDB) – Session 2.5.
-  const saveLocalNow = useCallback(async () => {
-    if (!ctxLocalSessionId) return;
+  const saveLocalNow = useCallback(async (sessionIdOverride?: string) => {
+    const localId = sessionIdOverride || ctxLocalSessionId;
+    if (!localId) return;
     setSaveState('saving');
     try {
-      await updateLocalSession(ctxLocalSessionId, { metadata, aktiverSchritt, status: 'entwurf_lokal' });
+      await updateLocalSession(localId, { metadata, aktiverSchritt, status: 'entwurf_lokal' });
       setSaveState('saved');
       setSaveError(null);
       setLastSavedAt(new Date());
@@ -762,21 +910,28 @@ export default function NatureScout() {
     }
   }, [ctxLocalSessionId, metadata, aktiverSchritt]);
 
-  // Auto-Save: je Änderung speichern (debounced, vor der Analyse). Routing: lokal (offline) oder Server (online).
+  // Auto-Save: je Änderung speichern (debounced, vor der Analyse). Routing nach Capability-Matrix (§3).
   useEffect(() => {
     if (aktiverSchritt < 1 || aktiverSchritt >= 8) return; // ab Analyse (Schritt 8) übernimmt der bestehende Pfad
     const hasServerDraft = !!activeDraftId;
     const hasLocalSession = !!ctxLocalSessionId;
-    if (!hasServerDraft && !hasLocalSession) return;
+    const preferLocal = strategy === 'nur-lokal';
+    if (!hasServerDraft && !hasLocalSession && !preferLocal) return;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
-      if (hasLocalSession) void saveLocalNow();
-      else void saveDraftNow();
+      void (async () => {
+        if (preferLocal || hasLocalSession) {
+          const localId = await ensureLocalMirrorSession();
+          if (localId) await saveLocalNow(localId);
+          return;
+        }
+        if (hasServerDraft) await saveDraftNow();
+      })();
     }, 1200);
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [metadata, activeDraftId, ctxLocalSessionId, aktiverSchritt, saveDraftNow, saveLocalNow]);
+  }, [metadata, activeDraftId, ctxLocalSessionId, aktiverSchritt, strategy, saveDraftNow, saveLocalNow, ensureLocalMirrorSession]);
 
   // Handler für den Upload-Status aus der UploadImages-Komponente
   const handleUploadActiveChange = (isActive: boolean) => {
@@ -803,42 +958,11 @@ export default function NatureScout() {
 
   // Handler für "Neuen Habitat erfassen" - setzt alles zurück für einen neuen Habitat
   const handleNeuerHabitat = () => {
-    // Metadaten auf Anfangswerte zurücksetzen
-    setMetadata({
-      erfassungsperson: "",
-      organizationId: "",
-      organizationName: "",
-      organizationLogo: "",
-      email: "",
-      gemeinde: "",
-      flurname: "",
-      latitude: 0,
-      longitude: 0,
-      standort: "",
-      bilder: [],
-      analyseErgebnis: undefined
-    });
-    
-    // Zum ersten Schritt zurückkehren
-    setAktiverSchritt(0);
-
-    // Upload-Status zurücksetzen
-    setIsAnyUploadActive(false);
-
-    // Entwurfs-/Auto-Save-Status zurücksetzen, damit ein neuer Entwurf angelegt wird
-    setCtxJobId(null);
-    setCtxLocalSessionId(null);
+    resetCaptureSession();
+    resetLocalCaptureWizard();
     setActiveLocalSessionId(null);
-    setIsResumedDraft(false);
-    draftCreationStartedRef.current = false;
-    setSaveState('idle');
-    setSaveError(null);
-    setLastSavedAt(null);
-    
-    // Hilfe-Sprechblase wieder anzeigen
-    setShowHelpBubble(true);
-    
-    // Erfolgs-Toast anzeigen
+    router.replace('/naturescout');
+
     toast.success('Bereit für einen neuen Habitat! 🌱', {
       description: 'Alle Daten wurden zurückgesetzt. Sie können jetzt einen weiteren Habitat erfassen.'
     });
@@ -998,7 +1122,8 @@ export default function NatureScout() {
       case 4: // Panoramabild
         return <SingleImageUpload 
           metadata={metadata} 
-          setMetadata={setMetadata} 
+          setMetadata={setMetadata}
+          ensureLocalSession={ensureLocalMirrorSession}
           imageKey="Panoramabild"
           title="Panoramabild"
           instruction="Gesamtüberblick des Habitats"
@@ -1010,7 +1135,8 @@ export default function NatureScout() {
       case 5: // Detailbild
         return <SingleImageUpload 
           metadata={metadata} 
-          setMetadata={setMetadata} 
+          setMetadata={setMetadata}
+          ensureLocalSession={ensureLocalMirrorSession}
           imageKey="Detailansicht"
           title="Detailbild"
           instruction="Nahaufnahme mit Hintergrund"
@@ -1022,7 +1148,8 @@ export default function NatureScout() {
       case 6: // Pflanzenbild 1
         return <SingleImageUpload 
           metadata={metadata} 
-          setMetadata={setMetadata} 
+          setMetadata={setMetadata}
+          ensureLocalSession={ensureLocalMirrorSession}
           imageKey="Detailbild_1"
           title="Pflanzenbild 1"
           instruction="Erste typische Pflanzenart (optional)"
@@ -1034,7 +1161,8 @@ export default function NatureScout() {
       case 7: // Pflanzenbild 2
         return <SingleImageUpload 
           metadata={metadata} 
-          setMetadata={setMetadata} 
+          setMetadata={setMetadata}
+          ensureLocalSession={ensureLocalMirrorSession}
           imageKey="Detailbild_2"
           title="Pflanzenbild 2"
           instruction="Zweite typische Pflanzenart (optional)"
@@ -1112,7 +1240,7 @@ export default function NatureScout() {
               <div aria-live="polite">
                 {saveState === 'saving' && <span className="text-gray-500">Wird gespeichert…</span>}
                 {saveState === 'saved' && (
-                  ctxLocalSessionId ? (
+                  ctxLocalSessionId || strategy === 'nur-lokal' ? (
                     <span className="text-amber-600">
                       Lokal gesichert – wird übertragen, sobald online{lastSavedAt ? ` · ${lastSavedAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` : ''}
                     </span>
@@ -1127,7 +1255,9 @@ export default function NatureScout() {
                     Nicht gespeichert{saveError ? `: ${saveError}` : ''}
                     <button
                       type="button"
-                      onClick={() => void (ctxLocalSessionId ? saveLocalNow() : saveDraftNow())}
+                      onClick={() => void (strategy === 'nur-lokal' || ctxLocalSessionId
+                        ? ensureLocalMirrorSession().then((id) => { if (id) void saveLocalNow(id); })
+                        : saveDraftNow())}
                       className="underline hover:no-underline"
                     >
                       Erneut versuchen

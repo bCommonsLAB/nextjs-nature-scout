@@ -15,6 +15,8 @@ interface SingleImageUploadProps {
   schematicBg?: string;
   onUploadActiveChange?: (isActive: boolean) => void;
   requiredOrientation?: 'landscape' | 'portrait'; // Neue Prop für die gewünschte Orientierung
+  /** Legt bei Offline eine IndexedDB-Session an (falls nur Server-Entwurf existiert). */
+  ensureLocalSession?: () => Promise<string | null>;
 }
 
 export function SingleImageUpload({ 
@@ -26,7 +28,8 @@ export function SingleImageUpload({
   doAnalyzePlant,
   schematicBg,
   onUploadActiveChange,
-  requiredOrientation
+  requiredOrientation,
+  ensureLocalSession
 }: SingleImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   // jobId des aktiven Entwurfs (für serverseitiges Verknüpfen des Bildes, Session 1.3)
@@ -82,6 +85,7 @@ export function SingleImageUpload({
         imageKey={imageKey} // Neuer Parameter
         jobId={draftJobId}
         localSessionId={localSessionId}
+        ensureLocalSession={ensureLocalSession}
         anweisung={instruction}
         onBildUpload={handleBildUpload}
         onDeleteImage={handleDeleteImage}

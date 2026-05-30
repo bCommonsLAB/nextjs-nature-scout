@@ -21,6 +21,7 @@ import { useSync } from '@/lib/offline/use-sync';
 import { deleteLocalSession } from '@/lib/offline/db';
 import { LocalSessionStatus } from '@/lib/offline/types';
 import { RefreshCw, WifiOff } from 'lucide-react';
+import { useNatureScoutState } from '@/context/nature-scout-context';
 
 interface HabitateEntry {
   jobId: string;
@@ -102,6 +103,12 @@ function HabitatPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
+  const { resetCaptureSession } = useNatureScoutState();
+
+  const startNewCapture = () => {
+    resetCaptureSession();
+    router.push('/naturescout');
+  };
   
   const [data, setData] = useState<HabitateData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -655,7 +662,7 @@ function HabitatPageContent() {
             </>
           )}
           {hasAdvancedPermissions && isExpert && (
-            <Button variant="default" size="sm" onClick={() => router.push('/naturescout')}>
+            <Button variant="default" size="sm" onClick={startNewCapture}>
               <Plus className="mr-2 h-4 w-4" />
               Neues Habitat
             </Button>
@@ -922,7 +929,7 @@ function HabitatPageContent() {
               : 'Sie haben noch keine Habitaterfassungen durchgeführt.'}
           </p>
           {session?.user ? (
-            <Button onClick={() => router.push('/naturescout')}>
+            <Button onClick={startNewCapture}>
               <Plus className="mr-2 h-4 w-4" />
               Neues Habitat erfassen
             </Button>

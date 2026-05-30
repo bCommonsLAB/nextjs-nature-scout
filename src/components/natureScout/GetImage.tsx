@@ -8,12 +8,14 @@ import { toast } from "sonner";
 import Image from 'next/image';
 import { Button } from "../ui/button";
 import { detectBrowserEnvironment } from "@/lib/utils";
+import { checkOnline } from "@/lib/offline/capabilities";
 
 interface GetImageProps {
   imageTitle: string;
   imageKey: string;
   jobId?: string | null;
   localSessionId?: string | null;
+  ensureLocalSession?: () => Promise<string | null>;
   anweisung: string;
   onBildUpload: (
     imageKey: string,
@@ -38,6 +40,7 @@ export function GetImage({
   imageKey,
   jobId,
   localSessionId,
+  ensureLocalSession,
   anweisung,
   onBildUpload,
   onDeleteImage,
@@ -355,13 +358,28 @@ export function GetImage({
   async function processImage(file: File, filename: string, doAnalyzePlant: boolean) {
     setProgressPhase('upload');
 
-    // Offline-Modus (Session 2.5): Blob lokal in voller Qualität ablegen – kein Upload, kein PlantNet.
-    // Beides läuft erst beim späteren Sync (online).
-    if (localSessionId) {
+    // Offline-Modus (Session 2.5): Blob lokal ablegen – auch wenn die Erfassung online mit Server-Entwurf begann.
+    const online = await checkOnline(2500);
+    if (!online) {
+      let offlineSessionId = localSessionId;
+      if (ensureLocalSession) {
+        offlineSessionId = offlineSessionId || (await ensureLocalSession());
+      }
+      if (!offlineSessionId) {
+        throw new Error(
+          'Ohne Internetverbindung können Bilder nur lokal gespeichert werden. Lokaler Speicher ist nicht verfügbar.'
+        );
+      }
+
       setLocalUploadProgress(30);
       const { storeImageLocally } = await import('@/lib/offline/images');
       try {
-        const result = await storeImageLocally({ localSessionId, imageKey, blob: file, clientImageId: imageKey });
+        const result = await storeImageLocally({
+          localSessionId: offlineSessionId,
+          imageKey,
+          blob: file,
+          clientImageId: imageKey
+        });
         setLocalUploadProgress(100);
         if (result.storageWarning) {
           toast.warning('Lokaler Speicher wird knapp – bitte bald synchronisieren.');
@@ -496,14 +514,17 @@ export function GetImage({
       });
 
       setLocalUploadProgress(100);
+      const wasOffline = !(await checkOnline(1500));
       toast.success(
-        doAnalyzePlant 
-          ? 'Bild hochgeladen und Pflanze analysiert'
-          : 'Bild erfolgreich hochgeladen'
+        wasOffline
+          ? 'Bild lokal gespeichert – wird synchronisiert, sobald Sie online sind'
+          : doAnalyzePlant
+            ? 'Bild hochgeladen und Pflanze analysiert'
+            : 'Bild erfolgreich hochgeladen'
       );
     } catch (error) {
       console.error("Upload-Fehler:", error);
-      toast.error('Upload fehlgeschlagen');
+      toast.error(error instanceof Error ? error.message : 'Upload fehlgeschlagen');
     } finally {
       setIsUploading(false);
       event.target.value = '';
