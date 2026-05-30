@@ -3,6 +3,7 @@
 import { NatureScoutData, Bild, PlantNetResult } from "@/types/nature-scout";
 import { GetImage } from "./GetImage";
 import { useState, useEffect } from "react";
+import { useNatureScoutState } from "@/context/nature-scout-context";
 
 interface SingleImageUploadProps {
   metadata: NatureScoutData;
@@ -14,6 +15,8 @@ interface SingleImageUploadProps {
   schematicBg?: string;
   onUploadActiveChange?: (isActive: boolean) => void;
   requiredOrientation?: 'landscape' | 'portrait'; // Neue Prop für die gewünschte Orientierung
+  /** Legt bei Offline eine IndexedDB-Session an (falls nur Server-Entwurf existiert). */
+  ensureLocalSession?: () => Promise<string | null>;
 }
 
 export function SingleImageUpload({ 
@@ -25,10 +28,15 @@ export function SingleImageUpload({
   doAnalyzePlant,
   schematicBg,
   onUploadActiveChange,
-  requiredOrientation
+  requiredOrientation,
+  ensureLocalSession
 }: SingleImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
-  
+  // jobId des aktiven Entwurfs (für serverseitiges Verknüpfen des Bildes, Session 1.3)
+  // localSessionId: aktive Offline-Session (Bild lokal ablegen, Session 2.5)
+  const { jobId, editJobId, localSessionId } = useNatureScoutState();
+  const draftJobId = jobId || editJobId || null;
+
   // Upload-Status an übergeordnete Komponente weiterleiten
   useEffect(() => {
     if (onUploadActiveChange) {
@@ -50,7 +58,9 @@ export function SingleImageUpload({
       url,
       lowResUrl,
       analyse: analysis,
-      plantnetResult
+      plantnetResult,
+      // Stabile Client-ID je Slot (Idempotenz beim serverseitigen Verknüpfen/Sync)
+      clientImageId: imageKey
     };
       
     setMetadata(prev => ({
@@ -70,9 +80,12 @@ export function SingleImageUpload({
 
   return (
     <div className="h-full">
-      <GetImage 
-        imageTitle={title} 
+      <GetImage
+        imageTitle={title}
         imageKey={imageKey} // Neuer Parameter
+        jobId={draftJobId}
+        localSessionId={localSessionId}
+        ensureLocalSession={ensureLocalSession}
         anweisung={instruction}
         onBildUpload={handleBildUpload}
         onDeleteImage={handleDeleteImage}

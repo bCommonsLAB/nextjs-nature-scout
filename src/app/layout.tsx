@@ -10,6 +10,7 @@ import './leaflet-custom.css';  // Ihre custom Styles
 import { AuthProviders } from "@/components/providers/AuthProviders"
 import ErrorBoundary from "@/components/ErrorBoundary"
 import ChunkErrorHandler from "@/components/ChunkErrorHandler"
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister"
 
 // const customLocalization = {
 //   ...deDE,
@@ -37,12 +38,24 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: "Nature Scout",
   description: "Habitate finden und bewerten",
+  applicationName: "NatureScout",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "NatureScout",
+  },
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/apple-touch-icon.png",
+  },
 };
 
 export const viewport = {
   width: "device-width",
   initialScale: 1.0,
   maximumScale: 1.0,
+  themeColor: "#4F7942",
+  viewportFit: "cover" as const,
 };
 
 export default function RootLayout({
@@ -58,6 +71,7 @@ export default function RootLayout({
         <ErrorBoundary>
           <AuthProviders>
             <ChunkErrorHandler />
+            <ServiceWorkerRegister />
             <Navbar />
             <main>
               {children}

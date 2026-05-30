@@ -1,6 +1,13 @@
-# Benutzerverwaltung mit Clerk und MongoDB
+# Benutzerverwaltung (historisch: Clerk) und MongoDB
 
-Dieses Dokument beschreibt die Implementierung der Benutzerverwaltung in NatureScout mit Clerk für die Authentifizierung und MongoDB für die Rechteverwaltung.
+> ⚠️ **VERALTET / HISTORISCH.** Dieses Dokument beschreibt den früheren Stand mit **Clerk**.
+> NatureScout nutzt inzwischen **NextAuth (Auth.js)** – die hier genannten Clerk-Webhooks und
+> Endpunkte (`/api/webhook/clerk`, `/api/users/[clerkId]` …) existieren nicht mehr.
+> **Maßgeblich sind die Spezifikationen:** `specs/entitaeten/benutzer.md`,
+> `specs/entitaeten/einladung.md`, `specs/entitaeten/login-code.md` und
+> `specs/regeln/rollen-und-rechte.md`. Der Wechsel ist in `docs/auth-migration-plan.md` beschrieben.
+
+Dieses Dokument beschreibt die (frühere) Implementierung der Benutzerverwaltung in NatureScout mit Clerk für die Authentifizierung und MongoDB für die Rechteverwaltung.
 
 ## Architektur
 

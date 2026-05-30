@@ -8,6 +8,7 @@ import { authOptions } from '@/lib/auth';
 // Definiere die Typen
 interface MongoFilter {
   deleted?: { $ne: boolean };
+  status?: { $ne: string };
   verified?: boolean | { $ne: boolean };
   $or?: Array<{ [key: string]: { $regex: string, $options: string } }>;
   [key: string]: any; // Index-Signatur für dynamische Eigenschaften
@@ -61,9 +62,11 @@ export async function GET(request: Request) {
     // Suchfilter erstellen
     const filter: MongoFilter = {
       // Zeige nur Einträge an, die nicht als gelöscht markiert sind
-      deleted: { $ne: true }
+      deleted: { $ne: true },
+      // Entwürfe (status: 'draft') sind nie öffentlich sichtbar
+      status: { $ne: 'draft' }
     };
-    
+
     // Geo-Query: Bounds-Filterung hinzufügen, falls vorhanden
     if (bounds) {
       const boundsArray = bounds.split(',');
@@ -256,7 +259,7 @@ export async function GET(request: Request) {
     let filterOptions = null;
     if (includeFilterOptions) {
       // Basisfilter je nach gewähltem Verifizierungsstatus
-      const baseFilter: MongoFilter = { deleted: { $ne: true } };
+      const baseFilter: MongoFilter = { deleted: { $ne: true }, status: { $ne: 'draft' } };
       
       // Filter für Verifizierungsstatus hinzufügen
       if (verifizierungsstatus === 'verifiziert') {

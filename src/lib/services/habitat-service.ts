@@ -50,6 +50,9 @@ export async function createAnalyseJobsIndexes(): Promise<void> {
   await collection.createIndex({ verified: 1 });
   await collection.createIndex({ deleted: 1 });
   await collection.createIndex({ updatedAt: -1 });
+
+  // Index für "Meine Entwürfe" (eigene Habitate nach Status, z. B. status: 'draft')
+  await collection.createIndex({ 'metadata.email': 1, status: 1 });
   
   // Verbundindizes für häufige Abfragen in der öffentlichen Ansicht
   await collection.createIndex({ deleted: 1, verified: 1 });
@@ -123,11 +126,12 @@ export async function getFilterOptions(
   const db = await connectToDatabase();
   const collection = db.collection(process.env.MONGODB_COLLECTION_NAME || 'analyseJobs');
   
-  // Basisfilter: nicht gelöschte Dokumente
-  const baseMatch: { 
+  // Basisfilter: nicht gelöschte Dokumente, keine Entwürfe (status: 'draft')
+  const baseMatch: {
     deleted?: { $ne: boolean },
-    'metadata.email'?: string 
-  } = { deleted: { $ne: true } };
+    status?: { $ne: string },
+    'metadata.email'?: string
+  } = { deleted: { $ne: true }, status: { $ne: 'draft' } };
   
   // Für normale Benutzer: Nur eigene Einträge
   if (!hasAdvancedPermissions) {
@@ -209,7 +213,7 @@ export async function getFilterOptions(
       } else {
         // Für Experten/Admins: Alle Personen anzeigen
         const personenAgg = await collection.aggregate([
-          { $match: { deleted: { $ne: true } } },
+          { $match: { deleted: { $ne: true }, status: { $ne: 'draft' } } },
           { $group: { _id: '$metadata.erfassungsperson' } },
           { $match: { _id: { $ne: null } } },
           { $sort: { _id: 1 } }

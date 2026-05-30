@@ -11,6 +11,7 @@ import { useUser, useAuth } from "@/context/auth-context";
 import { UserOrganisationButton } from "@/components/UserOrganisation";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
+import { useNatureScoutState } from "@/context/nature-scout-context";
 
 export function Navbar() {
   const { data: session, status } = useSession();
@@ -151,10 +152,13 @@ export function Navbar() {
     return false;
   };
 
+  const { resetCaptureSession } = useNatureScoutState();
+
   // Funktion zum Navigieren zu neuem Habitat
   const navigateToNewHabitat = () => {
-    // Direkt navigieren, da keine ungespeicherten Änderungen mehr berücksichtigt werden müssen
-    router.push('/naturescout');
+    // Alte jobId im Context leeren (sonst PATCH auf abgeschlossenen Job → 409)
+    resetCaptureSession();
+    router.replace('/naturescout');
     // Mobile Menü schließen nach Navigation
     setIsMobileMenuOpen(false);
   };

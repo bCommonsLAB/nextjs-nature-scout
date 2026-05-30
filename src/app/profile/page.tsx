@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InfoIcon, AlertTriangle } from "lucide-react";
+import { OfflineDataManager } from "@/components/natureScout/OfflineDataManager";
 
 // Komponente für die Parameter-Verarbeitung
 function ProfileContent() {
@@ -445,18 +446,22 @@ function ProfileContent() {
             </p>
           </CardFooter>
         </Card>
-        <Button 
+
+        {/* Offline-Daten bereinigen (Session 2.6) */}
+        <OfflineDataManager />
+
+        <Button
           onClick={() => {
             if (hasAllConsents) {
               saveProfile();
             } else {
               setConsentDialogOpen(true);
             }
-          }} 
+          }}
           disabled={isSubmitting}
         >
           {isSubmitting ? 'Speichere...' : 'Profildaten speichern'}
-        </Button>      
+        </Button>
       </div>
 
       {/* Einwilligungs-Dialog */}

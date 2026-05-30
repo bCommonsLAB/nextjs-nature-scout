@@ -11,6 +11,13 @@ interface NatureScoutContextType {
   setEditJobId: React.Dispatch<React.SetStateAction<string | null>>;
   jobId: string | null;
   setJobId: React.Dispatch<React.SetStateAction<string | null>>;
+  // Aktive lokale (Offline-)Session-ID – gesetzt im Offline-Modus (Phase 2)
+  localSessionId: string | null;
+  setLocalSessionId: React.Dispatch<React.SetStateAction<string | null>>;
+  /** Wird bei „Neue Erfassung“ erhöht – NatureScout setzt lokalen Wizard-State zurück. */
+  captureSessionKey: number;
+  /** Entwurfs-/Offline-IDs im Context leeren (z. B. Navigation „Neues Habitat“). */
+  resetCaptureSession: () => void;
 }
 
 // Erstelle den Context mit Defaultwerten
@@ -21,6 +28,10 @@ const NatureScoutContext = createContext<NatureScoutContextType>({
   setEditJobId: () => {},
   jobId: null,
   setJobId: () => {},
+  localSessionId: null,
+  setLocalSessionId: () => {},
+  captureSessionKey: 0,
+  resetCaptureSession: () => {},
 });
 
 // Hook zum Verwenden des Contexts
@@ -33,16 +44,29 @@ export function NatureScoutProvider({ children }: { children: ReactNode }) {
   const [metadata, setMetadata] = useState<NatureScoutData | null>(null);
   const [editJobId, setEditJobId] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
+  const [localSessionId, setLocalSessionId] = useState<string | null>(null);
+  const [captureSessionKey, setCaptureSessionKey] = useState(0);
+
+  const resetCaptureSession = () => {
+    setJobId(null);
+    setEditJobId(null);
+    setLocalSessionId(null);
+    setCaptureSessionKey((k) => k + 1);
+  };
 
   return (
-    <NatureScoutContext.Provider 
-      value={{ 
-        metadata, 
+    <NatureScoutContext.Provider
+      value={{
+        metadata,
         setMetadata,
         editJobId,
         setEditJobId,
         jobId,
-        setJobId
+        setJobId,
+        localSessionId,
+        setLocalSessionId,
+        captureSessionKey,
+        resetCaptureSession
       }}
     >
       {children}

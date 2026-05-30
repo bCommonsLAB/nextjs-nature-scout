@@ -587,6 +587,7 @@ export function LocationDetermination({
   
   // Flag, das bestimmt, ob bereits auf GPS-Position gezoomt wurde
   const [hasZoomedToGPS, setHasZoomedToGPS] = useState(false);
+  const hasZoomedToHabitatRef = useRef(false);
   
   // Speichern der letzten GPS-Positionen zur Ausreißer-Eliminierung
   const [recentPositions, setRecentPositions] = useState<Array<{
@@ -603,7 +604,11 @@ export function LocationDetermination({
   
   // Map-Initialisierungsstatus
   const mapInitializedRef = useRef<boolean>(false);
-  
+  // Karten-Bereitschaft als State (von MapNoSSR via onMapReady gemeldet): erst dann existiert die
+  // Leaflet-Karte wirklich, sodass die Resume-Zentrierung (centerMap) nicht ins Leere läuft.
+  const [mapReady, setMapReady] = useState(false);
+  const handleMapReady = useCallback(() => setMapReady(true), []);
+
   // Debug-Logging nur im Entwicklungsmodus aktivieren
   const isDev = process.env.NODE_ENV === 'development';
   const logDebug = useCallback((...args: any[]) => {
@@ -625,6 +630,14 @@ export function LocationDetermination({
   const [polygonPoints, setPolygonPoints] = useState<Array<[number, number]>>(
     metadata.polygonPoints || []
   );
+
+  // Gespeicherten Umriss aus Metadaten übernehmen (Resume Entwurf / Offline-Session)
+  useEffect(() => {
+    if (metadata.polygonPoints && metadata.polygonPoints.length >= 3) {
+      setPolygonPoints(metadata.polygonPoints);
+    }
+  }, [metadata.polygonPoints]);
+
   const [resetButtonPosition, setResetButtonPosition] = useState<{ lat: number; lng: number } | null>(null);
 
   // Wichtig: referenziell stabiles leeres Polygon, damit `MapNoSSR` nicht bei jedem Render
@@ -1046,6 +1059,21 @@ export function LocationDetermination({
     };
   }, []); // Keine Abhängigkeiten - nur einmal starten und im Hintergrund laufen lassen
 
+  // Beim Resume: Karte auf gespeicherten Habitat-Stand zentrieren (nicht auf aktuelles GPS)
+  useEffect(() => {
+    if (!mapRef.current || !mapReady || hasZoomedToHabitatRef.current) return;
+    if (!hasSavedPolygon) return;
+
+    const lat = metadata.latitude;
+    const lng = metadata.longitude;
+    if (!lat || !lng || lat === 0 || lng === 0) return;
+
+    if (isDebug) console.log('Zentrierung auf gespeicherten Habitat-Stand:', lat, lng);
+    mapRef.current.centerMap(lat, lng, 20);
+    hasZoomedToHabitatRef.current = true;
+    setHasZoomedToGPS(true);
+  }, [hasSavedPolygon, metadata.latitude, metadata.longitude, isDebug, mapReady]);
+
   // Effekt zum Aktualisieren des Markers und einmaliger Zentrierung
   useEffect(() => {
     if (!mapRef.current || currentPosition[0] === 0 || currentPosition[1] === 0) {
@@ -1056,8 +1084,8 @@ export function LocationDetermination({
     mapRef.current.updatePositionMarker(currentPosition[0], currentPosition[1]);
           if (isDebug) console.log("Positionsmarker aktualisiert:", currentPosition);
     
-    // 2. Einmalige Zentrierung und Zoom (nur beim ersten gültigen GPS-Update)
-    if (!hasZoomedToGPS && mapInitializedRef.current) {
+    // 2. Einmalige Zentrierung auf GPS nur ohne gespeicherten Habitat-Stand (Resume)
+    if (!hasZoomedToGPS && !hasSavedPolygon && mapInitializedRef.current) {
       if (isDebug) console.log("Einmalige Zentrierung auf GPS-Position:", currentPosition);
       
       // Zentrierung mit hohem Zoom-Level
@@ -1066,7 +1094,7 @@ export function LocationDetermination({
       // Flag setzen, damit dies nur einmal geschieht
       setHasZoomedToGPS(true);
     }
-  }, [currentPosition, hasZoomedToGPS]);
+  }, [currentPosition, hasZoomedToGPS, hasSavedPolygon, isDebug]);
 
   // Vereinfachte Map-Initialisierung - wird nur einmal ausgeführt
   useEffect(() => {
@@ -1081,7 +1109,7 @@ export function LocationDetermination({
     
     // Map als initialisiert markieren
     mapInitializedRef.current = true;
-    
+
     if (isDebug) console.log('Karte initialisiert mit niedrigem Zoom-Level');
   }, []); // Leere Abhängigkeiten - nur einmal ausführen
 
@@ -1424,6 +1452,7 @@ export function LocationDetermination({
           ref={mapRef}
           position={initialMapPosition}
           zoom={zoom}
+          onMapReady={handleMapReady}
           onCenterChange={handleCenterChange}
           onZoomChange={handleZoomChange}
           onPolygonChange={handlePolygonChange}

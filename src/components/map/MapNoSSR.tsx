@@ -132,6 +132,7 @@ interface MapNoSSRProps {
   schutzstatus?: string;               // Optionaler Schutzstatus für das eigene Polygon (geschützt/hochwertig/niederwertig)
   displayMode?: 'markers' | 'polygons'; // Anzeigemodus: Marker bei niedrigem Zoom, Polygone bei hohem Zoom
   onResetButtonPositionChange?: (position: { lat: number; lng: number } | null) => void;  // Callback für Button-Position
+  onMapReady?: () => void;             // Callback, sobald die Leaflet-Karte erstellt und bereit ist
 }
 
 // Komponente mit forwardRef, um Ref-Funktionen nach außen zu exponieren
@@ -154,7 +155,8 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
   onClick,
   schutzstatus = 'niederwertig',  // Standardwert: niederwertig
   displayMode = 'polygons',  // Standardwert: Polygone
-  onResetButtonPositionChange  // Callback für Button-Position
+  onResetButtonPositionChange,  // Callback für Button-Position
+  onMapReady
 }, ref) => {
   const isDebug = process.env.NEXT_PUBLIC_MAP_DEBUG === 'true';
   // Debug-Log für Rendering und Zustandsänderungen
@@ -191,6 +193,11 @@ const MapNoSSR = forwardRef<MapNoSSRHandle, MapNoSSRProps>(({
 
   // Status-Tracking für Map-Bereitschaft
   const [isMapReady, setIsMapReady] = useState(false);
+
+  // Eltern informieren, sobald die Leaflet-Karte erstellt und bereit ist (z. B. Resume-Zentrierung).
+  useEffect(() => {
+    if (isMapReady && onMapReady) onMapReady();
+  }, [isMapReady, onMapReady]);
 
   // Exponiere Methoden nach außen über Ref
   useImperativeHandle(ref, () => ({

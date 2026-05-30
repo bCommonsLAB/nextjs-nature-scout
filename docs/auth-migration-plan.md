@@ -1,5 +1,10 @@
 # Migration von Clerk zu Auth.js
 
+> ✅ **Status: abgeschlossen.** Die Migration ist umgesetzt – NatureScout läuft produktiv auf
+> **NextAuth (Auth.js)** mit Credentials-Provider (Passwort, 6-stelliger Login-Code,
+> Einladungs-Token) und JWT-Session. Dieses Dokument bleibt als Plan/Historie erhalten.
+> Aktueller fachlicher Stand: `specs/entitaeten/benutzer.md`, `specs/regeln/rollen-und-rechte.md`.
+
 ## Übersicht
 Diese Dokumentation beschreibt die schrittweise Migration von Clerk zur Auth.js für das NatureScout-Projekt.
 

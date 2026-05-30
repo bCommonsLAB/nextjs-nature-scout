@@ -56,11 +56,14 @@ Die Landingpage ist der öffentliche Einstiegspunkt für die Anwendung und stell
 
 ### Authentifizierung
 
-Die Authentifizierung wird über Clerk abgewickelt und umfasst Anmeldung, Registrierung und Nutzerprofil.
+Die Authentifizierung wird über **NextAuth (Auth.js)** abgewickelt (Credentials-Provider:
+Passwort, 6-stelliger Login-Code, Einladungs-Token; JWT-Session) und umfasst Anmeldung,
+Registrierung und Nutzerprofil. Fachliche Details siehe `specs/entitaeten/benutzer.md` und
+`specs/regeln/rollen-und-rechte.md`.
 
 **Hauptdateien:**
-- `src/app/anmelden/[[...sign-in]]/page.tsx`
-- `src/app/registrieren/page.tsx`
+- `src/lib/auth.ts` (NextAuth-Konfiguration), `src/lib/server-auth.ts` (Berechtigungen)
+- `src/app/auth/login`, `src/app/auth/register`
 - `src/components/auth/`
 
 ### Hauptanwendung: NatureScout
@@ -124,7 +127,7 @@ Die API-Routen bilden das Backend der Anwendung und stellen Daten und Funktionen
 
 - **Framework**: Next.js mit App Router
 - **UI-Bibliothek**: React mit Shadcn UI und Tailwind CSS
-- **Authentifizierung**: Clerk
+- **Authentifizierung**: NextAuth (Auth.js)
 - **Karten**: Leaflet
 - **Bildanalyse**: OpenAI API
 - **Datenbank**: MongoDB mit Mongoose

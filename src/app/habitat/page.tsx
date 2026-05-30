@@ -17,6 +17,11 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { FilterSelect } from './components/FilterSelect';
+import { useSync } from '@/lib/offline/use-sync';
+import { deleteLocalSession } from '@/lib/offline/db';
+import { LocalSessionStatus } from '@/lib/offline/types';
+import { RefreshCw, WifiOff } from 'lucide-react';
+import { useNatureScoutState } from '@/context/nature-scout-context';
 
 interface HabitateEntry {
   jobId: string;
@@ -71,10 +76,39 @@ interface HabitateData {
   };
 }
 
+// Lesbares Label für den lokalen Offline-Status (Session 2.5)
+const LOCAL_STATUS_LABEL: Record<LocalSessionStatus, string> = {
+  entwurf_lokal: 'Nur lokal gespeichert',
+  sync_ausstehend: 'Wird synchronisiert…',
+  synchronisiert: 'Synchronisiert (lokal noch vorhanden)',
+  abgeschlossen: 'Abgeschlossen',
+  sync_fehler: 'Synchronisierung fehlgeschlagen'
+};
+
+// Leichter Typ für eigene Entwürfe (GET /api/habitat/mine?status=draft) – Session 1.6
+interface DraftEntry {
+  jobId: string;
+  status: string;
+  startTime?: string;
+  updatedAt: string;
+  metadata?: {
+    gemeinde?: string;
+    flurname?: string;
+    standort?: string;
+    bilder?: Array<{ url: string }>;
+  };
+}
+
 function HabitatPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
+  const { resetCaptureSession } = useNatureScoutState();
+
+  const startNewCapture = () => {
+    resetCaptureSession();
+    router.push('/naturescout');
+  };
   
   const [data, setData] = useState<HabitateData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,6 +120,10 @@ function HabitatPageContent() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationResult, setMigrationResult] = useState<{ success: boolean; message: string } | null>(null);
+  // Eigene Entwürfe für „Erfassung fortsetzen" – Session 1.6
+  const [drafts, setDrafts] = useState<DraftEntry[]>([]);
+  // Offline-Sessions (IndexedDB) + Sync-Engine – Session 2.5
+  const { syncing, pendingCount, sessions: localSessions, syncNow, refresh: refreshSync } = useSync();
   
   const page = Number(searchParams.get('page') || '1');
   const search = searchParams.get('search') || '';
@@ -122,7 +160,27 @@ function HabitatPageContent() {
 
     checkPermissions();
   }, []);
-  
+
+  // Eigene Entwürfe laden (für „Erfassung fortsetzen") – Session 1.6
+  useEffect(() => {
+    if (!session?.user) {
+      setDrafts([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/habitat/mine?status=draft');
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled) setDrafts(Array.isArray(json.entries) ? json.entries : []);
+      } catch {
+        // Entwürfe sind optional – Fehler hier sind nicht kritisch
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [session?.user]);
+
   const debugLog = (section: string, data: Record<string, unknown>) => {
     console.log(`[DEBUG:${section}]`, data);
   };
@@ -342,6 +400,37 @@ function HabitatPageContent() {
     }
   };
   
+  // Entwurf verwerfen (Soft-Delete des eigenen Entwurfs) – Session 1.6
+  const handleDeleteDraft = async (jobId: string) => {
+    if (!confirm('Diesen Entwurf wirklich verwerfen? Die unfertige Erfassung wird entfernt.')) {
+      return;
+    }
+    try {
+      const response = await fetch(`/api/habitat/${jobId}`, { method: 'DELETE' });
+      if (!response.ok) {
+        throw new Error(`Fehler ${response.status}`);
+      }
+      setDrafts(prev => prev.filter(d => d.jobId !== jobId));
+    } catch (error) {
+      console.error('Fehler beim Verwerfen des Entwurfs:', error);
+      alert('Entwurf konnte nicht verworfen werden.');
+    }
+  };
+
+  // Lokale (Offline-)Session verwerfen – Session 2.5
+  const handleDeleteLocalSession = async (localId: string) => {
+    if (!confirm('Diese lokale Offline-Erfassung wirklich löschen? Noch nicht synchronisierte Daten gehen verloren.')) {
+      return;
+    }
+    try {
+      await deleteLocalSession(localId);
+      await refreshSync();
+    } catch (error) {
+      console.error('Fehler beim Löschen der lokalen Session:', error);
+      alert('Lokale Session konnte nicht gelöscht werden.');
+    }
+  };
+
   // Funktion zum Herunterladen aller Habitat-Daten (für Admins)
   const handleDownloadHabitatData = () => {
     window.location.href = '/api/habitat/download';
@@ -573,7 +662,7 @@ function HabitatPageContent() {
             </>
           )}
           {hasAdvancedPermissions && isExpert && (
-            <Button variant="default" size="sm" onClick={() => router.push('/naturescout')}>
+            <Button variant="default" size="sm" onClick={startNewCapture}>
               <Plus className="mr-2 h-4 w-4" />
               Neues Habitat
             </Button>
@@ -602,6 +691,94 @@ function HabitatPageContent() {
             <pre className="whitespace-pre-wrap font-mono text-sm">{migrationResult.message}</pre>
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* Erfassung fortsetzen: offene Entwürfe (Session 1.6) */}
+      {drafts.length > 0 && (
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <h2 className="text-lg font-semibold text-amber-800 mb-1">
+            Erfassung fortsetzen ({drafts.length})
+          </h2>
+          <p className="text-sm text-amber-700 mb-3">
+            Sie haben unfertige Erfassungen (Entwürfe). Setzen Sie eine Erfassung fort oder verwerfen Sie sie.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {drafts.map((d) => (
+              <div key={d.jobId} className="bg-white rounded-md border border-amber-200 p-3 flex flex-col gap-2">
+                <div className="text-sm font-medium text-gray-900">
+                  {d.metadata?.gemeinde || 'Unbekannter Standort'}
+                  {d.metadata?.flurname ? ` · ${d.metadata.flurname}` : ''}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {(d.metadata?.bilder?.length || 0)} Bild(er)
+                  {d.updatedAt ? ` · zuletzt ${new Date(d.updatedAt).toLocaleString('de-DE')}` : ''}
+                </div>
+                <div className="flex gap-2 mt-1">
+                  <Button size="sm" onClick={() => router.push(`/naturescout?editJobId=${d.jobId}`)}>
+                    Fortsetzen
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => handleDeleteDraft(d.jobId)}>
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Verwerfen
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Offline-Erfassungen (lokal, IndexedDB) + Sync (Session 2.5) */}
+      {localSessions.filter(s => s.status !== 'abgeschlossen').length > 0 && (
+        <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+            <h2 className="text-lg font-semibold text-blue-800 inline-flex items-center gap-2">
+              <WifiOff className="h-5 w-5" />
+              Offline-Erfassungen ({localSessions.filter(s => s.status !== 'abgeschlossen').length})
+            </h2>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void syncNow()}
+              disabled={syncing || pendingCount === 0}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Synchronisiere…' : `Jetzt synchronisieren${pendingCount ? ` (${pendingCount})` : ''}`}
+            </Button>
+          </div>
+          <p className="text-sm text-blue-700 mb-3">
+            Lokal auf diesem Gerät gespeicherte Erfassungen. Sie werden automatisch übertragen, sobald eine Internetverbindung besteht.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {localSessions.filter(s => s.status !== 'abgeschlossen').map((s) => {
+              const bildCount = Array.isArray(s.metadata?.bilder) ? s.metadata.bilder.length : 0;
+              const resumeHref = s.jobId
+                ? `/naturescout?editJobId=${s.jobId}`
+                : `/naturescout?localSessionId=${s.localId}`;
+              return (
+                <div key={s.localId} className="bg-white rounded-md border border-blue-200 p-3 flex flex-col gap-2">
+                  <div className="text-sm font-medium text-gray-900">
+                    {s.metadata?.gemeinde || 'Unbekannter Standort'}
+                    {s.metadata?.flurname ? ` · ${s.metadata.flurname}` : ''}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {bildCount} Bild(er) · {LOCAL_STATUS_LABEL[s.status]}
+                  </div>
+                  {s.lastError && <div className="text-xs text-red-600">{s.lastError}</div>}
+                  <div className="flex gap-2 mt-1">
+                    <Button size="sm" onClick={() => router.push(resumeHref)}>
+                      Fortsetzen
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleDeleteLocalSession(s.localId)}>
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Löschen
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {!hasAdvancedPermissions && (
@@ -752,7 +929,7 @@ function HabitatPageContent() {
               : 'Sie haben noch keine Habitaterfassungen durchgeführt.'}
           </p>
           {session?.user ? (
-            <Button onClick={() => router.push('/naturescout')}>
+            <Button onClick={startNewCapture}>
               <Plus className="mr-2 h-4 w-4" />
               Neues Habitat erfassen
             </Button>

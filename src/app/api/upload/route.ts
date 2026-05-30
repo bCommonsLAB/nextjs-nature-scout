@@ -1,18 +1,63 @@
 import { AzureStorageService } from '@/lib/services/azure-storage-service';
 import sharp from 'sharp';
 import { publicConfig } from '@/lib/config';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { getAnalysisJob, addImageToDraft } from '@/lib/services/analysis-service';
+import { Bild } from '@/types/nature-scout';
 
 const { maxWidth, maxHeight, quality } = publicConfig.imageSettings;
 const LOW_RES_MAX_SIZE = 360;
+
+/**
+ * Verknüpft ein hochgeladenes Bild serverseitig mit einem Entwurf (Best-Effort, Session 1.3).
+ *
+ * Nur wenn `jobId` übergeben wurde, der/die Angemeldete Eigentümer:in des Entwurfs ist und der
+ * Datensatz `status: 'draft'` hat. Fehler hier brechen den Upload NICHT ab – das Bild ist bereits
+ * in Azure und wird zusätzlich vom Client-Auto-Save (PATCH …/draft) referenziert.
+ */
+async function linkImageToDraft(
+  jobId: string,
+  imageKey: string,
+  clientImageId: string | null,
+  bildData: { filename: string; url: string; lowResUrl?: string }
+): Promise<void> {
+  try {
+    const session = await getServerSession(authOptions);
+    const userEmail = session?.user?.email;
+    if (!userEmail) return;
+
+    const job = await getAnalysisJob(jobId);
+    if (!job || job.status !== 'draft') return;
+    if (job.metadata?.email !== userEmail) return;
+
+    const bild: Bild = {
+      imageKey: imageKey || 'Bild',
+      filename: bildData.filename,
+      url: bildData.url,
+      lowResUrl: bildData.lowResUrl,
+      analyse: null,
+      ...(clientImageId ? { clientImageId } : {})
+    };
+    await addImageToDraft(jobId, bild);
+  } catch (error) {
+    console.warn('Bild konnte nicht serverseitig mit Entwurf verknüpft werden:', error);
+  }
+}
 
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get('image') as File;
-    
+
     if (!file) {
       return new Response('Keine Datei gefunden', { status: 400 });
     }
+
+    // Optionale Felder zum serverseitigen Verknüpfen mit einem Entwurf (Session 1.3)
+    const jobId = (formData.get('jobId') as string) || null;
+    const imageKey = (formData.get('imageKey') as string) || '';
+    const clientImageId = (formData.get('clientImageId') as string) || null;
 
     const buffer = Buffer.from(await file.arrayBuffer());
     
@@ -126,12 +171,17 @@ export async function POST(request: Request) {
       const url = await azureStorage.uploadImage(filename, processedBuffer);
       const lowResUrl = await azureStorage.uploadImage(lowResFilename, lowResBuffer);
 
-      return Response.json({ 
+      // Optional: Bild direkt am Entwurf referenzieren (verhindert verwaiste Bilder)
+      if (jobId) {
+        await linkImageToDraft(jobId, imageKey, clientImageId, { filename, url, lowResUrl });
+      }
+
+      return Response.json({
         filename,
         url,
         lowResFilename,
         lowResUrl,
-        success: true 
+        success: true
       });
     } catch (imageError: unknown) {
       console.error('Fehler bei der Bildverarbeitung:', imageError);
@@ -143,8 +193,12 @@ export async function POST(request: Request) {
         
         const azureStorage = new AzureStorageService();
         const url = await azureStorage.uploadImage(filename, buffer);
-        
-        return Response.json({ 
+
+        if (jobId) {
+          await linkImageToDraft(jobId, imageKey, clientImageId, { filename, url });
+        }
+
+        return Response.json({
           filename,
           url,
           success: true,

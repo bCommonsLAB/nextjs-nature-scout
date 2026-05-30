@@ -8,6 +8,7 @@ import { requireAuth } from '@/lib/server-auth';
 // Vor der GET-Funktion, definiere die Typen
 interface MongoFilter {
   deleted?: { $ne: boolean };
+  status?: { $ne: string };
   'metadata.email'?: string;
   'metadata.erfassungsperson'?: string;
   'metadata.gemeinde'?: string;
@@ -105,7 +106,9 @@ export async function GET(request: Request) {
     // Suchfilter erstellen
     const filter: MongoFilter = {
       // Zeige nur Einträge an, die nicht als gelöscht markiert sind
-      deleted: { $ne: true }
+      deleted: { $ne: true },
+      // Entwürfe (status: 'draft') gehören nicht in normale Listen, nur unter "Meine Habitate → Entwürfe"
+      status: { $ne: 'draft' }
     };
     
     // Für normale Benutzer: Nur eigene Einträge anzeigen
@@ -219,7 +222,7 @@ export async function GET(request: Request) {
     if (hasAdvancedPermissions) {
       // Admins und Experten sehen alle Personen
       allPersonsAggregation = await collection.aggregate([
-        { $match: { deleted: { $ne: true } } },
+        { $match: { deleted: { $ne: true }, status: { $ne: 'draft' } } },
         { $group: { _id: '$metadata.erfassungsperson' } },
         { $match: { _id: { $ne: null } } },
         { $sort: { _id: 1 } }
@@ -227,11 +230,12 @@ export async function GET(request: Request) {
     } else {
       // Normale Benutzer sehen nur sich selbst
       allPersonsAggregation = await collection.aggregate([
-        { 
-          $match: { 
-            deleted: { $ne: true }, 
-            'metadata.email': userEmail 
-          } 
+        {
+          $match: {
+            deleted: { $ne: true },
+            status: { $ne: 'draft' },
+            'metadata.email': userEmail
+          }
         },
         { $group: { _id: '$metadata.erfassungsperson' } },
         { $match: { _id: { $ne: null } } },

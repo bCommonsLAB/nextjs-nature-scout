@@ -55,6 +55,8 @@ export interface Bild {
   lowResUrl?: string;
   analyse: string | null;
   plantnetResult?: PlantNetResult;
+  // Stabile Client-ID zur Idempotenz beim (Wieder-)Verknüpfen/Sync von Bildern (Offline-Erfassung).
+  clientImageId?: string;
 }
 
 export interface PlantNetResponse {
@@ -88,10 +90,68 @@ export interface PlantNetResult {
 }
 
 
+/**
+ * Rolle einer handelnden Person (vgl. IUser.role in user-service.ts).
+ */
+export type BenutzerRolle = 'user' | 'experte' | 'admin' | 'superadmin';
+
+/**
+ * Audit-Information über eine handelnde Person (Verifizierung, Löschung, History).
+ */
+export interface AuditUser {
+  userId: string;
+  userName: string;
+  email?: string;
+  role: BenutzerRolle;
+}
+
+/**
+ * Vom Experten/Admin verifiziertes (effektives) Ergebnis. Hat fachlich Vorrang vor `result`.
+ * Siehe specs/regeln/verifizierungs-workflow.md.
+ */
+export interface VerifiedResult {
+  habitattyp?: string;
+  habitatfamilie?: string;
+  schutzstatus?: string;
+  kommentar?: string;
+}
+
+/**
+ * Eintrag der Versionshistorie (Reanalyse & Verifizierung).
+ */
+export interface HabitatHistoryEntry {
+  date: Date;
+  user: AuditUser;
+  module: string;
+  previousResult?: {
+    habitattyp?: string;
+    habitatfamilie?: string;
+    schutzstatus?: string;
+    kommentar?: string;
+  } | null;
+  changes?: {
+    bildCount?: number;
+    habitattyp?: string;
+    habitatfamilie?: string;
+    schutzstatus?: string;
+    kommentar?: string;
+  };
+}
+
+/**
+ * Habitat-Datensatz (Collection `analyseJobs`).
+ *
+ * Spec: specs/entitaeten/habitat.md – diese Definition spiegelt das tatsächlich
+ * persistierte Dokument inkl. Verifizierungs-, Soft-Delete- und History-Feldern wider.
+ */
 export interface AnalysisJob {
   _id: ObjectId;
-  jobId: string; // Neue Zeile für die ursprüngliche ID
-  status: 'pending' | 'completed' | 'failed';
+  jobId: string; // Fachlicher/öffentlicher Identifikator (= "auftragsId" in URLs)
+  // 'draft' = Erfassung läuft, noch nicht analysiert (ausfallsichere/offline-fähige Erfassung).
+  // Ablauf: draft → (Analyse starten) → pending → analyzing → completed/failed.
+  // Invariante: 'draft'-Datensätze sind nie öffentlich und tauchen nicht in normalen Listen auf
+  // (nur unter "Meine Habitate → Entwürfe"). Siehe specs/regeln/offline-erfassung-und-sync.md.
+  status: 'draft' | 'pending' | 'analyzing' | 'completed' | 'failed';
   metadata: NatureScoutData;
   result?: AnalyseErgebnis | null;
   llmInfo?: llmInfo
@@ -99,6 +159,20 @@ export interface AnalysisJob {
   startTime: Date;
   updatedAt: Date;
   protectionStatus?: 'red' | 'yellow' | 'green';
+
+  // Verifizierung (gesetzt durch effective-habitat/route.ts, entfernt durch unverify/route.ts)
+  verified?: boolean;
+  verifiedAt?: Date;
+  verifiedBy?: AuditUser;
+  verifiedResult?: VerifiedResult;
+
+  // Soft-Delete (gesetzt durch DELETE /api/habitat/[auftragsId])
+  deleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: AuditUser;
+
+  // Versionshistorie (Reanalyse & Verifizierung)
+  history?: HabitatHistoryEntry[];
 }
 
 
