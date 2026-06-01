@@ -866,14 +866,14 @@ export function GetImage({
               </>
             )}
           </label>
-          {/* File Input */}
-          <input 
-            id={`dropzone-file-${imageTitle}`} 
-            type="file" 
-            className="hidden" 
+          {/* File Input. Bewusst KEIN `capture`-Attribut: mobile Browser zeigen so die Auswahl
+              „Kamera ODER Galerie", statt die Kamera zu erzwingen – Foto aus der Galerie wieder möglich. */}
+          <input
+            id={`dropzone-file-${imageTitle}`}
+            type="file"
+            className="hidden"
             onChange={handleBildUpload}
             accept="image/*"
-            capture={isMobile && cameraAvailable ? "environment" : undefined} 
           />
         </div>
         
