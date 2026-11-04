@@ -867,13 +867,15 @@ export function GetImage({
             )}
           </label>
           {/* File Input */}
-          <input 
-            id={`dropzone-file-${imageTitle}`} 
-            type="file" 
-            className="hidden" 
+          {/* Bewusst OHNE capture-Attribut: capture erzwingt mobil direkt die Kamera und
+              verhindert die Auswahl bereits gespeicherter Fotos. Der native Datei-Dialog
+              bietet auf dem Smartphone ohnehin Kamera UND Fotomediathek/Dateien an. */}
+          <input
+            id={`dropzone-file-${imageTitle}`}
+            type="file"
+            className="hidden"
             onChange={handleBildUpload}
             accept="image/*"
-            capture={isMobile && cameraAvailable ? "environment" : undefined} 
           />
         </div>
         
