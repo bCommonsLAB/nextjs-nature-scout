@@ -18,6 +18,7 @@ import { MultiSelectFilter } from './components/MultiSelectFilter';
 import { Badge } from '@/components/ui/badge';
 import { HabitatOverviewMap } from '@/components/map/HabitatOverviewMap';
 import { LeaderboardSection } from './components/LeaderboardSection';
+import { StatsHighlights } from './components/StatsHighlights';
 
 interface HabitatEntry {
   jobId: string;
@@ -442,6 +443,18 @@ function UnsereHabitateContent() {
         
         {/* Rechte Spalte mit Ergebnissen */}
         <div className="w-full md:w-3/4">
+          {/* Kennzahlen – reagieren auf die aktiven Filter links */}
+          <StatsHighlights
+            filters={{
+              search: search || undefined,
+              gemeinde: gemeindeValues.length > 0 ? gemeindeValues : undefined,
+              habitat: habitatValues.length > 0 ? habitatValues : undefined,
+              habitatfamilie: habitatfamilieValues.length > 0 ? habitatfamilieValues : undefined,
+              protectionStatus: schutzstatusValues.length > 0 ? schutzstatusValues : undefined,
+              person: personValues.length > 0 ? personValues : undefined,
+              organization: organizationValues.length > 0 ? organizationValues : undefined,
+            }}
+          />
           <div className="flex justify-between items-center mb-4">
             <div>
               {/* Aktive Filter anzeigen */}

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Image from 'next/image';
-import { Building, Trophy } from 'lucide-react';
+import { Building, MapPin, Trophy } from 'lucide-react';
 
 interface Eintrag {
   name: string;
-  count: number;
+  count?: number;
+  hektar?: number;
   organizationName?: string;
   organizationLogo?: string;
 }
@@ -14,16 +15,28 @@ interface Eintrag {
 interface StatsData {
   topErfasser: Eintrag[];
   topOrganisationen: Eintrag[];
+  topGemeinden: Eintrag[];
 }
 
-// Einzelnes Logo mit Fallback, falls die URL nicht lädt.
-function OrgLogo({ url, alt }: { url?: string; alt: string }) {
+interface Zeile {
+  name: string;
+  valueText: string;
+  logo?: string;
+  icon: ReactNode;
+}
+
+function formatHa(n: number): string {
+  return `${n.toLocaleString('de-DE', { maximumFractionDigits: 1 })} ha`;
+}
+
+// Logo mit Fallback-Icon, falls keine/defekte URL.
+function LogoOrIcon({ url, alt, fallback }: { url?: string; alt: string; fallback: ReactNode }) {
   const [error, setError] = useState(false);
 
   if (!url || error) {
     return (
       <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-400">
-        <Building className="h-4 w-4" />
+        {fallback}
       </span>
     );
   }
@@ -49,23 +62,23 @@ function Rang({ platz }: { platz: number }) {
   );
 }
 
-function Bestenliste({ titel, eintraege }: { titel: string; eintraege: Eintrag[] }) {
+function Bestenliste({ titel, zeilen }: { titel: string; zeilen: Zeile[] }) {
   return (
     <div className="rounded-lg bg-white p-4 shadow">
       <h3 className="mb-3 font-semibold">{titel}</h3>
-      {eintraege.length === 0 ? (
+      {zeilen.length === 0 ? (
         <p className="text-sm text-gray-500">Noch keine Daten.</p>
       ) : (
         <ul className="divide-y divide-gray-100">
-          {eintraege.map((e, i) => (
-            <li key={e.name} className="flex items-center justify-between gap-3 py-2">
+          {zeilen.map((z, i) => (
+            <li key={z.name} className="flex items-center justify-between gap-3 py-2">
               <div className="flex min-w-0 items-center gap-3">
                 <Rang platz={i + 1} />
-                <OrgLogo url={e.organizationLogo} alt={e.organizationName || e.name} />
-                <span className="truncate">{e.name}</span>
+                <LogoOrIcon url={z.logo} alt={z.name} fallback={z.icon} />
+                <span className="truncate">{z.name}</span>
               </div>
-              <span className="flex-shrink-0 rounded-full bg-gray-100 px-2.5 py-0.5 text-sm text-gray-700">
-                {e.count}
+              <span className="flex-shrink-0 whitespace-nowrap rounded-full bg-gray-100 px-2.5 py-0.5 text-sm text-gray-700">
+                {z.valueText}
               </span>
             </li>
           ))}
@@ -99,10 +112,13 @@ export function LeaderboardSection() {
 
   const erfasser = data?.topErfasser ?? [];
   const orgs = data?.topOrganisationen ?? [];
+  const gemeinden = data?.topGemeinden ?? [];
 
-  // Unauffällig bleiben, solange geladen wird oder nichts vorhanden ist.
   if (loading) return null;
-  if (erfasser.length === 0 && orgs.length === 0) return null;
+  if (erfasser.length === 0 && orgs.length === 0 && gemeinden.length === 0) return null;
+
+  const building = <Building className="h-4 w-4" />;
+  const mapPin = <MapPin className="h-4 w-4" />;
 
   return (
     <section className="mt-12 border-t border-gray-200 pt-10">
@@ -112,12 +128,36 @@ export function LeaderboardSection() {
           <h2 className="text-2xl font-bold">Danke an unsere Gemeinschaft</h2>
         </div>
         <p className="text-gray-600">
-          Die fleißigsten Erfasser:innen und aktivsten Organisationen, die unsere Habitate sichtbar machen.
+          Die fleißigsten Erfasser:innen, die aktivsten Organisationen und die am besten erfassten Gemeinden.
         </p>
       </div>
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <Bestenliste titel="Fleißigste Erfasser:innen" eintraege={erfasser} />
-        <Bestenliste titel="Aktivste Organisationen" eintraege={orgs} />
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <Bestenliste
+          titel="Fleißigste Erfasser:innen"
+          zeilen={erfasser.map((e) => ({
+            name: e.name,
+            valueText: String(e.count ?? 0),
+            logo: e.organizationLogo,
+            icon: building,
+          }))}
+        />
+        <Bestenliste
+          titel="Aktivste Organisationen"
+          zeilen={orgs.map((e) => ({
+            name: e.name,
+            valueText: String(e.count ?? 0),
+            logo: e.organizationLogo,
+            icon: building,
+          }))}
+        />
+        <Bestenliste
+          titel="Größte erfasste Fläche je Gemeinde"
+          zeilen={gemeinden.map((e) => ({
+            name: e.name,
+            valueText: formatHa(e.hektar ?? 0),
+            icon: mapPin,
+          }))}
+        />
       </div>
     </section>
   );
