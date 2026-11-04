@@ -27,9 +27,13 @@ export async function PATCH(
     }
     
     const body = await request.json();
-    const { effectiveHabitat, kommentar } = body;
-    
-    if (!effectiveHabitat) {
+    const { effectiveHabitat, habitatfamilie: habitatfamilieInput, kommentar } = body;
+
+    // Thomas-Regel (Feedback v. 12.09.2026): Bei Habitatgruppe "andere" darf ohne
+    // konkreten Habitattyp verifiziert werden; die Einschätzung steht nur im Kommentar.
+    const istAndere = habitatfamilieInput === 'andere';
+
+    if (!effectiveHabitat && !istAndere) {
       return NextResponse.json(
         { error: 'Effektiver Habitat ist erforderlich' },
         { status: 400 }
@@ -52,14 +56,23 @@ export async function PATCH(
       );
     }
     
-    // Hole die habitatFamilie und schutzstatus vom gewählten Habitattyp
-    const habitatType = await habitatTypesCollection.findOne({ name: effectiveHabitat });
+    // Hole die habitatFamilie und schutzstatus vom gewählten Habitattyp.
+    // Sonderfall "andere": kein Habitattyp, leerer schutzstatus -> protectionStatus 'green'
+    // (nicht schützenswert, nicht öffentlich); die Einschätzung steht im kommentar.
+    let habitattyp = effectiveHabitat || '';
     let habitatfamilie = '';
     let schutzstatus = '';
-    
-    if (habitatType) {
-      habitatfamilie = habitatType.habitatFamilie || '';
-      schutzstatus = habitatType.schutzstatus || entry.result?.schutzstatus || '';
+
+    if (effectiveHabitat) {
+      const habitatType = await habitatTypesCollection.findOne({ name: effectiveHabitat });
+      if (habitatType) {
+        habitatfamilie = habitatType.habitatFamilie || '';
+        schutzstatus = habitatType.schutzstatus || entry.result?.schutzstatus || '';
+      }
+    } else if (istAndere) {
+      habitattyp = '';
+      habitatfamilie = 'andere';
+      schutzstatus = '';
     }
     
     // Erstelle einen Eintrag für die Versionshistorie
@@ -79,7 +92,7 @@ export async function PATCH(
         kommentar: entry.verifiedResult?.kommentar || entry.result?.kommentar
       },
       changes: {
-        habitattyp: effectiveHabitat,
+        habitattyp: habitattyp,
         habitatfamilie: habitatfamilie,
         schutzstatus: schutzstatus,
         kommentar: kommentar
@@ -100,7 +113,7 @@ export async function PATCH(
           $set: {
             // Aktualisiere die verifiedResult-Attribute statt result
             "verifiedResult": {
-              habitattyp: effectiveHabitat,
+              habitattyp: habitattyp,
               habitatfamilie: habitatfamilie,
               schutzstatus: schutzstatus,
               kommentar: kommentar
@@ -139,7 +152,7 @@ export async function PATCH(
     // Formatierte Antwort mit einfachen Datentypen
     return NextResponse.json({ 
       success: true, 
-      habitattyp: effectiveHabitat,
+      habitattyp: habitattyp,
       habitatfamilie: habitatfamilie,
       schutzstatus: schutzstatus,
       kommentar: kommentar,

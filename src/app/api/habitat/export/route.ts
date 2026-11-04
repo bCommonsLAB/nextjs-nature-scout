@@ -3,6 +3,7 @@ import { Sort as MongoSort, Document } from 'mongodb';
 import { connectToDatabase } from '@/lib/services/db';
 import { UserService } from '@/lib/services/user-service';
 import { requireAuth } from '@/lib/server-auth';
+import { wgs84ToUtm32N } from '@/lib/utils/geo';
 
 // Definiere die Typen
 interface MongoFilter {
@@ -233,13 +234,38 @@ export async function GET(request: Request) {
       // URL für das Habitat (momentan leer, später: `${baseUrl}/habitat/${entry.jobId}`)
       const url = ''; // TODO: Später mit Link füllen: `${baseUrl}/habitat/${entry.jobId}`
       
+      // Reprojektion WGS84 (EPSG:4326) -> EPSG:25832 (ETRS89/UTM 32N) für den Gemeinde-GeoBrowser.
+      const latW = entry.metadata?.latitude;
+      const lonW = entry.metadata?.longitude;
+      let east: number | null = null;
+      let north: number | null = null;
+      if (typeof latW === 'number' && typeof lonW === 'number') {
+        const utm = wgs84ToUtm32N(latW, lonW);
+        east = Math.round(utm.easting * 100) / 100;
+        north = Math.round(utm.northing * 100) / 100;
+      }
+      const polygonPointsWgs84 = entry.metadata?.polygonPoints || null;
+      const polygon = Array.isArray(polygonPointsWgs84)
+        ? polygonPointsWgs84
+            .filter((p) => Array.isArray(p) && p.length >= 2 && typeof p[0] === 'number' && typeof p[1] === 'number')
+            .map((p): [number, number] => {
+              const utm = wgs84ToUtm32N(p[0], p[1]);
+              return [Math.round(utm.easting * 100) / 100, Math.round(utm.northing * 100) / 100];
+            })
+        : null;
+
       return {
         Id: entry.jobId,
         gemeinde: entry.metadata?.gemeinde || '',
         flurname: entry.metadata?.flurname || '',
+        // EPSG:25832 (ETRS89/UTM 32N) – für den Import in den Gemeinde-GeoBrowser:
+        east,
+        north,
+        polygon,
+        // WGS84 (EPSG:4326) – Referenz:
         latitude: entry.metadata?.latitude || null,
         longitude: entry.metadata?.longitude || null,
-        polygonPoints: entry.metadata?.polygonPoints || null,
+        polygonPoints: polygonPointsWgs84,
         updatedAt: entry.updatedAt || '',
         protectionStatus: mapProtectionStatusToColor(protectionStatus),
         url: url
@@ -250,7 +276,12 @@ export async function GET(request: Request) {
     const exportStructure = {
       header: {
         source: 'Dachverband für Natur- und Umweltschutz',
-        date: new Date().toISOString().split('T')[0] // Format: YYYY-MM-DD
+        date: new Date().toISOString().split('T')[0], // Format: YYYY-MM-DD
+        // Koordinatensystem von east/north/polygon (Standard Südtirol, vom Gemeindenverband angefordert):
+        crs: 'EPSG:25832',
+        crsName: 'ETRS89 / UTM Zone 32N',
+        // latitude/longitude/polygonPoints sind zusätzlich in WGS84 enthalten:
+        crsWgs84: 'EPSG:4326'
       },
       data: exportedData
     };
