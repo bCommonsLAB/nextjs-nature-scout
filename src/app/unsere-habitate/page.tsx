@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { MultiSelectFilter } from './components/MultiSelectFilter';
 import { Badge } from '@/components/ui/badge';
 import { HabitatOverviewMap } from '@/components/map/HabitatOverviewMap';
+import { LeaderboardSection } from './components/LeaderboardSection';
 
 interface HabitatEntry {
   jobId: string;
@@ -637,6 +638,9 @@ function UnsereHabitateContent() {
           )}
         </div>
       </div>
+
+      {/* Anerkennung: Bestenlisten der fleißigsten Erfasser:innen und Organisationen */}
+      <LeaderboardSection />
     </div>
   );
 }
