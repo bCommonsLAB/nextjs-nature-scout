@@ -82,6 +82,10 @@ export function EffektiverHabitatEditor({
   const [filteredHabitats, setFilteredHabitats] = useState<HabitatType[]>([]);
   
   const router = useRouter();
+
+  // Thomas-Regel (Feedback v. 12.09.2026): Bei Habitatgruppe "andere" ist keine
+  // Habitattyp-Zuordnung nötig – die Einschätzung steht nur im Kommentar.
+  const istAndere = selectedFamily === 'andere';
   
   useEffect(() => {
     async function fetchHabitatTypes() {
@@ -168,6 +172,14 @@ export function EffektiverHabitatEditor({
       return;
     }
     
+    // Thomas-Regel: Bei "andere" keine Habitat-Auswahl anbieten – alles kommt in die Anmerkung.
+    if (value === 'andere') {
+      setFilteredHabitats([]);
+      setSelectedHabitat('');
+      setSelectedHabitatInfo(null);
+      return;
+    }
+
     // Filtere Habitate nach ausgewählter Familie
     const filteredOptions = habitatOptions.filter((h: HabitatType) => h.habitatFamilie === value);
     setFilteredHabitats(filteredOptions);
@@ -199,11 +211,19 @@ export function EffektiverHabitatEditor({
   };
   
   const handleSave = async () => {
-    if (!selectedHabitat) {
+    if (!selectedFamily) {
+      setError('Bitte wählen Sie eine Habitatgruppe aus');
+      return;
+    }
+    if (!istAndere && !selectedHabitat) {
       setError('Bitte wählen Sie einen Habitattyp aus');
       return;
     }
-    
+    if (istAndere && !habitatKommentar.trim()) {
+      setError('Bei der Gruppe „andere" bitte eine Anmerkung als Feedback für die erfassende Person hinterlegen.');
+      return;
+    }
+
     console.log("Versuche Habitat zu speichern mit jobId:", jobId);
     
     if (!jobId) {
@@ -220,6 +240,7 @@ export function EffektiverHabitatEditor({
         },
         body: JSON.stringify({
           effectiveHabitat: selectedHabitat,
+          habitatfamilie: selectedFamily,
           kommentar: habitatKommentar
         }),
       });
@@ -336,26 +357,35 @@ export function EffektiverHabitatEditor({
                 </Select>
               </div>
               
-              {/* Dropdown für Habitate der ausgewählten Familie */}
-              <div className="space-y-1">
-                <div className="text-xs text-gray-500">Habitat auswählen</div>
-                <Select 
-                  value={selectedHabitat} 
-                  onValueChange={handleHabitatChange}
-                  disabled={saving || !selectedFamily}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={!selectedFamily ? "Bitte zuerst Familie wählen" : "Habitattyp auswählen"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredHabitats.map((habitat) => (
-                      <SelectItem key={habitat._id} value={habitat.name}>
-                        {habitat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Habitat-Auswahl – bei Gruppe "andere" entfällt sie (nur Kommentar) */}
+              {istAndere ? (
+                <div className="space-y-1">
+                  <div className="text-xs text-gray-500">Habitat</div>
+                  <div className="px-3 py-2 border rounded-md bg-gray-50 text-sm text-gray-600">
+                    Keine Habitat-Zuordnung – bitte die Einschätzung unten als Anmerkung hinterlegen.
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="text-xs text-gray-500">Habitat auswählen</div>
+                  <Select
+                    value={selectedHabitat}
+                    onValueChange={handleHabitatChange}
+                    disabled={saving || !selectedFamily}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={!selectedFamily ? "Bitte zuerst Familie wählen" : "Habitattyp auswählen"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredHabitats.map((habitat) => (
+                        <SelectItem key={habitat._id} value={habitat.name}>
+                          {habitat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               
               {/* Zeige Schutzstatus des ausgewählten Habitats an */}
               {selectedHabitatInfo?.schutzstatus && (
@@ -379,9 +409,13 @@ export function EffektiverHabitatEditor({
       )}
       
       <div className="space-y-2">
-        <div className="text-sm font-medium">Anmerkung zur Verifizierung</div>
+        <div className="text-sm font-medium">
+          Anmerkung zur Verifizierung{istAndere ? ' – Pflicht (Feedback für die erfassende Person)' : ''}
+        </div>
         <Textarea
-          placeholder="Ihre Anmerkungen zur Habitat-Verifizierung (z.B. Gründe für die Änderung, besondere Merkmale)"
+          placeholder={istAndere
+            ? 'Kein eindeutig zuordenbarer/schützenswerter Lebensraum. Bitte kurze Begründung bzw. Hinweis für die erfassende Person.'
+            : 'Ihre Anmerkungen zur Habitat-Verifizierung (z.B. Gründe für die Änderung, besondere Merkmale)'}
           value={habitatKommentar}
           onChange={(e) => setHabitatKommentar(e.target.value)}
           disabled={saving}
@@ -397,9 +431,9 @@ export function EffektiverHabitatEditor({
       )}
       
       <div className="flex justify-end">
-        <Button 
+        <Button
           onClick={handleSave}
-          disabled={loading || saving || selectedHabitat === ''}
+          disabled={loading || saving || !selectedFamily || (!istAndere && selectedHabitat === '')}
           className="flex items-center gap-2"
         >
           {saving ? (

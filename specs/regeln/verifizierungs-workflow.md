@@ -12,13 +12,18 @@ Beschreibt, wie ein KI-analysiertes Habitat durch Expert:innen/Admins fachlich b
 
 1. **Ausgangslage:** Habitat mit `status: 'completed'` und KI-`result` (noch `verified` ungesetzt).
 2. **Verifizieren** (Experte/Admin) via `PATCH .../effective-habitat` mit `{ effectiveHabitat,
-   kommentar }`:
+   habitatfamilie?, kommentar }`:
    - Der gewählte `effectiveHabitat` (Habitattyp-Name) wird in `habitatTypes` nachgeschlagen;
      `habitatFamilie` und `schutzstatus` werden von dort übernommen.
    - Es wird gesetzt: `verifiedResult { habitattyp, habitatfamilie, schutzstatus, kommentar }`,
      `verified: true`, `verifiedAt`, `verifiedBy { userId, userName, role }`.
    - `protectionStatus` wird aus `verifiedResult.schutzstatus` abgeleitet (s. `schutzstatus.md`).
    - Ein `history`-Eintrag (Modul „Habitat-Verifizierung") mit `previousResult`/`changes` wird angehängt.
+   - **Sonderfall „andere" (Feedback Th. Wilhalm, 12.09.2026):** Bei Habitatgruppe `andere` ist
+     **keine** Habitattyp-Zuordnung nötig. Es wird ohne `habitattyp` verifiziert
+     (`habitatfamilie: 'andere'`, `schutzstatus` leer → `protectionStatus: 'green'`); die fachliche
+     Einschätzung steht ausschließlich im `kommentar` (Pflichtfeld, Feedback für die erfassende
+     Person). Das Habitat gilt als verifiziert, bleibt aber **nicht öffentlich**.
 3. **Öffentlich-Werden:** Ist `protectionStatus ∈ {red, yellow}`, ist das Habitat ab jetzt
    öffentlich sichtbar.
 4. **Zurücknehmen** (Experte/Admin) via `POST .../unverify`: entfernt `verified`, `verifiedAt`,
