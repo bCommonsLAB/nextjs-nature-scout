@@ -210,8 +210,18 @@ export function Navbar() {
   return (
     <header className="flex flex-col justify-center px-16 w-full bg-stone-50 min-h-[72px] max-md:px-5">
       <nav className="flex flex-wrap gap-10 justify-between items-center w-full">
-        <div className="flex justify-center items-center self-stretch my-auto max-w-[198px]">
-          <Link href="/">
+        <div className="flex justify-center items-center self-stretch my-auto">
+          <Link href="/" className="flex items-center gap-3">
+            {/* DVN-Logo (Dachverband) der NatureScout-Wortmarke vorangestellt – stärkere DVN-Sichtbarkeit */}
+            <Image
+              src="/images/dvn-logo.png"
+              alt="Dachverband für Natur- und Umweltschutz"
+              width={36}
+              height={36}
+              priority
+              className="object-contain"
+              style={{ width: 'auto', height: '36px' }}
+            />
             <Image
               src="/images/naturescout-normal.svg"
               alt="NatureScout Logo"
