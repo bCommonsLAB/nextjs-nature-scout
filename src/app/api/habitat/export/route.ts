@@ -210,7 +210,7 @@ export async function GET(request: Request) {
                     (request.headers.get('host') ? `https://${request.headers.get('host')}` : '');
     
     // Transformiere die Daten in eine flache Struktur
-    const exportedData = entries.map((entry: MongoDocument) => {
+    const features = entries.map((entry: MongoDocument) => {
       // Verwende protectionStatus direkt, mit Fallback auf schutzstatus für alte Daten
       let protectionStatus: 'red' | 'yellow' | 'green' | undefined = entry.protectionStatus;
       
@@ -254,50 +254,59 @@ export async function GET(request: Request) {
             })
         : null;
 
+      // GeoJSON-Geometrie: Polygon aus den reprojizierten Punkten (Ring geschlossen),
+      // sonst Point aus east/north, sonst null.
+      let geometry:
+        | { type: 'Polygon'; coordinates: [number, number][][] }
+        | { type: 'Point'; coordinates: [number, number] }
+        | null = null;
+      if (polygon && polygon.length >= 3) {
+        const ring: [number, number][] = [...polygon];
+        const first = ring[0];
+        const last = ring[ring.length - 1];
+        if (first && last && (first[0] !== last[0] || first[1] !== last[1])) {
+          ring.push(first);
+        }
+        geometry = { type: 'Polygon', coordinates: [ring] };
+      } else if (east !== null && north !== null) {
+        geometry = { type: 'Point', coordinates: [east, north] };
+      }
+
+      // Ein GeoJSON-Feature je Habitat (Zielformat Gemeinde-GeoBrowser, EPSG:25832).
       return {
-        Id: entry.jobId,
-        gemeinde: entry.metadata?.gemeinde || '',
-        flurname: entry.metadata?.flurname || '',
-        // EPSG:25832 (ETRS89/UTM 32N) – für den Import in den Gemeinde-GeoBrowser:
-        east,
-        north,
-        polygon,
-        // WGS84 (EPSG:4326) – Referenz:
-        latitude: entry.metadata?.latitude || null,
-        longitude: entry.metadata?.longitude || null,
-        polygonPoints: polygonPointsWgs84,
-        updatedAt: entry.updatedAt || '',
-        protectionStatus: mapProtectionStatusToColor(protectionStatus),
-        url: url
+        type: 'Feature' as const,
+        properties: {
+          Id: entry.jobId,
+          gemeinde: entry.metadata?.gemeinde || '',
+          flurname: entry.metadata?.flurname || '',
+          east,
+          north,
+          updatedAt: entry.updatedAt || '',
+          protectionStatus: mapProtectionStatusToColor(protectionStatus),
+          url: url,
+        },
+        geometry,
       };
     });
     
-    // Erstelle die JSON-Struktur mit Header
-    const exportStructure = {
-      header: {
-        source: 'Dachverband für Natur- und Umweltschutz',
-        date: new Date().toISOString().split('T')[0], // Format: YYYY-MM-DD
-        // Koordinatensystem von east/north/polygon (Standard Südtirol, vom Gemeindenverband angefordert):
-        crs: 'EPSG:25832',
-        crsName: 'ETRS89 / UTM Zone 32N',
-        // latitude/longitude/polygonPoints sind zusätzlich in WGS84 enthalten:
-        crsWgs84: 'EPSG:4326'
+    // GeoJSON-FeatureCollection mit benanntem CRS (Zielformat des Gemeinde-GeoBrowsers).
+    const featureCollection = {
+      type: 'FeatureCollection' as const,
+      crs: {
+        type: 'name',
+        properties: { name: 'urn:ogc:def:crs:EPSG::25832' },
       },
-      data: exportedData
+      features,
     };
-    
-    // Erstelle JSON-String mit schöner Formatierung
-    const jsonString = JSON.stringify(exportStructure, null, 2);
-    
-    // Datum im Dateinamen verwenden
+
+    const jsonString = JSON.stringify(featureCollection, null, 2);
     const dateString = new Date().toISOString().split('T')[0];
-    
-    // JSON-Daten zurückgeben mit Dateinamen
+
     return new NextResponse(jsonString, {
       headers: {
-        'Content-Type': 'application/json',
-        'Content-Disposition': `attachment; filename="habitat-export-${dateString}.json"`
-      }
+        'Content-Type': 'application/geo+json',
+        'Content-Disposition': `attachment; filename="habitat-export-${dateString}.geojson"`,
+      },
     });
   } catch (error) {
     console.error('Fehler beim Exportieren der Habitat-Daten:', error);
